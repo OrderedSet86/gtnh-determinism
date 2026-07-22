@@ -20,6 +20,16 @@ JAVA_BIN=${PROBE_JAVA:-java}
 
 cd "$SERVER_DIR"
 
+# Don't start while a previous server instance is still alive/shutting down
+for i in $(seq 1 60); do
+  pgrep -f "lwjgl3ify-forgePatches.jar" >/dev/null || break
+  sleep 2
+done
+if pgrep -f "lwjgl3ify-forgePatches.jar" >/dev/null; then
+  echo "A server instance is still running; aborting" >&2
+  exit 1
+fi
+
 rm -rf World world
 # server.properties: force seed, offline, no spawn protection surprises
 if [ ! -f server.properties.bak ] && [ -f server.properties ]; then cp server.properties server.properties.bak; fi
