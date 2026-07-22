@@ -28,6 +28,12 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (loadedMods.contains("gregtech")) {
             mixins.add("WorldgenGTOreLayerMixin");
         }
+        if (loadedMods.contains("BiomesOPlenty")) {
+            mixins.add("BiomeFeaturesMixin");
+            mixins.add("BOPBiomeDecoratorMixin");
+            mixins.add("WorldGenBOPGrassManagerMixin");
+            mixins.add("WorldGenBOPFlowerManagerMixin");
+        }
         return mixins;
     }
 }
