@@ -22,6 +22,12 @@ public class LateMixinLoader implements ILateMixinLoader {
             mixins.add("ThaumcraftWorldGeneratorMixin");
             mixins.add("WorldGenMoundMixin");
         }
+        if (loadedMods.contains("TConstruct")) {
+            mixins.add("SlimeIslandGenMixin");
+        }
+        if (loadedMods.contains("gregtech")) {
+            mixins.add("WorldgenGTOreLayerMixin");
+        }
         return mixins;
     }
 }

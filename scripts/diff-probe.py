@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Compare two worldgen probe dumps (same seed, different chunk walk orders).
+"""Compare two worldgen probe dumps (same seed, different chunk walk orders or launches).
+
+Handles v1 dumps (chunk -> hash string) and v3 dumps (chunk -> {"b": blocks, "t": te, "s": [16 section hashes]}).
+For v3, classifies differences (blocks vs tile entities) and shows the Y-section histogram of block noise.
 
 Usage: diff-probe.py a.json b.json
-
-Exit 0 if the worlds are identical, 1 if any chunk differs.
+Exit 0 if identical, 1 otherwise.
 """
 import json
 import sys
+from collections import Counter
 
 
 def main() -> int:
@@ -18,26 +21,44 @@ def main() -> int:
         print(f"WARNING: seeds differ ({a['seed']} vs {b['seed']}) — comparison is meaningless")
 
     keys = sorted(set(a["chunks"]) | set(b["chunks"]), key=lambda k: tuple(map(int, k.split(","))))
-    diffs = []
+    v3 = keys and isinstance(a["chunks"][keys[0]], dict)
+
+    diffs, blocks_only, te_only, both = [], 0, 0, 0
+    section_hist = Counter()
     for k in keys:
-        ha, hb = a["chunks"].get(k), b["chunks"].get(k)
-        if ha != hb:
-            diffs.append((k, ha, hb))
+        ca, cb = a["chunks"].get(k), b["chunks"].get(k)
+        if ca == cb:
+            continue
+        diffs.append(k)
+        if v3 and ca and cb:
+            bd = ca["b"] != cb["b"]
+            td = ca["t"] != cb["t"]
+            blocks_only += bd and not td
+            te_only += td and not bd
+            both += bd and td
+            for i, (sa, sb_) in enumerate(zip(ca["s"], cb["s"])):
+                if sa != sb_:
+                    section_hist[i] += 1
 
     total = len(keys)
     print(f"seed {a['seed']}  |  {a['order']} vs {b['order']}  |  {total} chunks compared")
     if not diffs:
-        print("IDENTICAL — worldgen was deterministic across walk orders")
+        print("IDENTICAL — worldgen was deterministic")
         return 0
 
-    print(f"DIFFERENT — {len(diffs)}/{total} chunks differ ({100 * len(diffs) / total:.1f}%):")
-    for k, ha, hb in diffs:
-        print(f"  chunk {k:>9}  {ha[:12] if ha else 'missing':>12} != {hb[:12] if hb else 'missing':>12}")
-
-    # crude clustering: bounding boxes of differing regions help find the culprit structure
-    xs = [int(k.split(",")[0]) for k, _, _ in diffs]
-    zs = [int(k.split(",")[1]) for k, _, _ in diffs]
-    print(f"differing region bounds: x [{min(xs)}..{max(xs)}], z [{min(zs)}..{max(zs)}]  (chunk coords; multiply by 16 for blocks)")
+    print(f"DIFFERENT — {len(diffs)}/{total} chunks differ ({100 * len(diffs) / total:.1f}%)")
+    if v3:
+        print(f"  blocks-only: {blocks_only}   te-only: {te_only}   both: {both}")
+        if section_hist:
+            print("  block noise by Y-section (section i = y in [16i, 16i+15]):")
+            for i in range(16):
+                n = section_hist.get(i, 0)
+                if n:
+                    print(f"    y {i * 16:>3}-{i * 16 + 15:<3}  {'#' * min(n, 60)} {n}")
+    xs = [int(k.split(",")[0]) for k in diffs]
+    zs = [int(k.split(",")[1]) for k in diffs]
+    print(f"differing region bounds: x [{min(xs)}..{max(xs)}], z [{min(zs)}..{max(zs)}] (chunk coords)")
+    print("differing chunks:", " ".join(diffs[:40]) + (" …" if len(diffs) > 40 else ""))
     return 1
 
 

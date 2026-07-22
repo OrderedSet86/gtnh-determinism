@@ -84,11 +84,69 @@ public class WorldgenProbe {
         final Map<String, String> hashes = new TreeMap<>();
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
+                materializeTileEntities(world, world.getChunkFromChunkCoords(x, z));
+            }
+        }
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
                 hashes.put(x + "," + z, hashChunk(world.getChunkFromChunkCoords(x, z)));
             }
         }
 
         final String structures = dumpVillages(world);
+        final StringBuilder tedetail = new StringBuilder();
+        if (Boolean.getBoolean("probe.tedetail")) {
+            tedetail.append(",\n  \"tedetail\": {\n");
+            boolean firstC = true;
+            for (int x = -radius; x <= radius; x++) {
+                for (int z = -radius; z <= radius; z++) {
+                    final Chunk c = world.getChunkFromChunkCoords(x, z);
+                    final Map<String, String> tes = new TreeMap<>();
+                    for (Object o : c.chunkTileEntityMap.values()) {
+                        final TileEntity te = (TileEntity) o;
+                        final NBTTagCompound tag = new NBTTagCompound();
+                        String h;
+                        try {
+                            te.writeToNBT(tag);
+                            h = hex(
+                                MessageDigest.getInstance("SHA-256")
+                                    .digest(canonicalNbt(tag).getBytes(StandardCharsets.UTF_8))).substring(0, 10);
+                        } catch (Exception e) {
+                            h = "err";
+                        }
+                        tes.put(
+                            te.getClass()
+                                .getName() + "@"
+                                + te.xCoord
+                                + ","
+                                + te.yCoord
+                                + ","
+                                + te.zCoord,
+                            h);
+                    }
+                    if (tes.isEmpty()) continue;
+                    if (!firstC) tedetail.append(",\n");
+                    firstC = false;
+                    tedetail.append("    \"")
+                        .append(x)
+                        .append(",")
+                        .append(z)
+                        .append("\": {");
+                    boolean firstT = true;
+                    for (Map.Entry<String, String> e : tes.entrySet()) {
+                        if (!firstT) tedetail.append(", ");
+                        firstT = false;
+                        tedetail.append("\"")
+                            .append(e.getKey())
+                            .append("\": \"")
+                            .append(e.getValue())
+                            .append("\"");
+                    }
+                    tedetail.append("}");
+                }
+            }
+            tedetail.append("\n  }");
+        }
 
         final StringBuilder sb = new StringBuilder();
         sb.append("{\n  \"seed\": ")
@@ -104,18 +162,47 @@ public class WorldgenProbe {
             first = false;
             sb.append("    \"")
                 .append(e.getKey())
-                .append("\": \"")
-                .append(e.getValue())
-                .append("\"");
+                .append("\": ")
+                .append(e.getValue());
         }
         sb.append("\n  },\n  \"villages\": ")
             .append(structures)
+            .append(tedetail)
             .append("\n}\n");
         final File f = new File(out);
         try (FileWriter w = new FileWriter(f)) {
             w.write(sb.toString());
         }
         LOG.info("[probe] wrote {} chunk hashes to {}", hashes.size(), f.getAbsolutePath());
+
+        final String dump = System.getProperty("probe.dump");
+        if (dump != null) {
+            final String[] parts = dump.split(",");
+            final Chunk dc = world.getChunkFromChunkCoords(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
+            final StringBuilder db = new StringBuilder();
+            for (int y = 0; y < 256; y++) {
+                for (int lx = 0; lx < 16; lx++) {
+                    for (int lz = 0; lz < 16; lz++) {
+                        final net.minecraft.block.Block bl = dc.getBlock(lx, y, lz);
+                        if (bl == net.minecraft.init.Blocks.air) continue;
+                        db.append(lx)
+                            .append(",")
+                            .append(y)
+                            .append(",")
+                            .append(lz)
+                            .append(" ")
+                            .append(net.minecraft.block.Block.blockRegistry.getNameForObject(bl))
+                            .append(":")
+                            .append(dc.getBlockMetadata(lx, y, lz))
+                            .append("\n");
+                    }
+                }
+            }
+            try (FileWriter w = new FileWriter(out + ".dump-" + parts[0] + "_" + parts[1] + ".txt")) {
+                w.write(db.toString());
+            }
+            LOG.info("[probe] dumped chunk {} block listing", dump);
+        }
     }
 
     private static List<int[]> buildWalk(String order, int r) {
@@ -150,24 +237,83 @@ public class WorldgenProbe {
         return walk;
     }
 
-    private static String hashChunk(Chunk chunk) throws Exception {
-        final MessageDigest md = MessageDigest.getInstance("SHA-256");
-        for (ExtendedBlockStorage ebs : chunk.getBlockStorageArray()) {
-            if (ebs == null) {
-                md.update((byte) 0);
-                continue;
+    /**
+     * Tile entities can be created lazily on first access, so the live chunkTileEntityMap contents depend on
+     * incidental access timing (observed with GT ore TEs). Force every TE-capable block to materialize its TE so the
+     * hashed set is a pure function of the blocks.
+     */
+    private static void materializeTileEntities(WorldServer world, Chunk chunk) {
+        final int baseX = chunk.xPosition << 4;
+        final int baseZ = chunk.zPosition << 4;
+        for (int lx = 0; lx < 16; lx++) {
+            for (int lz = 0; lz < 16; lz++) {
+                for (int y = 0; y < 256; y++) {
+                    final net.minecraft.block.Block b = chunk.getBlock(lx, y, lz);
+                    if (b == net.minecraft.init.Blocks.air) continue;
+                    if (b.hasTileEntity(chunk.getBlockMetadata(lx, y, lz))) {
+                        world.getTileEntity(baseX + lx, y, baseZ + lz);
+                    }
+                }
             }
-            md.update((byte) 1);
-            md.update(ebs.getBlockLSBArray());
-            final NibbleArray msb = ebs.getBlockMSBArray();
-            if (msb != null) md.update(msb.data);
-            final NibbleArray meta = ebs.getMetadataArray();
-            if (meta != null) md.update(meta.data);
         }
+    }
+
+    private static String hashChunk(Chunk chunk) throws Exception {
+        // v3: {"b": whole-blocks hash, "t": tile entity hash, "s": [16 per-section hashes]}
+        final StringBuilder out = new StringBuilder("{\"s\": [");
+        final MessageDigest all = MessageDigest.getInstance("SHA-256");
+        final ExtendedBlockStorage[] arr = chunk.getBlockStorageArray();
+        for (int i = 0; i < arr.length; i++) {
+            final MessageDigest sec = MessageDigest.getInstance("SHA-256");
+            final ExtendedBlockStorage ebs = arr[i];
+            if (ebs == null) {
+                sec.update((byte) 0);
+                all.update((byte) 0);
+            } else {
+                sec.update((byte) 1);
+                all.update((byte) 1);
+                sec.update(ebs.getBlockLSBArray());
+                all.update(ebs.getBlockLSBArray());
+                final NibbleArray msb = ebs.getBlockMSBArray();
+                if (msb != null) {
+                    sec.update(msb.data);
+                    all.update(msb.data);
+                }
+                final NibbleArray meta = ebs.getMetadataArray();
+                if (meta != null) {
+                    sec.update(meta.data);
+                    all.update(meta.data);
+                }
+            }
+            out.append("\"")
+                .append(hex(sec.digest()).substring(0, 12))
+                .append("\"")
+                .append(i < arr.length - 1 ? ", " : "");
+        }
+        out.append("], \"b\": \"")
+            .append(hex(all.digest()))
+            .append("\", \"t\": \"")
+            .append(hashTileEntities(chunk))
+            .append("\"}");
+        return out.toString();
+    }
+
+    private static String hex(byte[] d) {
+        final StringBuilder sb = new StringBuilder(d.length * 2);
+        for (byte b : d) sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+
+    private static String hashTileEntities(Chunk chunk) throws Exception {
+        final MessageDigest md = MessageDigest.getInstance("SHA-256");
         // Tile entities (chest loot etc.), canonicalized: sorted by position, NBT keys sorted recursively.
         final Map<String, TileEntity> tes = new TreeMap<>();
         for (Object o : chunk.chunkTileEntityMap.values()) {
             final TileEntity te = (TileEntity) o;
+            // Skip orphaned TEs (block was overwritten later in worldgen but the TE lingered in the map);
+            // they don't affect the persisted block/ore state and only add launch-timing jitter.
+            final net.minecraft.block.Block at = chunk.getBlock(te.xCoord & 15, te.yCoord, te.zCoord & 15);
+            if (!at.hasTileEntity(chunk.getBlockMetadata(te.xCoord & 15, te.yCoord, te.zCoord & 15))) continue;
             tes.put(
                 te.xCoord + ","
                     + te.yCoord
@@ -190,10 +336,7 @@ public class WorldgenProbe {
             }
             md.update(canonicalNbt(tag).getBytes(StandardCharsets.UTF_8));
         }
-        final byte[] d = md.digest();
-        final StringBuilder sb = new StringBuilder(d.length * 2);
-        for (byte b : d) sb.append(String.format("%02x", b));
-        return sb.toString();
+        return hex(md.digest());
     }
 
     /**
