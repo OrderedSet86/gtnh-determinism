@@ -88,6 +88,8 @@ public class WorldgenProbe {
             }
         }
 
+        final String structures = dumpVillages(world);
+
         final StringBuilder sb = new StringBuilder();
         sb.append("{\n  \"seed\": ")
             .append(seed)
@@ -106,7 +108,9 @@ public class WorldgenProbe {
                 .append(e.getValue())
                 .append("\"");
         }
-        sb.append("\n  }\n}\n");
+        sb.append("\n  },\n  \"villages\": ")
+            .append(structures)
+            .append("\n}\n");
         final File f = new File(out);
         try (FileWriter w = new FileWriter(f)) {
             w.write(sb.toString());
@@ -190,6 +194,85 @@ public class WorldgenProbe {
         final StringBuilder sb = new StringBuilder(d.length * 2);
         for (byte b : d) sb.append(String.format("%02x", b));
         return sb.toString();
+    }
+
+    /**
+     * Reflectively dumps every village StructureStart from the overworld chunk generator's MapGenVillage: per village,
+     * the sorted list of component class names + bounding boxes. Field/method lookup is done by TYPE so it works with
+     * both MCP and SRG runtime names, and with modded chunk providers (RWG) as long as they hold a MapGenVillage field.
+     */
+    private static String dumpVillages(WorldServer world) {
+        try {
+            Object provider = world.theChunkProviderServer.currentChunkProvider;
+            Object villageGen = null;
+            for (java.lang.reflect.Field f : provider.getClass()
+                .getDeclaredFields()) {
+                if (net.minecraft.world.gen.structure.MapGenVillage.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    villageGen = f.get(provider);
+                    break;
+                }
+            }
+            if (villageGen == null) return "\"no MapGenVillage field found\"";
+            Map<?, ?> structureMap = null;
+            Class<?> c = villageGen.getClass();
+            while (c != null && structureMap == null) {
+                for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                    if (Map.class.isAssignableFrom(f.getType())) {
+                        f.setAccessible(true);
+                        structureMap = (Map<?, ?>) f.get(villageGen);
+                        break;
+                    }
+                }
+                c = c.getSuperclass();
+            }
+            if (structureMap == null) return "\"no structureMap found\"";
+            final java.util.List<String> villages = new ArrayList<>();
+            for (Object start : structureMap.values()) {
+                java.util.List<?> components = null;
+                for (Class<?> sc = start.getClass(); sc != null; sc = sc.getSuperclass()) {
+                    for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
+                        if (java.util.List.class.isAssignableFrom(f.getType())) {
+                            f.setAccessible(true);
+                            components = (java.util.List<?>) f.get(start);
+                            break;
+                        }
+                    }
+                    if (components != null) break;
+                }
+                if (components == null) continue;
+                final java.util.List<String> parts = new ArrayList<>();
+                for (Object comp : components) {
+                    parts.add(
+                        comp.getClass()
+                            .getSimpleName() + "@"
+                            + bboxOf(comp));
+                }
+                java.util.Collections.sort(parts);
+                villages.add("\"" + parts.size() + " pieces: " + String.join("; ", parts) + "\"");
+            }
+            java.util.Collections.sort(villages);
+            return "[\n    " + String.join(",\n    ", villages) + "\n  ]";
+        } catch (Exception e) {
+            return "\"error: " + e + "\"";
+        }
+    }
+
+    private static String bboxOf(Object component) {
+        try {
+            for (Class<?> sc = component.getClass(); sc != null; sc = sc.getSuperclass()) {
+                for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
+                    if (net.minecraft.world.gen.structure.StructureBoundingBox.class.isAssignableFrom(f.getType())) {
+                        f.setAccessible(true);
+                        net.minecraft.world.gen.structure.StructureBoundingBox bb = (net.minecraft.world.gen.structure.StructureBoundingBox) f
+                            .get(component);
+                        if (bb == null) return "nobb";
+                        return bb.minX + "," + bb.minY + "," + bb.minZ + ".." + bb.maxX + "," + bb.maxY + "," + bb.maxZ;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return "nobb";
     }
 
     @SuppressWarnings("unchecked")
