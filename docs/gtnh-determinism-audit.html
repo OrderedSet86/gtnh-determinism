@@ -360,7 +360,25 @@
 </ul>
 <div class="note">Rule of thumb from this audit: <b>stable in-session but different after relaunch → hash-order bug (F1). Different even in-session → clock RNG or chunk-order bug (F2–F6).</b></div>
 
-<h2><span class="sec">5</span>Fix priority</h2>
+<h2><span class="sec">5</span>Headless verification results (2026-07-22)</h2>
+<p>Candidate fixes were built and tested headless against the actual <b>GTNH 2.7.4 server pack</b> (208 mods) using a purpose-built probe mod: force-generate a 17&times;17-chunk square around origin on seed <code>4502440316375437578</code>, hash every chunk (blocks + tile-entity NBT), and dump every village's component list. Each run is a fresh JVM.</p>
+<div class="table-scroll"><table>
+  <thead><tr><th>Configuration</th><th>Two launches, same seed &amp; walk order</th></tr></thead>
+  <tbody>
+    <tr><td><b>Stock 2.7.4</b></td><td>Village layouts <span class="chip crit">completely different</span> — 38 pieces vs 81 pieces; one launch has the Tinkers smeltery, the other doesn't. 68/289 chunk hashes differ (23.5%).</td></tr>
+    <tr><td><b>+ F1/F2/F6 fixes</b> (villagedeterminism mod, WitcheryExtras mixin, RWG patch)</td><td>Village layouts <span class="chip ok">byte-identical</span> across launches. Residual chunk-hash differences remain (~75/289).</td></tr>
+    <tr><td><b>+ F3 draft</b> (tcworldgendeterminism mixin mod: per-feature forked RNGs, position-claimed bonus nodes, synchronous maze, seeded barrow loot)</td><td>Mixins verified applied; villages still identical; launch-test chunk diff drops to 58/289. <span class="chip warn">open finding:</span> ~20% of chunks still differ between fresh JVMs on an <em>identical</em> chunk walk — at least one more clock-seeded worldgen source exists in the full 208-mod pack outside the audited repos. Next step: split block/TE hashes in the probe and bisect mod groups.</td></tr>
+  </tbody>
+</table></div>
+<p>The F1 fix ships two ways: a Hodgepodge mixin (PR-ready, branch <code>determinism-fixes</code>) and a standalone reflection mod <code>villagedeterminism</code> that drops into any pack version. The GT5U vein fix (F4) is built but pends a compatibility test since it replaces a fast-moving mod.</p>
+
+<h2><span class="sec">6</span>What players will notice</h2>
+<p><b>One-time cost:</b> the fixes change how randomness is derived, so the first generation on fixed jars produces a <em>different</em> world for a given seed than stock did — old seed notes reset once, then the seed is stable forever, for everyone. Existing saves are safe: only newly generated chunks are affected.</p>
+<p><b>What becomes reliable:</b> village layouts (blacksmith/smeltery presence becomes a property of the seed), village chest loot, Witchery covens/wicker men/shacks/goblin huts, RWG tree geometry, GT vein identity near caves, and — with the F3 draft — Thaumcraft nodes, totems, barrows, ring placement, and barrow container types.</p>
+<p><b>What still varies:</b> Witchery village walls (tick-time build), Roguelike dungeon position within its seed-fixed region, block-level border effects from vanilla-class bugs, and the unidentified residual above. Macro placement is stable; individual blocks near chunk seams may not be.</p>
+<p><b>In practice:</b> practice worlds match run worlds; seeds become shareable, verifiable claims; set-seed categories become viable with automated verification (two runners' probe hashes should match chunk-for-chunk minus documented residuals). Determinism is per mod-set — pack version changes still legitimately re-roll seeds.</p>
+
+<h2><span class="sec">7</span>Fix priority</h2>
 <ol class="fixes">
   <li><b>VillagerRegistry ordering mixin (F1)</b> — one small Hodgepodge mixin; deterministic village layouts across the whole pack. Highest payoff per line of code, and it's upstream-Forge-clean.</li>
   <li><b>Witchery RNG redirect (F2)</b> — mixin in WitcheryExtras; seeded grid decisions for surface structures, walls built at gen time.</li>
