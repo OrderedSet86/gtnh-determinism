@@ -1,0 +1,5 @@
+forks/
+jars/
+probe-build/build/
+probe-build/.gradle/
+probe-build/gtnhShared/

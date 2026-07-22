@@ -1,0 +1,374 @@
+<title>GTNH Worldgen Determinism Audit</title>
+<style>
+  :root {
+    --bg: #f5f7f4;
+    --surface: #fdfefc;
+    --ink: #1c2420;
+    --ink-soft: #4a5650;
+    --ink-faint: #77837c;
+    --line: #d9e0da;
+    --accent: #0f7a6f;
+    --accent-soft: #e2efec;
+    --crit: #b23b42;
+    --crit-soft: #f6e7e7;
+    --warn: #a97b2a;
+    --warn-soft: #f4ecdd;
+    --ok: #41804f;
+    --ok-soft: #e5efe5;
+    --code-bg: #eef1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131817;
+      --surface: #1a201e;
+      --ink: #dee6e0;
+      --ink-soft: #a4b0a9;
+      --ink-faint: #6f7c75;
+      --line: #2b332f;
+      --accent: #52c4b4;
+      --accent-soft: #1c2e2b;
+      --crit: #e0757b;
+      --crit-soft: #33211f;
+      --warn: #d8a854;
+      --warn-soft: #302818;
+      --ok: #7cb98a;
+      --ok-soft: #1e2b20;
+      --code-bg: #20272311;
+      --code-bg: #232a26;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131817;
+    --surface: #1a201e;
+    --ink: #dee6e0;
+    --ink-soft: #a4b0a9;
+    --ink-faint: #6f7c75;
+    --line: #2b332f;
+    --accent: #52c4b4;
+    --accent-soft: #1c2e2b;
+    --crit: #e0757b;
+    --crit-soft: #33211f;
+    --warn: #d8a854;
+    --warn-soft: #302818;
+    --ok: #7cb98a;
+    --ok-soft: #1e2b20;
+    --code-bg: #232a26;
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f7f4;
+    --surface: #fdfefc;
+    --ink: #1c2420;
+    --ink-soft: #4a5650;
+    --ink-faint: #77837c;
+    --line: #d9e0da;
+    --accent: #0f7a6f;
+    --accent-soft: #e2efec;
+    --crit: #b23b42;
+    --crit-soft: #f6e7e7;
+    --warn: #a97b2a;
+    --warn-soft: #f4ecdd;
+    --ok: #41804f;
+    --ok-soft: #e5efe5;
+    --code-bg: #eef1ec;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Seravek", "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    font-size: 16px;
+  }
+  .wrap { max-width: 74ch; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+
+  header.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 1.5rem; margin-bottom: 2.5rem; }
+  .eyebrow {
+    font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: 2.1rem;
+    line-height: 1.15;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+    font-weight: 650;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 1.05rem; margin: 0; max-width: 62ch; }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem;
+    margin-top: 1.25rem;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.75rem; color: var(--ink-faint);
+  }
+
+  h2 {
+    font-size: 1.35rem; font-weight: 650; margin: 3rem 0 1rem;
+    text-wrap: balance;
+  }
+  h2 .sec { color: var(--accent); font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; margin-right: 0.5rem; letter-spacing: 0.08em; }
+  h3 { font-size: 1.05rem; font-weight: 650; margin: 1.75rem 0 0.5rem; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  code, .file {
+    font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 0.82em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    overflow-x: auto;
+    font-size: 0.8rem;
+    line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+  .table-scroll { overflow-x: auto; margin: 1.25rem 0; }
+  th {
+    text-align: left; font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ink-faint); font-weight: 600;
+    padding: 0.45rem 0.75rem 0.45rem 0; border-bottom: 1.5px solid var(--ink);
+  }
+  td { padding: 0.55rem 0.75rem 0.55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child a { text-decoration: none; font-weight: 600; }
+
+  .chip {
+    display: inline-block;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.68rem; letter-spacing: 0.05em;
+    padding: 0.1rem 0.5rem; border-radius: 99px;
+    white-space: nowrap;
+  }
+  .chip.crit { background: var(--crit-soft); color: var(--crit); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.ok   { background: var(--ok-soft); color: var(--ok); }
+  .chip.info { background: var(--accent-soft); color: var(--accent); }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--stripe, var(--ink-faint));
+    border-radius: 6px;
+    padding: 1.4rem 1.6rem 1.1rem;
+    margin: 1.5rem 0;
+  }
+  .finding.crit { --stripe: var(--crit); }
+  .finding.warn { --stripe: var(--warn); }
+  .finding h3 { margin: 0 0 0.35rem; font-size: 1.1rem; }
+  .finding h3 .fid { color: var(--stripe); font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; margin-right: 0.5rem; }
+  .finding .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.5rem 0 1rem; }
+  .finding h4 {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--ink-faint); margin: 1.25rem 0 0.4rem; font-weight: 600;
+  }
+  .finding ul { margin: 0 0 1rem; padding-left: 1.2rem; }
+  .finding li { margin-bottom: 0.35rem; }
+
+  .primer {
+    display: grid; gap: 1rem; margin: 1.25rem 0;
+  }
+  .primer .mech {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+    padding: 1rem 1.25rem;
+  }
+  .mech b { display: block; margin-bottom: 0.25rem; }
+  .mech .tag { font-family: ui-monospace, Menlo, monospace; font-size: 0.7rem; color: var(--accent); letter-spacing: 0.08em; }
+
+  ul.cleared { padding-left: 1.2rem; }
+  ul.cleared li { margin-bottom: 0.5rem; }
+  .ok-mark { color: var(--ok); font-weight: 700; }
+
+  ol.fixes { padding-left: 1.4rem; }
+  ol.fixes li { margin-bottom: 0.75rem; }
+  ol.fixes b { font-weight: 650; }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 0.75rem 1.1rem;
+    border-radius: 0 6px 6px 0;
+    margin: 1.25rem 0;
+    font-size: 0.92rem;
+  }
+  footer { margin-top: 4rem; border-top: 1px solid var(--line); padding-top: 1rem; font-size: 0.8rem; color: var(--ink-faint); }
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <p class="eyebrow">GT: New Horizons &middot; Speedrun Community &middot; Code Audit</p>
+  <h1>Why the same seed makes different worlds</h1>
+  <p class="standfirst">A source-level audit of world-generation nondeterminism in GT:NH 1.7.10 — six confirmed mechanisms ranked by routing impact, cross-referenced against the <code>#run-determinism</code> Discord archive, each with a concrete fix.</p>
+  <div class="meta-row">
+    <span>scope: overworld structures, TF, GC, biomes</span>
+    <span>method: direct source reads + decompiled Witchery/TC4</span>
+    <span>date: 2026-07-22</span>
+  </div>
+</header>
+
+<h2><span class="sec">0</span>Summary</h2>
+<p>Village <em>positions</em> are seed-stable. What breaks routing is everything layered on top: village <em>layouts</em> scramble on every game launch because of a Forge registry bug; Witchery rolls its surface structures off a clock-seeded RNG; Thaumcraft's node and structure gen shifts with chunk exploration order; GregTech veins can still swap identity near caves; Roguelike Dungeons pick their spot by probing terrain that may or may not exist yet. Terrain and biome layout themselves are clean — which matches what runners observe.</p>
+
+<div class="table-scroll"><table>
+  <thead><tr><th>#</th><th>Finding</th><th>Affects</th><th>Class</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td><a href="#f1">F1</a></td><td>Forge <code>VillagerRegistry</code> HashMap ordering</td><td>Village layouts, blacksmith/smeltery presence, everything downstream in village chunks</td><td>Per JVM launch</td><td><span class="chip crit">confirmed</span></td></tr>
+    <tr><td><a href="#f2">F2</a></td><td>Witchery: clock RNG + tick-time walls</td><td>Covens, wicker men, shacks, goblin huts; village walls</td><td>Per run + tick timing</td><td><span class="chip crit">confirmed</span></td></tr>
+    <tr><td><a href="#f3">F3</a></td><td>Thaumcraft: draw skew, <code>world.rand</code>, gen thread</td><td>Nodes, totems, barrows, eldritch rings, TC loot</td><td>Chunk-order + per run</td><td><span class="chip crit">confirmed</span></td></tr>
+    <tr><td><a href="#f4">F4</a></td><td>GT vein retry probes live terrain</td><td>Ore vein identity &amp; height near caves/surface</td><td>Chunk-order (rare)</td><td><span class="chip crit">confirmed</span></td></tr>
+    <tr><td><a href="#f5">F5</a></td><td>Roguelike Dungeons probe neighbor terrain</td><td>Dungeon position within its region</td><td>Chunk-order</td><td><span class="chip crit">confirmed</span></td></tr>
+    <tr><td><a href="#f6">F6</a></td><td>RWG tree decoration</td><td>Tree geometry; same-chunk downstream decoration</td><td>Per run + chunk-order</td><td><span class="chip warn">confirmed, low routing impact</span></td></tr>
+    <tr><td><a href="#f7">F7</a></td><td>Smaller residuals (NHCore, TF, Forestry, amunra&hellip;)</td><td>Localized block-level differences</td><td>Mixed</td><td><span class="chip warn">triaged</span></td></tr>
+  </tbody>
+</table></div>
+
+<h2><span class="sec">1</span>How determinism actually breaks here</h2>
+<p>Forge 1.7.10 re-seeds the shared populate RNG before <em>each</em> registered world generator, so one mod cannot shift another mod's stream directly. Every confirmed bug works through one of four mechanisms:</p>
+<div class="primer">
+  <div class="mech"><span class="tag">A &middot; clock-seeded RNG</span><b>Randomness that never saw the seed.</b> <code>new Random()</code>, <code>Math.random()</code>, or the global <code>world.rand</code> (seeded from the clock at world load) used during generation. Different every run, full stop.</div>
+  <div class="mech"><span class="tag">B &middot; conditional draw skew</span><b>A branch that consumes draws only sometimes.</b> When the branch condition depends on anything non-seed-pure, every consumer after it reads a shifted stream. This is the mental model the community already had — and it shows up in Thaumcraft in exactly that form.</div>
+  <div class="mech"><span class="tag">C &middot; chunk-order dependence</span><b>Reading world state that may not exist yet.</b> Probing blocks in neighbor chunks, or caching a decision from whichever chunk generates first. Walk toward a structure from the east instead of the north and the probe sees different blocks.</div>
+  <div class="mech"><span class="tag">D &middot; unstable iteration order</span><b>Hash-ordered registries.</b> <code>HashMap&lt;Class, &hellip;&gt;</code> iterates in identity-hash order, which changes every JVM launch — stable within a session, scrambled across restarts.</div>
+</div>
+<p>Chunk population order is driven by player movement, so mechanism C means "which direction you approach from" is itself an input to worldgen. This also explains the community's split observations: things that are "consistent within a session but not across restarts" are mechanism D; things that differ "even within the same session" are A or C.</p>
+
+<h2><span class="sec">2</span>Confirmed findings</h2>
+
+<div class="finding crit" id="f1">
+  <h3><span class="fid">F1</span>Village layouts scramble every launch — a Forge bug, not a mod bug</h3>
+  <div class="chips"><span class="chip crit">mechanism D</span><span class="chip info">stable in-session, new every launch</span><span class="chip info">confidence: verified in source</span></div>
+  <p>Forge's <code>VillagerRegistry</code> stores village building handlers in <code>HashMap&lt;Class&lt;?&gt;, IVillageCreationHandler&gt;</code> (<span class="file">VillagerRegistry.java:49</span>). When a village start piece assembles its building list, <code>addExtraVillageComponents</code> (<span class="file">:211</span>) iterates <code>.values()</code> — identity-hash order, reshuffled every JVM launch. Two effects compound:</p>
+  <ul>
+    <li>Handlers consume draws from the village layout RNG as they're visited (TiC's tool station rolls <code>random.nextInt(4)</code>, Witchery's apothecary rolls conditionally), so the draw <em>order</em> — and everything after it — changes per launch.</li>
+    <li>Vanilla's piece picker walks the weighted list in order, subtracting weights, so even draw-free handlers change which building a given roll selects.</li>
+  </ul>
+  <p>The pack registers handlers from <b>Witchery (~6), VillageNames (~6), TinkersConstruct (2, including the smeltery), Railcraft, ForestryMC, and WitchingGadgets</b> — a large map, thoroughly scrambled. Village <em>positions</em> come from seeded math in <code>MapGenVillage</code> and are unaffected.</p>
+  <h4>Contamination</h4>
+  <p>In RWG's populate (<span class="file">ChunkGeneratorRealistic.java:474-524</span>) villages place their blocks from the <em>same</em> shared RNG that then feeds vanilla dungeons, lakes, ores, and tree decoration. A different layout consumes a different number of draws — so in any chunk a village touches, all of those shift too.</p>
+  <h4>Discord cross-reference</h4>
+  <ul>
+    <li>Raven, 2022: removing Witchery made villages "generate in the same spot every time" — Witchery was the biggest handler contributor in that minimal test, not the root cause.</li>
+    <li>exfret: "village layouts aren't completely random&hellip; they take one of a selection of forms" — the forms are permutations of handler iteration order.</li>
+    <li>lhaxq, 2025 (pack 2.7): "cannot get the village that used to have a smeltery to spawn with one again" — the smeltery is literally one of the scrambled handlers. Any change to the pack's mod set re-deals the deck, which is why 2.7 "broke" villages without touching village code.</li>
+  </ul>
+  <h4>Fix</h4>
+  <p>Small and pack-wide: a Hodgepodge mixin that makes <code>addExtraVillageComponents</code> iterate handlers in a deterministic order (sort by class name). One-file change, fixes every mod's village pieces at once. A stricter variant also hands each handler a forked RNG seeded from the layout seed + handler name, so a future mod can't skew its neighbors.</p>
+</div>
+
+<div class="finding crit" id="f2">
+  <h3><span class="fid">F2</span>Witchery rolls structures off the clock and builds walls on a timer</h3>
+  <div class="chips"><span class="chip crit">mechanism A + C</span><span class="chip info">different every run</span><span class="chip info">confidence: verified (decompiled 0.24.1)</span></div>
+  <p>Witchery is closed-source; findings are from decompiling the shipped jar.</p>
+  <ul>
+    <li><b>Surface structures.</b> <code>WitcheryWorldGenerator.generate</code> discards the seeded per-chunk RNG Forge hands it and passes <b><code>world.rand</code></b> — the global, clock-seeded World random — into all overworld generation, then calls <code>Collections.shuffle(generators, random)</code> with it. Covens, wicker men, shacks, and goblin huts land at seed-gated grid cells (that part is seeded), but whether and what actually spawns there is rolled off the clock. Nondeterministic every run.</li>
+    <li><b>Village walls.</b> Village gen plants an invisible spawner block whose tile entity waits <b>40+ ticks</b>, then builds the walls from whatever the world looks like at that moment, only replacing blocks that are currently replaceable (<code>WorldHandlerVillageDistrict$Wall</code>). Wall shape therefore depends on chunk-load and tick timing — this is why runners see walls pop in inside render distance, and why exfret found them inconsistent even within a session.</li>
+  </ul>
+  <h4>Fix</h4>
+  <p>Witchery is ARR, so fixes go in a mixin host (WitcheryExtras already ships mixins into it). Redirect <code>generateOverworld</code>'s RNG to a seed-derived one (the AE2 grid-seed pattern maps 1:1: seed the cell decision from <code>worldSeed + cellX/cellZ</code>), and build walls at generation time from the village's own seeded RNG instead of a delayed tile entity.</p>
+</div>
+
+<div class="finding crit" id="f3">
+  <h3><span class="fid">F3</span>Thaumcraft: terrain-gated draws, clock loot, and a thread in worldgen</h3>
+  <div class="chips"><span class="chip crit">mechanism A + B + C</span><span class="chip info">differs even within a session</span><span class="chip info">confidence: verified (TC 4.2.3.5 sources)</span></div>
+  <p>TC's generator does use the seeded per-chunk RNG — but almost every feature gates further draws on live terrain reads, at un-offset coordinates that neighbor-chunk decoration may already have altered:</p>
+  <ul>
+    <li><code>generateTotem</code> (<span class="file">ThaumcraftWorldGenerator.java:118-170</span>): rolls position, then reads <code>getHeightValue</code>/<code>getBlock</code>; only if the column looks right does it consume more draws and place a node. One flipped gate shifts every later TC draw in the chunk — textbook conditional draw skew.</li>
+    <li><code>generateWildNodes</code> (<span class="file">:172-204</span>): same shape — terrain reads decide whether extra <code>nextInt</code> calls happen before <code>createRandomNodeAt</code> consumes a long, variable draw chain.</li>
+    <li>Barrow loot rolls straight off <b><code>world.rand</code></b> (<span class="file">WorldGenMound.java:2508+</span>) — urn/crate contents are clock-random.</li>
+    <li>The scattered-feature bonus node is deduped through an <b>in-memory map</b> keyed by position hash (<span class="file">:421-426</span>) — which chunk claims it depends on population order, and the map resets every session.</li>
+    <li>Eldritch ring generation <b>spawns a background thread</b> (<code>new Thread(new MazeThread(&hellip;)).start()</code>, <span class="file">:456-457</span>) whose writes race the main generation thread.</li>
+  </ul>
+  <p>Net effect: node types/positions, totems, barrows, and rings vary run-to-run and route-to-route — matching rakdarian's "all thaumcraft structures are non-deterministic even in the same session." Taint biomes are decided in the biome layer, which is seed-pure — matching Pao's observation that they <em>are</em> stable.</p>
+  <h4>Fix</h4>
+  <p>Largest job on the list, best done incrementally in Salis-Arcana (which already mixins into TC worldgen classes): give each feature its own RNG forked from <code>worldSeed + chunk coords + feature id</code> so terrain gates can't skew siblings; replace <code>world.rand</code> loot rolls with the feature RNG; make the bonus-node dedup a pure function of position; run maze gen synchronously with a seeded RNG.</p>
+</div>
+
+<div class="finding crit" id="f4">
+  <h3><span class="fid">F4</span>GT ore veins can still reroll — the retry probe reads live terrain</h3>
+  <div class="chips"><span class="chip crit">mechanism C</span><span class="chip info">rare; near caves, ravines, mountainsides</span><span class="chip info">confidence: verified in current source</span></div>
+  <p>Modern GT5U worldgen is otherwise exemplary — every entry point reseeds from <code>worldSeed + coordinates</code> and vein geometry is cached so all chunks of a vein agree. But the placement-attempt loop survives from the old code: <code>testWorldgenChunkified</code> probes a 9-block column of <em>live world blocks</em> at the triggering chunk's center (<span class="file">WorldgenGTOreLayer.java:239-251</span>); fewer than 5 stone hits returns <code>NO_OVERLAP_AIR_BLOCK</code>, and the driver retries with the <em>next</em> vein type (<span class="file">GTWorldgenerator.java:465-478</span>). The first chunk of the vein region to generate caches the winner for the whole vein.</p>
+  <p>So when some chunks of a vein region have cavey/exposed probe columns and others don't, the vein's identity (and its resolved height) depends on which chunk you cause to generate first — i.e., your approach direction. This is exactly the copper&harr;iron reroll Leosha diagnosed and exfret hit in 2023; it's rare because most probe columns are solid stone.</p>
+  <h4>Fix</h4>
+  <p>Make the probe seed-pure: drop the world read and accept placement (veins in air pockets are harmless), or probe the chunk's own freshly generated (pre-population) block array instead of the live world. Small, contained change.</p>
+</div>
+
+<div class="finding crit" id="f5">
+  <h3><span class="fid">F5</span>Roguelike Dungeons choose their spot by probing terrain that may not exist yet</h3>
+  <div class="chips"><span class="chip crit">mechanism C</span><span class="chip info">position varies within its region</span><span class="chip info">confidence: verified in source</span></div>
+  <p>The spawn <em>region</em> is seed-gated (same grid trick Witchery uses, <span class="file">Dungeon.java:120-143</span>) — but the exact position is found by up to 50 attempts of <code>getNearbyCoord</code>, each candidate 40–100 blocks away, validated by <code>validLocation</code> (<span class="file">:165-211</span>) which reads live blocks over 9&times;9 areas deep inside neighboring chunks. Whether a candidate passes depends on whether those chunks are terrain-only or already decorated — so the dungeon's final position (and therefore its position-seeded layout and loot, via the axis-collapsing <code>seed&nbsp;*&nbsp;x&nbsp;*&nbsp;z</code> at <span class="file">:227-231</span>) is approach-order-dependent.</p>
+  <h4>Fix</h4>
+  <p>Validate against seed-pure data (biome + noise-derived height) instead of live blocks, or restrict probing to the triggering chunk. Also worth replacing <code>seed*x*z</code> (zero on axes, x&harr;z symmetric) with a proper hash while in there.</p>
+</div>
+
+<div class="finding warn" id="f6">
+  <h3><span class="fid">F6</span>RWG trees: clock-sized big trees and gate-skewed pines</h3>
+  <div class="chips"><span class="chip warn">mechanism A + B + C</span><span class="chip info">cosmetic, but contaminates</span><span class="chip info">confidence: verified in source</span></div>
+  <p>Two distinct bugs in the pack's own overworld generator:</p>
+  <ul>
+    <li><code>DecoBigTree</code>'s no-arg constructor sizes the tree with <b><code>Math.random()</code></b> (<span class="file">DecoBigTree.java:37</span>), used in WoodHills/WoodMountains decoration — clock-random geometry.</li>
+    <li><code>DecoLargePine</code> (<span class="file">DecoLargePine.java:33-36</span>) and family return <em>before any draw</em> unless the ground block is grass/dirt — a terrain gate on the shared decoration RNG. Tree trunks and branches also write across chunk borders unclamped, cascading state into neighbors and flipping <em>their</em> gates (including TC's totem checks and GT's vein probes).</li>
+  </ul>
+  <p>This is the user-observed <code>DecoLargePine</code>/cherry-blossom variance. Tree shapes themselves don't matter for routing, but the skew propagates to every later consumer of that chunk's decoration RNG.</p>
+  <h4>Fix</h4>
+  <p>Replace the <code>Math.random()</code> ctor with the passed RNG; make each tree consume a fixed draw shape (roll first, gate after — one <code>nextLong()</code> to fork a private RNG per tree is the cheap idiom, already used correctly by TC's greatwood and RWG's own <code>DecoBigTree.generate</code>).</p>
+</div>
+
+<div class="finding warn" id="f7">
+  <h3><span class="fid">F7</span>Smaller residuals</h3>
+  <div class="chips"><span class="chip warn">mixed mechanisms</span><span class="chip info">localized impact</span></div>
+  <ul>
+    <li><b>NewHorizonsCoreMod</b>: <span class="file">ZincGravelWorldgen.java:47-49</span> misses the +8 decoration offset (cascading-gen class — the same bug Hodgepodge fixes for BOP kelp); <code>OilGeneratorFix.buildOilStructure</code> reads/writes neighbor-chunk state during populate. Decision RNG for both is seed-pure; only boundary blocks vary.</li>
+    <li><b>Vanilla dungeons</b> (spawner rooms, via RWG populate): placement checks read blocks near chunk edges — mild order dependence, was in vanilla too.</li>
+    <li><b>Twilight Forest</b>: the GTNH fork's decorator is properly rewritten; the residual is <code>getHeightValue</code> reads that can see neighbor-chunk trees, skewing decoration draws near borders. TF <em>landmark positions</em> are seeded math — clean.</li>
+    <li><b>Forestry</b>: <span class="file">WorldGenPadauk.java:47-51</span> uses three fresh <code>new Random()</code> for branch geometry — clock-random tree shape, no stream contamination.</li>
+    <li><b>amunra</b> (space dims): <span class="file">Pyramid.java:452-473</span> picks room entrances with <code>Math.random()</code> — pyramid interiors differ per run.</li>
+    <li><b>BloodMagic</b>: <code>TEDemonPortal</code> picks buildings via <code>new Random()</code> + HashMap key iteration — but it's ritual-triggered at runtime, not worldgen; irrelevant to seed routing.</li>
+  </ul>
+</div>
+
+<h2><span class="sec">3</span>Audited and cleared</h2>
+<ul class="cleared">
+  <li><span class="ok-mark">✓</span> <b>AE2 meteors</b> — eigenraven's 2022 fix (grid-cell seeding + persisted per-meteor seed, <span class="file">MeteoriteWorldGen.java:44-88</span>) is correct and complete; it's the template the other fixes should copy.</li>
+  <li><span class="ok-mark">✓</span> <b>Terrain &amp; biome layout</b> — RWG is pure seeded noise; Climate Control hooks vanilla's GenLayer init, which the <code>rwg</code> world type never calls, so it can't perturb the overworld.</li>
+  <li><span class="ok-mark">✓</span> <b>GT veins otherwise</b> — coordinate-derived seeds everywhere, ordered ArrayList registries, per-vein caching. F4 is the one surviving hole.</li>
+  <li><span class="ok-mark">✓</span> <b>Galacticraft Moon/Mars dungeons</b> — generated per-chunk from block arrays with a seed-pure position and layout seed. (Weak seeding — <code>seed*x*z</code> collapses on axes — but identically every run.)</li>
+  <li><span class="ok-mark">✓</span> <b>Village positions, TF landmarks, strongholds, mineshafts</b> — vanilla seeded MapGen math.</li>
+  <li><span class="ok-mark">✓</span> <b>TC taint biomes</b> — biome-layer decision, seed-pure (matches field reports).</li>
+  <li><span class="ok-mark">✓</span> <b>Chest loot</b> — deterministic <em>given</em> the structure layout; it only looks random because F1 changes which building the chest is in.</li>
+</ul>
+
+<h2><span class="sec">4</span>Verifying in-game</h2>
+<p>For any candidate fix, the test that matters distinguishes the two nondeterminism classes:</p>
+<ul>
+  <li><b>Launch test (mechanism A/D):</b> generate the seed, note the target (village layout, blacksmith), quit the <em>game process</em>, relaunch, regenerate. F1-class bugs flip here; a same-session regen will falsely look stable.</li>
+  <li><b>Approach test (mechanism B/C):</b> two fresh worlds, same seed, same session — but walk to the target from opposite directions (spiral out east-first vs north-first). GT vein rerolls, Roguelike positions, and TC structures flip here.</li>
+  <li>Compare with VisualProspecting exports or a region-file diff rather than eyeballing; AmidstGTNH helps for macro placement.</li>
+</ul>
+<div class="note">Rule of thumb from this audit: <b>stable in-session but different after relaunch → hash-order bug (F1). Different even in-session → clock RNG or chunk-order bug (F2–F6).</b></div>
+
+<h2><span class="sec">5</span>Fix priority</h2>
+<ol class="fixes">
+  <li><b>VillagerRegistry ordering mixin (F1)</b> — one small Hodgepodge mixin; deterministic village layouts across the whole pack. Highest payoff per line of code, and it's upstream-Forge-clean.</li>
+  <li><b>Witchery RNG redirect (F2)</b> — mixin in WitcheryExtras; seeded grid decisions for surface structures, walls built at gen time.</li>
+  <li><b>GT vein probe (F4)</b> — small GT5U PR; make the air-block probe seed-pure.</li>
+  <li><b>RWG trees (F6)</b> — small RWG PR; fixes the visible tree variance and stops decoration-stream contamination.</li>
+  <li><b>Roguelike validLocation (F5)</b> — medium; seed-pure placement.</li>
+  <li><b>Thaumcraft rework (F3)</b> — largest; stage it through Salis-Arcana, loot rolls first (cheap), node placement second.</li>
+</ol>
+
+<footer>Prepared from direct source reads across the GTNH mod monorepo collection, decompiled Witchery 0.24.1 and Thaumcraft 4.2.3.5 sources, Forge/FML 1.7.10, and the #run-determinism channel archive (2022–2026). File:line references are to current repo state as of 2026-07-22.</footer>
+</div>
