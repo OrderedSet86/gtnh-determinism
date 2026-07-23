@@ -107,7 +107,7 @@ public class WorldgenProbe {
             boolean firstC = true;
             for (int x = -radius; x <= radius; x++) {
                 for (int z = -radius; z <= radius; z++) {
-                    final Chunk c = world.getChunkFromChunkCoords(x, z);
+                    final Chunk c = world.getChunkFromChunkCoords(cx + x, cz + z);
                     final Map<String, String> tes = new TreeMap<>();
                     for (Object o : c.chunkTileEntityMap.values()) {
                         final TileEntity te = (TileEntity) o;
@@ -135,9 +135,9 @@ public class WorldgenProbe {
                     if (!firstC) tedetail.append(",\n");
                     firstC = false;
                     tedetail.append("    \"")
-                        .append(x)
+                        .append(cx + x)
                         .append(",")
-                        .append(z)
+                        .append(cz + z)
                         .append("\": {");
                     boolean firstT = true;
                     for (Map.Entry<String, String> e : tes.entrySet()) {
