@@ -54,7 +54,7 @@ if [ -f java9args.txt ]; then JAVA_ARGS="@java9args.txt"; fi
 
 "$JAVA_BIN" $JAVA_ARGS \
   -Xmx6G -Xms6G \
-  -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} \
+  -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
   -jar "$LAUNCH_JAR" nogui
 

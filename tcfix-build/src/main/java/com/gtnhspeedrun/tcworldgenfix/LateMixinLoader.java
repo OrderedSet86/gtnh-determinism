@@ -36,6 +36,7 @@ public class LateMixinLoader implements ILateMixinLoader {
         }
         if (loadedMods.contains("witchery")) {
             mixins.add("WitcheryWorldGeneratorMixin");
+            mixins.add("ComponentWickerManMixin");
         }
         if (loadedMods.contains("RWG")) {
             mixins.add("RwgDecoForkMixin");

@@ -72,7 +72,13 @@ public class WorldgenProbe {
         final int walkR = radius + 1;
         LOG.info("[probe] seed={} order={} radius={} (walking r={})", seed, order, radius, walkR);
 
+        final int cx = Integer.getInteger("probe.cx", 0);
+        final int cz = Integer.getInteger("probe.cz", 0);
         final List<int[]> walk = buildWalk(order, walkR);
+        for (int[] c : walk) {
+            c[0] += cx;
+            c[1] += cz;
+        }
         long t0 = System.currentTimeMillis();
         int n = 0;
         for (int[] c : walk) {
@@ -84,16 +90,17 @@ public class WorldgenProbe {
         final Map<String, String> hashes = new TreeMap<>();
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
-                materializeTileEntities(world, world.getChunkFromChunkCoords(x, z));
+                materializeTileEntities(world, world.getChunkFromChunkCoords(cx + x, cz + z));
             }
         }
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
-                hashes.put(x + "," + z, hashChunk(world.getChunkFromChunkCoords(x, z)));
+                hashes.put((cx + x) + "," + (cz + z), hashChunk(world.getChunkFromChunkCoords(cx + x, cz + z)));
             }
         }
 
         final String structures = dumpVillages(world);
+        final String witchery = dumpWitcheryStructures();
         final StringBuilder tedetail = new StringBuilder();
         if (Boolean.getBoolean("probe.tedetail")) {
             tedetail.append(",\n  \"tedetail\": {\n");
@@ -167,6 +174,8 @@ public class WorldgenProbe {
         }
         sb.append("\n  },\n  \"villages\": ")
             .append(structures)
+            .append(",\n  \"witchery\": ")
+            .append(witchery)
             .append(tedetail)
             .append("\n}\n");
         final File f = new File(out);
@@ -337,6 +346,44 @@ public class WorldgenProbe {
             md.update(canonicalNbt(tag).getBytes(StandardCharsets.UTF_8));
         }
         return hex(md.digest());
+    }
+
+    /** Reflectively reads Witchery's structuresList (chunk coords of placed surface structures) if present. */
+    private static String dumpWitcheryStructures() {
+        try {
+            final Class<?> gr = Class.forName("cpw.mods.fml.common.registry.GameRegistry");
+            java.util.Set<?> gens = null;
+            for (java.lang.reflect.Field f : gr.getDeclaredFields()) {
+                if (java.util.Set.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    final Object v = f.get(null);
+                    if (v instanceof java.util.Set) {
+                        gens = (java.util.Set<?>) v;
+                        break;
+                    }
+                }
+            }
+            if (gens == null) return "\"no worldGenerators set\"";
+            for (Object g : gens) {
+                if (!g.getClass()
+                    .getName()
+                    .endsWith("WitcheryWorldGenerator")) continue;
+                for (java.lang.reflect.Field f : g.getClass()
+                    .getDeclaredFields()) {
+                    if (java.util.List.class.isAssignableFrom(f.getType())) {
+                        f.setAccessible(true);
+                        final java.util.List<?> list = (java.util.List<?>) f.get(g);
+                        final java.util.List<String> out = new ArrayList<>();
+                        for (Object c : list) out.add("\"" + c.toString() + "\"");
+                        java.util.Collections.sort(out);
+                        return "[" + String.join(", ", out) + "]";
+                    }
+                }
+            }
+            return "\"witchery generator not found\"";
+        } catch (Exception e) {
+            return "\"error: " + e + "\"";
+        }
     }
 
     /**
