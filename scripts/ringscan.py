@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-"""Offline replica of gtnhdeterminism's TcForkUtil.fork + TC eldritch ring candidacy.
+"""Offline replica of gtnhdeterminism's eldritch ring siting (jar >= 0.3, region-grid model).
 
-Predicts, purely from the world seed, which chunks roll an eldritch ring
-(obelisk) candidate under the seeded generateSurface (jar >= 0.1), and which
-candidate wins the deterministic priority contest (jar >= 0.2, EldritchRingLottery).
+One obelisk site per 25x25-chunk region: 9 seeded candidate slots in the region's
+central 3x3 chunks, tried in seeded order; in-game the winner is the FIRST candidate
+whose 5-column validity test passes on virgin terrain. Terrain is not evaluable
+offline, so this prints each region's candidates in try-order — the obelisk stands
+at the first of those that passes (flat-ish stone/sand/grass/gravel/dirt surface).
 
-Usage: ringscan.py [seed] [centerChunkX] [centerChunkZ] [radiusChunks]
-
-Caveats:
-- WIN/suppressed verdicts within ~32 chunks of the scan edge are unreliable
-  (suppressors outside the scanned window are not considered) — scan with margin.
-- A WIN only means the site may generate; Thaumcraft's stock 5-column terrain
-  validity test still applies, so a winner can still produce no obelisk
-  (granite/water/slope/trees at the probed columns).
+Usage: ringscan.py [seed] [centerChunkX] [centerChunkZ] [radiusRegions]
 """
 
 import sys
@@ -73,59 +68,43 @@ def fork(world_seed, cx, cz, salt):
     return r
 
 
-def ring_candidate(world_seed, cx, cz):
-    """Mirror of the salt-5 structure stream in ThaumcraftWorldGeneratorMixin."""
-    r = fork(world_seed, cx, cz, 5)
-    x16 = r.next_int(16)
-    z16 = r.next_int(16)
-    if r.next_int(150) == 0:
-        return None  # mound branch
-    if r.next_int(66) != 0:
-        return None
-    w = 11 + r.next_int(6) * 2
-    h = 11 + r.next_int(6) * 2
-    return dict(cx=cx, cz=cz, x=cx * 16 + x16, z=cz * 16 + z16, w=w, h=h)
+
+REGION = 25
+MARGIN = 11
+REGION_SALT = 8
 
 
-def priority(world_seed, cx, cz):
-    return fork(world_seed, cx, cz, 7).next_long()
-
-
-def cells_range(c):
-    """Chunk-coord rect that MazeThread would fill for candidate c."""
-    col = c["cx"] - (1 + c["w"] // 2)
-    row = c["cz"] - (1 + c["h"] // 2)
-    return col, col + c["w"] - 1, row, row + c["h"] - 1
-
-
-def conflicts(a, b):
-    """True if candidate b's maze cells intersect a's mazesInRange scan rect."""
-    x0, x1, z0, z1 = cells_range(b)
-    return not (x1 < a["cx"] - a["w"] or x0 > a["cx"] + a["w"]
-                or z1 < a["cz"] - a["h"] or z0 > a["cz"] + a["h"])
+def region_candidates(world_seed, rm, rn):
+    """Mirror of EldritchRingLottery.candidates (jar >= 0.3)."""
+    r = fork(world_seed, rm, rn, REGION_SALT)
+    slots = list(range(9))
+    for i in range(8, 0, -1):  # Fisher-Yates, Java order
+        j = r.next_int(i + 1)
+        slots[i], slots[j] = slots[j], slots[i]
+    out = []
+    for slot in slots:
+        cx = rm * REGION + MARGIN + slot % 3
+        cz = rn * REGION + MARGIN + slot // 3
+        x16, z16 = r.next_int(16), r.next_int(16)
+        w = 11 + r.next_int(6) * 2
+        h = 11 + r.next_int(6) * 2
+        out.append(dict(cx=cx, cz=cz, x=cx * 16 + x16, z=cz * 16 + z16, w=w, h=h))
+    return out
 
 
 def main():
     seed = int(sys.argv[1]) if len(sys.argv) > 1 else 88888888
-    ccx, ccz = (int(sys.argv[2]), int(sys.argv[3])) if len(sys.argv) > 4 else (-50, 28)
-    radius = int(sys.argv[4]) if len(sys.argv) > 4 else 40
+    ccx = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    ccz = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+    radius = int(sys.argv[4]) if len(sys.argv) > 4 else 2
 
-    cands = []
-    for cx in range(ccx - radius, ccx + radius + 1):
-        for cz in range(ccz - radius, ccz + radius + 1):
-            c = ring_candidate(seed, cx, cz)
-            if c:
-                c["prio"] = priority(seed, cx, cz)
-                cands.append(c)
-
-    print(f"seed {seed}: {len(cands)} ring candidates within +-{radius} chunks of ({ccx},{ccz})")
-    for c in sorted(cands, key=lambda c: (abs(c["cx"] - ccx) + abs(c["cz"] - ccz))):
-        others = [o for o in cands if o is not c and conflicts(c, o)]
-        losers = [o for o in others if o["prio"] < c["prio"]]
-        wins = all(o["prio"] < c["prio"] for o in others)
-        print(f"  chunk ({c['cx']:4d},{c['cz']:4d}) center block ({c['x']:6d},{c['z']:6d}) "
-              f"w={c['w']} h={c['h']} conflicts={len(others)} "
-              f"{'WINS (deterministic rule)' if wins else 'suppressed by higher-priority neighbor'}")
+    crm, crn = ccx // REGION, ccz // REGION
+    for rm in range(crm - radius, crm + radius + 1):
+        for rn in range(crn - radius, crn + radius + 1):
+            print(f"region ({rm},{rn}) — chunks [{rm*REGION}..{rm*REGION+REGION-1}] x "
+                  f"[{rn*REGION}..{rn*REGION+REGION-1}] — candidates in try-order:")
+            for i, c in enumerate(region_candidates(seed, rm, rn)):
+                print(f"  #{i+1}: chunk ({c['cx']},{c['cz']}) center block ({c['x']},{c['z']}) w={c['w']} h={c['h']}")
 
 
 if __name__ == "__main__":

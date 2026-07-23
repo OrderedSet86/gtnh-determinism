@@ -49,6 +49,13 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (loadedMods.contains("Forestry")) {
             mixins.add("ComponentVillageBeeHouseMixin");
         }
+        if (loadedMods.contains("Roguelike")) {
+            mixins.add("WorldEditorMixin");
+            mixins.add("DungeonMixin");
+            mixins.add("TreasureChestMixin");
+            mixins.add("TreasureManagerMixin");
+            mixins.add("InventoryMixin");
+        }
         return mixins;
     }
 }

@@ -129,6 +129,7 @@ public abstract class ThaumcraftWorldGeneratorMixin {
             int randPosY = world.getHeightValue(randPosX, randPosZ) - 9;
             if (randPosY < world.getActualHeight()) {
                 world.getChunkFromBlockCoords(randPosX, randPosZ);
+                int[] tcfix$ringSite;
                 if (srand.nextInt(150) == 0) {
                     final WorldGenMound mound = new WorldGenMound();
                     if (mound.generate(world, srand, randPosX, randPosY, randPosZ)) {
@@ -144,31 +145,46 @@ public abstract class ThaumcraftWorldGeneratorMixin {
                             true,
                             false);
                     }
-                } else if (srand.nextInt(66) == 0) {
-                    final WorldGenEldritchRing stonering = new WorldGenEldritchRing();
-                    randPosY = randPosY + 8;
-                    final int w = 11 + srand.nextInt(6) * 2;
-                    final int h = 11 + srand.nextInt(6) * 2;
-                    stonering.chunkX = chunkX;
-                    stonering.chunkZ = chunkZ;
-                    stonering.width = w;
-                    stonering.height = h;
-                    if (stonering.generate(world, srand, randPosX, randPosY, randPosZ)) {
-                        auraGen = true;
-                        ThaumcraftWorldGenerator
-                            .createRandomNodeAt(world, randPosX, randPosY + 2, randPosZ, srand, false, true, false);
-                        // Synchronous, seeded — original spawned a background thread here.
-                        new MazeThread(chunkX, chunkZ, w, h, srand.nextLong()).run();
+                } else if ((tcfix$ringSite = com.gtnhspeedrun.tcworldgenfix.EldritchRingLottery
+                    .designatedSite(world, world.getSeed(), chunkX, chunkZ)) != null) {
+                        // v2 (0.3): region-grid siting at stock density — see EldritchRingLottery. Replaces the
+                        // stock per-chunk 1/66 roll + first-populated-wins maze race (order-dependent, 0.2 note).
+                        final WorldGenEldritchRing stonering = new WorldGenEldritchRing();
+                        final int rx = chunkX * 16 + tcfix$ringSite[0];
+                        final int rz = chunkZ * 16 + tcfix$ringSite[1];
+                        final int ry = com.gtnhspeedrun.tcworldgenfix.EldritchRingLottery.surfaceY(world, rx, rz);
+                        final int w = tcfix$ringSite[2];
+                        final int h = tcfix$ringSite[3];
+                        stonering.chunkX = chunkX;
+                        stonering.chunkZ = chunkZ;
+                        stonering.width = w;
+                        stonering.height = h;
+                        // Own forks: the ring's cosmetic draws consume a live-condition-dependent COUNT of rolls,
+                        // so nothing downstream may share its stream (node and maze each get their own fork).
+                        if (ry > 0 && stonering.generate(world, tcfix$fork(world, chunkX, chunkZ, 9), rx, ry, rz)) {
+                            auraGen = true;
+                            ThaumcraftWorldGenerator.createRandomNodeAt(
+                                world,
+                                rx,
+                                ry + 2,
+                                rz,
+                                tcfix$fork(world, chunkX, chunkZ, 10),
+                                false,
+                                true,
+                                false);
+                            // Synchronous, seeded — original spawned a background thread here.
+                            new MazeThread(chunkX, chunkZ, w, h, tcfix$fork(world, chunkX, chunkZ, 11).nextLong())
+                                .run();
+                        }
+                    } else if (srand.nextInt(40) == 0) {
+                        randPosY = randPosY + 9;
+                        final WorldGenHilltopStones hilltopStones = new WorldGenHilltopStones();
+                        if (hilltopStones.generate(world, srand, randPosX, randPosY, randPosZ)) {
+                            auraGen = true;
+                            ThaumcraftWorldGenerator
+                                .createRandomNodeAt(world, randPosX, randPosY + 5, randPosZ, srand, false, true, false);
+                        }
                     }
-                } else if (srand.nextInt(40) == 0) {
-                    randPosY = randPosY + 9;
-                    final WorldGenHilltopStones hilltopStones = new WorldGenHilltopStones();
-                    if (hilltopStones.generate(world, srand, randPosX, randPosY, randPosZ)) {
-                        auraGen = true;
-                        ThaumcraftWorldGenerator
-                            .createRandomNodeAt(world, randPosX, randPosY + 5, randPosZ, srand, false, true, false);
-                    }
-                }
             }
 
             this.generateTotem(world, tcfix$fork(world, chunkX, chunkZ, 6), chunkX, chunkZ, auraGen, newGen);
