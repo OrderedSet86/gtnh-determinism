@@ -61,14 +61,14 @@ public abstract class ThaumcraftWorldGeneratorMixin {
     @Shadow
     private void generateOres(World world, Random random, int chunkX, int chunkZ, boolean newGen) {}
 
-    /** Deterministic per-(chunk, feature) RNG — vanilla-style coordinate seeding plus a feature salt. */
+    /**
+     * Deterministic per-(chunk, feature) RNG — vanilla-style coordinate seeding plus a feature salt.
+     * Delegates to {@link com.gtnhspeedrun.tcworldgenfix.TcForkUtil} so EldritchRingLottery can replay the
+     * exact same streams for remote chunks.
+     */
     @Unique
     private static Random tcfix$fork(World world, int chunkX, int chunkZ, long salt) {
-        final Random r = new Random(world.getSeed() + salt * 0x9E3779B97F4A7C15L);
-        final long a = r.nextLong() / 2L * 2L + 1L;
-        final long b = r.nextLong() / 2L * 2L + 1L;
-        r.setSeed(chunkX * a + chunkZ * b ^ world.getSeed() ^ salt);
-        return r;
+        return com.gtnhspeedrun.tcworldgenfix.TcForkUtil.fork(world, chunkX, chunkZ, salt);
     }
 
     /**
