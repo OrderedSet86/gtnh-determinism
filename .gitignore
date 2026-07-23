@@ -3,3 +3,5 @@ jars/
 probe-build/build/
 probe-build/.gradle/
 probe-build/gtnhShared/
+docs/HANDOFF*
+.env
