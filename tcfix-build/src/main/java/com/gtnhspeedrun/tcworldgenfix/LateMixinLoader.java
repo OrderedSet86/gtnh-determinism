@@ -12,7 +12,7 @@ public class LateMixinLoader implements ILateMixinLoader {
 
     @Override
     public String getMixinConfig() {
-        return "mixins.tcworldgendeterminism.late.json";
+        return "mixins.gtnhdeterminism.late.json";
     }
 
     @Override
@@ -33,6 +33,19 @@ public class LateMixinLoader implements ILateMixinLoader {
             mixins.add("BOPBiomeDecoratorMixin");
             mixins.add("WorldGenBOPGrassManagerMixin");
             mixins.add("WorldGenBOPFlowerManagerMixin");
+        }
+        if (loadedMods.contains("witchery")) {
+            mixins.add("WitcheryWorldGeneratorMixin");
+        }
+        if (loadedMods.contains("RWG")) {
+            mixins.add("RwgDecoForkMixin");
+            mixins.add("DecoBigTreeCtorMixin");
+        }
+        if (loadedMods.contains("ProjRed|Exploration")) {
+            mixins.add("TileLilyMixin");
+        }
+        if (loadedMods.contains("Forestry")) {
+            mixins.add("ComponentVillageBeeHouseMixin");
         }
         return mixins;
     }

@@ -1,49 +1,51 @@
 # gtnh-determinism
 
-Candidate fixes + verification harness for same-seed worldgen nondeterminism in GT: New Horizons (1.7.10).
+Same-seed world generation for GT: New Horizons (1.7.10), made reproducible.
 Companion to the audit report (docs/gtnh-determinism-audit.html) and the `#run-determinism` Discord archive.
+
+## The testing jar (for the community)
+
+**`jars/gtnhdeterminism-0.1.jar` — drop it into `mods/` of a stock GTNH 2.7.4 instance. No other changes.**
+
+One jar carries every fix (reflection fix for FML + 13 late mixins, each gated on its target mod being present):
+
+| Target | What was wrong | What the jar fixes |
+|---|---|---|
+| Forge/FML | Village building handlers iterate in per-launch HashMap order | Village layouts (smeltery/blacksmith presence) identical per seed |
+| Witchery | Worldgen rolled off clock-seeded `world.rand` + shuffle | Covens, wicker men, shacks, goblin huts seed-stable |
+| Thaumcraft | Terrain-gated draw skew, `world.rand` barrow loot, gen-thread race | Nodes, totems, barrows, rings + their loot seed-stable |
+| GregTech | Vein retry probed live terrain (chunk-order avalanche) | Ore vein identity/height seed-pure |
+| RWG | Terrain-gated draw skew in all decorations; `Math.random()` big trees | Tree/decoration streams stable |
+| TinkersConstruct | Slime islands sized/shaped by a clock-seeded field (`rand`/`random` shadowing bug) | Slime islands seed-stable |
+| BiomesO'Plenty | Flora picked with `Math.random()` over an identity-ordered HashMap; desynced dirt/gravel patches | Flora + patches seed-stable |
+| ProjectRed | Lily colors (dye yield!) rolled clock-random at worldgen | Lily colors derived from seed+position |
+| Forestry | Village bee house rolled bee species/frames/flowers off `world.rand` | Village bees seed-stable |
+
+Verified headless on GTNH 2.7.4 (fresh-JVM launch pairs, 289 chunks hashed per run):
+seed -5093808211664363778 **IDENTICAL** with the single jar alone; across a 13-seed sample, remaining
+variance is tile-entity bookkeeping jitter (no block, ore-type, or chest-content differences) plus one
+rare unidentified sky-height event still under investigation.
+
+Heads-up when adopting: the fixes change how randomness is derived, so a seed generates a *different*
+(now canonical) world than stock — old seed notes reset once, then hold forever. Existing saves are safe
+(only newly generated chunks are affected).
 
 ## Layout
 
-- `forks/` — working clones of the affected mods, branch `determinism-fixes`, pushed to github.com/OrderedSet86 forks (gitignored here; they are their own repos)
-- `jars/` — built candidate jars, ready to drop into a pack instance (gitignored; rebuild via `./gradlew build` in each fork)
-- `probe-build/` — **WorldgenProbe**, a tiny server-side mod for headless determinism testing
-- `scripts/` — headless runner + diff tool
-- `docs/` — audit report
+- `tcfix-build/` — source of the `gtnhdeterminism` jar (mod id `gtnhdeterminism`)
+- `probe-build/` — **WorldgenProbe**, headless determinism tester (inert without `-Dprobe.order`)
+- `scripts/` — `run-probe.sh`, `diff-probe.py`, `multiseed-driver.sh`
+- `forks/` — mod forks with source-level fixes for upstream PRs (branch `determinism-fixes`; pushed to github.com/OrderedSet86)
+- `docs/` — audit report + user impact
+- `jars/` — the testing jar + probe
 
-## The fixes (branch `determinism-fixes` in each fork)
-
-| Fork | Finding | Change |
-|---|---|---|
-| Hodgepodge | F1 | Mixin `MixinVillagerRegistry_DeterministicOrder`: FML's village creation handlers move from identity-hash `HashMap` order (reshuffles every JVM launch → scrambled village layouts) to a class-name-sorted `TreeMap`. Config: `fixVillageHandlerOrder`. |
-| WitcheryExtras | F2 | Mixin `WitcheryWorldGeneratorMixin`: Witchery worldgen uses the seeded per-chunk Random instead of clock-seeded `world.rand` (covens, wicker men, shacks, goblin huts + a `Collections.shuffle`). Village walls (tick-time TE build) not yet addressed. |
-| GT5-Unofficial | F4 | Vein placement no longer probes live world blocks on the no-overlap path (`NO_OVERLAP_AIR_BLOCK` retry), so vein identity/height can't depend on which chunk of the vein region generates first. |
-| Realistic-World-Gen | F6 | Every `rwg.deco` generator forks a private RNG with exactly one draw from the shared decoration stream (terrain-gated early returns can no longer skew later decorations); `DecoBigTree` no longer sizes trees with `Math.random()`. |
-
-Not yet implemented: F3 (Thaumcraft — stage via Salis-Arcana), F5 (Roguelike Dungeons `validLocation` world probes), Witchery walls.
-
-## Headless before/after verification
-
-**WorldgenProbe** activates only when `-Dprobe.order=...` is set. It force-generates a square of chunks around
-the origin in a controlled order, writes per-chunk SHA-256 hashes (blocks + metadata + canonicalized tile-entity
-NBT) to JSON, and shuts the server down. Same seed + different walk order ⇒ identical JSON iff worldgen is
-chunk-order independent. Relaunching the JVM between runs additionally catches per-launch bugs (F1).
+## Headless verification
 
 ```bash
-# in a GTNH server install with mods/worldgenprobe-*.jar present:
-PROBE_JAVA=/path/to/java17 scripts/run-probe.sh <server-dir> <seed> rows  baseline-rows.json 8
-PROBE_JAVA=/path/to/java17 scripts/run-probe.sh <server-dir> <seed> cols  baseline-cols.json 8
-scripts/diff-probe.py baseline-rows.json baseline-cols.json
-# → swap in jars/ fixes, repeat, compare the diff counts
+PROBE_JAVA=/path/to/java17 scripts/run-probe.sh <server-dir> <seed> rows a.json 8
+PROBE_JAVA=/path/to/java17 scripts/run-probe.sh <server-dir> <seed> rows b.json 8   # fresh JVM = launch test
+scripts/diff-probe.py a.json b.json                                                  # expect IDENTICAL
 ```
-
-Walk orders: `rows`, `cols`, `rows-reverse`, `spiral`. The world folder is deleted before each run; the seed is
-forced via `server.properties` (`level-type=rwg`).
-
-## Caveats
-
-- Fix jars are built from current master branches; pack 2.7.4 ships slightly older versions. Hodgepodge / RWG /
-  WitcheryExtras are safe drop-ins; the GT5U jar replaces a fast-moving mod — test it last and separately.
-- Even with all four fixes, some block-level variance remains expected (vanilla dungeon edge checks, TF
-  `getHeightValue` reads, Thaumcraft F3 unfixed) — the metric is the *reduction* in differing chunks, and
-  specifically whether village/structure chunks stabilize.
+Walk orders `rows|cols|rows-reverse|spiral` test chunk-order dependence; same-order pairs across
+launches test clock/hash-order sources. `PROBE_TEDETAIL=true` dumps per-TE hashes; `PROBE_DUMP=x,z`
+dumps a chunk's block listing.
