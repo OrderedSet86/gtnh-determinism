@@ -1,0 +1,211 @@
+<title>GTNH Determinism — Applied Fixes</title>
+<style>
+  :root {
+    --bg: #f5f7f4; --surface: #fdfefc; --ink: #1c2420; --ink-soft: #4a5650; --ink-faint: #77837c;
+    --line: #d9e0da; --accent: #0f7a6f; --accent-soft: #e2efec;
+    --crit: #b23b42; --warn: #a97b2a; --warn-soft: #f4ecdd; --ok: #41804f; --ok-soft: #e5efe5;
+    --code-bg: #eef1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131817; --surface: #1a201e; --ink: #dee6e0; --ink-soft: #a4b0a9; --ink-faint: #6f7c75;
+      --line: #2b332f; --accent: #52c4b4; --accent-soft: #1c2e2b;
+      --crit: #e0757b; --warn: #d8a854; --warn-soft: #302818; --ok: #7cb98a; --ok-soft: #1e2b20;
+      --code-bg: #232a26;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131817; --surface: #1a201e; --ink: #dee6e0; --ink-soft: #a4b0a9; --ink-faint: #6f7c75;
+    --line: #2b332f; --accent: #52c4b4; --accent-soft: #1c2e2b;
+    --crit: #e0757b; --warn: #d8a854; --warn-soft: #302818; --ok: #7cb98a; --ok-soft: #1e2b20;
+    --code-bg: #232a26;
+  }
+  :root[data-theme="light"] {
+    --bg: #f5f7f4; --surface: #fdfefc; --ink: #1c2420; --ink-soft: #4a5650; --ink-faint: #77837c;
+    --line: #d9e0da; --accent: #0f7a6f; --accent-soft: #e2efec;
+    --crit: #b23b42; --warn: #a97b2a; --warn-soft: #f4ecdd; --ok: #41804f; --ok-soft: #e5efe5;
+    --code-bg: #eef1ec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Seravek", "Segoe UI", "Trebuchet MS", system-ui, sans-serif;
+    line-height: 1.6; margin: 0; font-size: 16px;
+  }
+  .wrap { max-width: 74ch; margin: 0 auto; padding: 3rem 1.25rem 6rem; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 1.4rem; margin-bottom: 2rem; }
+  .eyebrow {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.72rem;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 0.7rem;
+  }
+  h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 0.6rem; text-wrap: balance; font-weight: 650; }
+  .standfirst { color: var(--ink-soft); font-size: 1.02rem; margin: 0; }
+  h2 { font-size: 1.3rem; font-weight: 650; margin: 2.75rem 0 0.75rem; text-wrap: balance; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  code {
+    font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: 0.82em;
+    background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px;
+  }
+  .fix {
+    background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 6px; padding: 1.15rem 1.4rem 0.9rem; margin: 1.1rem 0;
+  }
+  .fix h3 { margin: 0 0 0.15rem; font-size: 1.05rem; font-weight: 650; }
+  .fix .sub {
+    font-family: ui-monospace, Menlo, monospace; font-size: 0.7rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-faint); margin: 0 0 0.75rem;
+  }
+  .fix dl { margin: 0; display: grid; grid-template-columns: 5.5rem 1fr; gap: 0.3rem 0.9rem; }
+  .fix dt {
+    font-family: ui-monospace, Menlo, monospace; font-size: 0.68rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--ink-faint); padding-top: 0.15rem;
+  }
+  .fix dd { margin: 0 0 0.5rem; }
+  .chip {
+    display: inline-block; font-family: ui-monospace, Menlo, monospace; font-size: 0.68rem;
+    letter-spacing: 0.05em; padding: 0.1rem 0.5rem; border-radius: 99px; white-space: nowrap;
+  }
+  .chip.ok { background: var(--ok-soft); color: var(--ok); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  ul { margin: 0 0 1rem; padding-left: 1.25rem; }
+  li { margin-bottom: 0.4rem; }
+  .note {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 0.75rem 1.1rem; border-radius: 0 6px 6px 0; margin: 1.25rem 0; font-size: 0.93rem;
+  }
+  footer { margin-top: 3.5rem; border-top: 1px solid var(--line); padding-top: 1rem; font-size: 0.8rem; color: var(--ink-faint); }
+  @media (max-width: 540px) { .fix dl { grid-template-columns: 1fr; } .fix dt { padding-top: 0.4rem; } }
+</style>
+
+<div class="wrap">
+<header>
+  <p class="eyebrow">GT: New Horizons &middot; Speedrun Community</p>
+  <h1>The determinism jar: every fix, and why it was needed</h1>
+  <p class="standfirst">What <code>gtnhdeterminism-0.1.jar</code> changes so that one seed always makes one world. Drop it into <code>mods/</code> of a stock GTNH 2.7.4 instance — nothing else to install or configure. Companion to the <a href="https://claude.ai/code/artifact/8ecf9dbb-314e-4737-ac21-a5ed6fa4d23d">full audit</a>.</p>
+</header>
+
+<h2>Why worldgen wasn't reproducible</h2>
+<p>Nearly every bug below is one of four patterns: randomness seeded from the <b>clock</b> instead of the world seed; a <b>conditional branch</b> that consumes random draws only sometimes, shifting everything rolled after it; decisions that read <b>world state that may not exist yet</b>, so the outcome depends on which direction you explored from; and registries stored in <b>hash-ordered collections</b> whose iteration order reshuffles every game launch.</p>
+
+<h2>The fixes</h2>
+
+<div class="fix">
+  <h3>Village layouts scrambled every game launch</h3>
+  <p class="sub">Forge/FML &middot; affects every village</p>
+  <dl>
+    <dt>Symptom</dt><dd>Same seed, same village location — but different buildings each launch. The Tinkers smeltery or blacksmith might exist one session and be gone the next; chest loot "cycled between forms."</dd>
+    <dt>Cause</dt><dd>Forge stores the modded village-building handlers (Witchery, VillageNames, Tinkers, Railcraft, Forestry, WitchingGadgets…) in a <code>HashMap</code> keyed by class. Java hashes classes by memory address, so the iteration order — which sets both the RNG draw order and the building-list order — reshuffles on every JVM start.</dd>
+    <dt>Fix</dt><dd>After all mods register, the handler map is replaced with one sorted by class name. One canonical village per seed, for everyone.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>Witchery structures: wrong dice, and a type roulette</h3>
+  <p class="sub">Witchery &middot; covens, wicker men, shacks, goblin huts</p>
+  <dl>
+    <dt>Symptom</dt><dd>Structures moved between runs (pre-fix); after the first fix they stayed put but the <em>type</em> still changed with your walking route — hay man one run, witch house or circle the next. Spawner contents also varied.</dd>
+    <dt>Cause</dt><dd>Three stacked bugs: worldgen rolled off <code>world.rand</code> (seeded from the clock at world load); the structure for each site was picked by shuffling one <b>shared</b> list in place every chunk, so the winner depended on how many chunks you generated on the way there; and the wicker man's spawner mob type was a separate <code>world.rand</code> roll.</dd>
+    <dt>Fix</dt><dd>All rolls use the seeded per-chunk RNG; the site's structure is chosen by shuffling a fresh, name-sorted copy of the list — a pure function of seed and location; the spawner type comes from the seeded roll too.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>Thaumcraft: everything downstream of a terrain check</h3>
+  <p class="sub">Thaumcraft 4 &middot; nodes, totems, barrows, eldritch rings</p>
+  <dl>
+    <dt>Symptom</dt><dd>Node types/positions, totems, and barrows differed even within one session; barrow urn/crate loot never repeated.</dd>
+    <dt>Cause</dt><dd>All surface features shared one RNG stream, with extra draws gated on live terrain reads at chunk borders — one flipped check shifted every later roll. Barrow loot used <code>world.rand</code>; bonus nodes went to whichever chunk generated first; ring mazes were built on a background thread racing worldgen.</dd>
+    <dt>Fix</dt><dd>Every feature gets its own RNG derived from seed + chunk + feature; bonus nodes belong to the chunk that contains the feature; maze generation is synchronous and seeded; barrow loot rolls from the generation RNG.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>GregTech ore veins occasionally rerolled</h3>
+  <p class="sub">GregTech &middot; ore vein identity and height</p>
+  <dl>
+    <dt>Symptom</dt><dd>Rarely, a known vein came up as a different ore (copper↔iron) depending on the direction you approached from — and one flip could cascade into neighboring veins.</dd>
+    <dt>Cause</dt><dd>Vein placement probed a column of <em>live world blocks</em>; if it hit air (cave, ravine, mountainside), the vein rerolled to the next type — and the result was cached for the whole region by whichever chunk generated first.</dd>
+    <dt>Fix</dt><dd>The probe accepts unconditionally: vein identity and height are pure functions of the seed.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>RWG trees and decorations</h3>
+  <p class="sub">Realistic World Gen &middot; overworld decoration</p>
+  <dl>
+    <dt>Symptom</dt><dd>Trees (large pines, big trees) differed between runs; the noise also nudged other features sharing the decoration RNG.</dd>
+    <dt>Cause</dt><dd>Decorations bailed out early on terrain checks <em>before</em> consuming their rolls, shifting every later decoration's stream; big trees sized themselves with <code>Math.random()</code>.</dd>
+    <dt>Fix</dt><dd>Every decoration takes exactly one draw from the shared stream and forks its own RNG from it; the clock-random tree sizing is pinned.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>Tinkers slime islands: a one-word bug</h3>
+  <p class="sub">TinkersConstruct &middot; sky slime islands</p>
+  <dl>
+    <dt>Symptom</dt><dd>Slime islands existed at the same places but changed size, altitude, and shape every launch.</dd>
+    <dt>Cause</dt><dd>The generator receives the seeded RNG as parameter <code>rand</code> — but the code body used <code>random</code>, an instance field initialized as <code>new Random()</code> (clock-seeded). A classic variable-shadowing bug.</dd>
+    <dt>Fix</dt><dd>Use the seeded parameter throughout.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>BiomesO'Plenty flora — and the dirt patches it dragged along</h3>
+  <p class="sub">BiomesO'Plenty &middot; grass/flower selection, underground dirt/gravel patches</p>
+  <dl>
+    <dt>Symptom</dt><dd>The last big launch-to-launch source: flora types swapped, and whole dirt/gravel patches relocated underground.</dd>
+    <dt>Cause</dt><dd>Each weighted grass/flower pick rolled with <code>Math.random()</code> and then walked a HashMap in memory-address order. Worse, the chosen generator consumed a different number of draws from the shared decoration RNG — relocating vanilla dirt/gravel patches downstream.</dd>
+    <dt>Fix</dt><dd>Flora tables keep registration order; the pick rolls from the seeded decoration RNG.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>ProjectRed lily colors</h3>
+  <p class="sub">ProjectRed &middot; water lily dye yield</p>
+  <dl>
+    <dt>Symptom</dt><dd>Lilies grew in the same spots, but their color — i.e. which dye they yield — changed every launch. Dyes are run-relevant.</dd>
+    <dt>Cause</dt><dd>The flower color is rolled when the tile is created, using a clock-seeded default RNG.</dd>
+    <dt>Fix</dt><dd>Color derived from world seed + position: same lily, same dye, always.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>Forestry village bees</h3>
+  <p class="sub">Forestry &middot; village bee house</p>
+  <dl>
+    <dt>Symptom</dt><dd>The village bee house building was stable, but the bee species inside, the apiary frames, and the flower garden varied per launch.</dd>
+    <dt>Cause</dt><dd>The building placed from the seeded structure RNG, but the contents rolled off <code>world.rand</code>.</dd>
+    <dt>Fix</dt><dd>Contents roll from a fork of the structure RNG — village bees are a property of the seed.</dd>
+  </dl>
+</div>
+
+<div class="fix">
+  <h3>AE2 meteors <span class="chip ok">already fixed upstream, 2022</span></h3>
+  <p class="sub">Applied Energistics 2 &middot; context</p>
+  <dl>
+    <dt>Cause</dt><dd>Meteor decisions were computed from per-chunk randomness for a cell-level choice — whichever chunk generated first won — with no persisted per-meteor seed.</dd>
+    <dt>Fix</dt><dd>eigenraven's grid-cell seeding + persisted meteor seed (AE2 PR #200) — the template every fix above follows. Included in the pack since; nothing needed in the jar.</dd>
+  </dl>
+</div>
+
+<h2>How it was verified</h2>
+<ul>
+  <li><b>Launch tests</b> — generate 289 chunks, restart the game, generate again, compare every block and tile entity: <b>byte-identical worlds</b> on the primary test seed; across a 13-seed sample, zero block, ore-type, or chest-content differences.</li>
+  <li><b>Route tests</b> — same seed generated in three different chunk orders (simulating different walking paths): village buildings/chests and the witchery structure (position <em>and</em> type) came out byte-identical, verified at a live village site on seed <code>88888888</code>.</li>
+  <li>Community in-game testing caught the witchery type roulette that fixed-route testing couldn't — thanks, and keep reporting.</li>
+</ul>
+
+<h2>Known remaining variance <span class="chip warn">fine print</span></h2>
+<ul>
+  <li><b>Decoration detail</b> — individual grass/flower/tree placement can still differ with your exploration route (a 1.7.10-wide behavior, not practically fixable per-mod). Structures, chests, veins, spawners, dyes, and bees are route-robust.</li>
+  <li><b>Village piece height</b> — a building can anchor ±1 block of Y depending on approach.</li>
+  <li><b>Witchery village walls</b> — built on a delayed timer after generation; shape still timing-dependent.</li>
+  <li><b>Witch counts</b> at witchery structures (entities, not blocks) and internal tile-entity bookkeeping — no gameplay effect on blocks or loot.</li>
+  <li>One <b>rare sky-height anomaly</b> observed once in 26 test runs — still being hunted.</li>
+</ul>
+
+<div class="note"><b>Adopting the jar re-rolls seeds once.</b> The fixes change how randomness is derived, so a seed produces a different — now canonical — world than stock. Old seed notes reset one time, then hold for every runner, every launch. Existing saves are safe: only newly generated chunks are affected.</div>
+
+<footer>gtnhdeterminism-0.1 &middot; GTNH 2.7.4 &middot; one @Mod class + 15 self-gating mixins &middot; sources and per-mod patches: github.com/OrderedSet86 (mod forks, branch determinism-fixes) &middot; 2026-07-22</footer>
+</div>
