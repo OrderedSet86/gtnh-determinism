@@ -116,18 +116,30 @@ public abstract class TreasureManagerMixin {
     }
 
     /**
-     * @author GTNH speedrun determinism audit
-     * @reason Chest pick stays index-based (membership-local by nature); the ITEMS drawn for the picked chest come
-     *         from its position fork so they cannot shift other chests.
+     * Membership-robust single-chest delivery: pick over the FULL placed-chest list (placement is deterministic;
+     * the live subset is not — chunk-load order decides which deep chests later population carves over, and a
+     * live-set-indexed pick would redistribute a floor's rule items whenever one chest dies). Items destined for a
+     * dead chest are dropped — exactly stock's semantics, where those picks landed in carved-over chests and were
+     * lost. Draw count is constant regardless of liveness, so no other chest ever shifts.
      */
-    @Overwrite
-    public void addItem(Random rand, int level, IWeighted<ItemStack> item, int amount) {
-        final List<ITreasureChest> list = tcfix$liveOnly(getChests(level));
+    @Unique
+    private void tcfix$addItemStable(Random rand, List<ITreasureChest> list, IWeighted<ItemStack> item, int amount) {
         if (list.isEmpty()) return;
         for (int i = 0; i < amount; ++i) {
             final ITreasureChest chest = list.get(rand.nextInt(list.size()));
-            chest.setRandomEmptySlot(item.get(tcfix$chestRand(rand.nextLong(), chest)));
+            final ItemStack stack = item.get(tcfix$chestRand(rand.nextLong(), chest));
+            if (tcfix$live(chest)) chest.setRandomEmptySlot(stack);
         }
+    }
+
+    /**
+     * @author GTNH speedrun determinism audit
+     * @reason Route-independent pick over the full placed-chest list; dead-chest picks are dropped (stock loss
+     *         semantics). Items come from the picked chest's position fork so they cannot shift other chests.
+     */
+    @Overwrite
+    public void addItem(Random rand, int level, IWeighted<ItemStack> item, int amount) {
+        tcfix$addItemStable(rand, getChests(level), item, amount);
     }
 
     /**
@@ -136,11 +148,17 @@ public abstract class TreasureManagerMixin {
      */
     @Overwrite
     public void addItem(Random rand, Treasure type, IWeighted<ItemStack> item, int amount) {
-        final List<ITreasureChest> list = tcfix$liveOnly(getChests(type));
-        if (list.isEmpty()) return;
-        for (int i = 0; i < amount; ++i) {
-            final ITreasureChest chest = list.get(rand.nextInt(list.size()));
-            chest.setRandomEmptySlot(item.get(tcfix$chestRand(rand.nextLong(), chest)));
-        }
+        tcfix$addItemStable(rand, getChests(type), item, amount);
+    }
+
+    /**
+     * @author GTNH speedrun determinism audit
+     * @reason The (type, level) variant is the main typed single-chest rule path (LootRule with toEach=false) and
+     *         was previously NOT overwritten: it picked and drew everything from the shared stream. Same
+     *         stable-pick treatment as the other addItem variants.
+     */
+    @Overwrite
+    public void addItem(Random rand, Treasure type, int level, IWeighted<ItemStack> item, int amount) {
+        tcfix$addItemStable(rand, getChests(type, level), item, amount);
     }
 }
