@@ -21,9 +21,18 @@ overstates certainty for items concentrated in few regions (e.g. dungeon loot).
 
 `inconclusive` means the sample cannot bound the difference at ±10% — mostly rare items. Those
 are covered by the direct-code Monte-Carlo tier instead: `roguelike-loot-mc.json` holds 500,000
-draws per loot category/level made by calling the *shipped* Roguelike loot-table code via
-reflection, certifying rare-item table probabilities to sub-percent precision (the jar provably
-does not modify table code — its mixins only substitute the Random instance).
+draws per loot category/level (75 cells, 37.5M draws total) made by calling the *shipped*
+Roguelike loot-table code via reflection with a **fixed RNG seed**.
+
+The fixed seed makes this an exact certification rather than a statistical one: on 2026-07-23 the
+job was run in three configurations — no jar installed, the 0.4 release jar installed, and the
+archived pre-release run — and all three histograms are **byte-identical**
+(md5 `bf21f8b059edb62ce2293a77e07f4a10`). With the jar present or absent, 37.5 million draws
+through the shipped table code produce bit-for-bit the same output: the jar does not alter any
+loot-table code path, so every item's table probability — including the rarest tail entries —
+is unchanged *exactly*. What the jar does change about loot is only which Random instance feeds
+the draws and how items are delivered to chests; those delivery-level effects are what the
+report tables above measure.
 
 ## Reports
 
