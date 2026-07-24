@@ -25,6 +25,9 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (Boolean.getBoolean("probe.parallelnoise") && loadedMods.contains("RWG")) {
             mixins.add("ChunkGeneratorRealisticMixin");
         }
+        if (Boolean.getBoolean("probe.fastnoise") && loadedMods.contains("RWG")) {
+            mixins.add("PerlinNoiseMixin");
+        }
         return mixins;
     }
 }

@@ -163,6 +163,9 @@ public class WorldgenProbe {
             if (jOrder != null) System.setProperty("probe.order", jOrder);
             if (jRadius != null) System.setProperty("probe.radius", jRadius);
             if (jOut != null) System.setProperty("probe.out", jOut);
+            setOrClear("probe.search", jsonField(json, "search"));
+            setOrClear("probe.dim0only", jsonField(json, "dim0only"));
+            setOrClear("probe.nohash", jsonField(json, "nohash"));
             injectLevelSeed(seed);
             LOG.info("[probe] CRIU resume: level-seed={} order={} out={}", seed, jOrder, jOut);
         } catch (Exception e) {

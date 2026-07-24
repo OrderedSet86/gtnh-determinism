@@ -8,9 +8,12 @@
 # Usage: criu-harness.sh <server-dir> <images-dir> checkpoint
 #        criu-harness.sh <server-dir> <images-dir> run <seed> <order> <out.json> [radius]
 #
-# Requires: criu (root or CAP_SYS_ADMIN — typically run under sudo), worldgenprobe >= 0.3.
-# Sequential restores only: CRIU restores the original PID and the bound server port, so
-# parallel restores need PID/net namespaces (not implemented here).
+# Requires: criu with `setcap cap_checkpoint_restore,cap_sys_ptrace+eip` (or root), worldgenprobe >= 0.3.
+# Restores run inside fresh user+pid+net namespaces (unshare -Urpfn): the image's original PID is
+# always free there, and the restored listening socket lands in a netns the user namespace owns
+# (the probe never uses the network). The checkpoint aligns RLIMIT_NOFILE soft=hard first so the
+# unprivileged restore never has to raise a limit. Parallel restores = one namespace set each; the
+# images dir is read-only at restore time so concurrent restores can share it.
 set -euo pipefail
 
 SERVER_DIR=$1
@@ -49,7 +52,8 @@ EOF
   if [ -f java9args.txt ]; then JAVA_ARGS="@java9args.txt"; fi
   # -XX:-UsePerfData: no hsperfdata mmap for criu to trip on; stdin </dev/null so the
   # console-reader thread EOFs and exits before the dump. probe.order/out are placeholders —
-  # every restore overrides them from go.json.
+  # every restore overrides them from go.json. ulimit soft=hard: see header (unprivileged restore).
+  ulimit -n "$(ulimit -Hn)"
   setsid "$JAVA_BIN" $JAVA_ARGS \
     -Xmx6G -Xms6G -XX:-UsePerfData \
     -Dprobe.criu="$CTL" -Dprobe.order=rows -Dprobe.radius=4 -Dprobe.out=placeholder.json \
@@ -64,7 +68,15 @@ EOF
   [ -f "$CTL/ready" ] || { echo "barrier never reached" >&2; exit 1; }
   PID=$(cat "$CTL/ready")
   echo "barrier reached (pid $PID), dumping…"
-  criu dump -t "$PID" --images-dir "$IMAGES_DIR" --file-locks --shell-job -v1
+  criu dump -t "$PID" --images-dir "$IMAGES_DIR" --file-locks --shell-job --unprivileged -v1
+  # this criu leaves the dumped tree STOPPED (not killed): a stopped JVM still holds .probe.lock and
+  # still races restores for go.json — kill it explicitly (SIGKILL only lands after SIGCONT thaws it)
+  if kill -0 "$PID" 2>/dev/null; then
+    kill -9 "$PID" 2>/dev/null || true
+    kill -CONT "$PID" 2>/dev/null || true
+    for i in $(seq 1 10); do kill -0 "$PID" 2>/dev/null || break; sleep 1; done
+    kill -0 "$PID" 2>/dev/null && { echo "dumped JVM $PID would not die" >&2; exit 1; }
+  fi
   echo "checkpoint complete: $IMAGES_DIR"
   ;;
 run)
@@ -75,22 +87,20 @@ run)
   flock -n 9 || { echo "another probe run holds $SERVER_DIR/.probe.lock; aborting" >&2; exit 1; }
   rm -rf World world
   rm -f "$OUT"
-  printf '{"seed": %s, "order": "%s", "radius": %s, "out": "%s"}\n' "$SEED" "$ORDER" "$RADIUS" "$OUT" > "$CTL/go.json"
+  printf '{"seed": %s, "order": "%s", "radius": %s, "out": "%s", "search": "%s", "dim0only": "%s", "nohash": "%s"}\n' \
+    "$SEED" "$ORDER" "$RADIUS" "$OUT" "${PROBE_SEARCH:-false}" "${PROBE_DIM0ONLY:-false}" "${PROBE_NOHASH:-false}" > "$CTL/go.json"
   T0=$(date +%s)
-  criu restore --images-dir "$IMAGES_DIR" --file-locks --shell-job -d -v1
-  echo "restored; waiting for $OUT…"
-  for i in $(seq 1 600); do
-    [ -f "$OUT" ] && break
-    sleep 1
-  done
+  # Foreground restore in the INIT namespaces: the image's original PID is free because checkpoint
+  # kills the dumped tree, and the file caps on criu only work fully in the init userns (namespaced
+  # restores fail on rlimit/SO_*FORCE, which need init-userns CAP_SYS_RESOURCE/CAP_NET_ADMIN).
+  # criu (no -d) parents the restored JVM, so this command returns when the probe run finishes and
+  # the server exits. Sequential restores only (PID + port live in the shared namespaces).
+  criu restore --images-dir "$IMAGES_DIR" --file-locks --shell-job --unprivileged -v1 \
+    --log-file "$IMAGES_DIR/restore.log" \
+    || { echo "restore failed; see $IMAGES_DIR/restore.log" >&2; rm -f "$CTL/go.json"; exit 1; }
   rm -f "$CTL/go.json"
-  [ -f "$OUT" ] || { echo "probe JSON never appeared" >&2; exit 1; }
+  [ -f "$OUT" ] || { echo "probe JSON never appeared (restored server exited without writing it)" >&2; exit 1; }
   echo "seed $SEED done in $(( $(date +%s) - T0 ))s -> $OUT"
-  # the restored server shuts itself down after the probe; wait for it to release the port
-  for i in $(seq 1 60); do
-    kill -0 "$(cat "$CTL/ready")" 2>/dev/null || break
-    sleep 1
-  done
   ;;
 *)
   echo "unknown command: $CMD (use checkpoint | run)" >&2; exit 1 ;;
