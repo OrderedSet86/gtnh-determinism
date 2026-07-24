@@ -46,11 +46,16 @@ report tables above measure.
   seeds x 2 repeats = 100 regions) vs the 0.4 release jar (same 50 seeds x 1 = 50 regions),
   all cold runs. Result: **3 FAIL rows of 538** (~0.5 expected false at the 99.9% threshold),
   all ultra-rare chest items (≤0.2 per 100 chests, single-digit observation counts per arm):
-  `TConstruct:handGuard:2` (x0.31 — recurs from the old arm, worth a targeted follow-up),
-  `witchery:ingredient:24` (x2.4) and `BiomesOPlenty:flippers:0` (x3.0, first appearance).
-  Since the Monte-Carlo certifies table probabilities identical bit-for-bit, any real effect
-  behind these rows must be delivery-level (draw volume / chest placement), and at these counts
-  heavy-tailed sampling is the likelier explanation for two of the three. Everything
+  `TConstruct:handGuard:2` (x0.31), `witchery:ingredient:24` (x2.4), `BiomesOPlenty:flippers:0`
+  (x3.0). The handGuard row was investigated to closure: it comes from the Tinkers village
+  tool-workshop chest — a uniform 145-entry table drawn with the village structure rand through
+  vanilla chest-fill code that no mixin touches. Per-seed counts are byte-identical between two
+  independent fixed-arm generations (60/60 seeds), confirming the fixed arm is one deterministic
+  realization per seed rather than an independent sample; a rare item landing low in that single
+  realization is expected tail behavior, not a rate change. The same one-realization argument
+  applies to the other two rows. Note the general subtlety for future reports: with the jar,
+  "more seeds" is the only way to grow the fixed arm's effective sample — repeats are identical
+  by design. Everything
   routing-relevant — all vein materials, small ores, village pieces, witchery structure counts,
   and every common chest item — passes or is centered on 1.0: the previously reported fireworks
   (-33%) and Alunite (+15%) deltas remain non-significant under clustering (point estimates
