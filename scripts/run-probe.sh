@@ -40,6 +40,7 @@ level-type=rwg
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1
+server-port=${PROBE_PORT:-25565}
 motd=worldgen probe
 EOF
 echo "eula=true" > eula.txt

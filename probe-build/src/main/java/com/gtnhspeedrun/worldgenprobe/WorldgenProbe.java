@@ -12,11 +12,22 @@ import java.util.TreeMap;
 import net.minecraft.nbt.NBTBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.world.WorldManager;
 import net.minecraft.world.WorldServer;
+import net.minecraft.world.WorldServerMulti;
+import net.minecraft.world.WorldSettings;
+import net.minecraft.world.WorldType;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.NibbleArray;
 import net.minecraft.world.chunk.storage.ExtendedBlockStorage;
+import net.minecraft.world.storage.ISaveHandler;
+import net.minecraft.world.storage.ThreadedFileIOBase;
+import net.minecraft.world.storage.WorldInfo;
+import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.world.WorldEvent;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,17 +36,6 @@ import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.WorldManager;
-import net.minecraft.world.WorldServerMulti;
-import net.minecraft.world.WorldSettings;
-import net.minecraft.world.WorldType;
-import net.minecraft.world.storage.ISaveHandler;
-import net.minecraft.world.storage.ThreadedFileIOBase;
-import net.minecraft.world.storage.WorldInfo;
-import net.minecraftforge.common.DimensionManager;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.world.WorldEvent;
 
 /**
  * Headless worldgen determinism probe for the GTNH speedrun community.
@@ -60,10 +60,14 @@ public class WorldgenProbe {
     public static final String MODID = "worldgenprobe";
     public static final Logger LOG = LogManager.getLogger(MODID);
 
+    /** EndlessIDs (2.9.0+/daily packs, replaces NEID) forbids raw section-array reads — see hashChunk. */
+    private static final boolean ENDLESS_IDS = cpw.mods.fml.common.Loader.isModLoaded("endlessids");
+
     /**
      * CRIU checkpoint barrier. With -Dprobe.criu=<control-dir>, this handler blocks the server thread after mod
      * loading but before DedicatedServer.startServer parses level-seed (the port is already bound at this point,
-     * which is fine for sequential restores). The external harness dumps the frozen JVM here; every restore resumes in the
+     * which is fine for sequential restores). The external harness dumps the frozen JVM here; every restore resumes in
+     * the
      * poll loop, reads <control-dir>/go.json ({"seed":..,"order":"..","radius":..,"out":".."}), injects the seed into
      * the live PropertyManager and the probe params into system properties, then lets startServer continue: seed
      * parse -> loadAllWorlds -> FMLServerStartedEvent -> normal probe run.
@@ -138,9 +142,7 @@ public class WorldgenProbe {
             }
             LOG.info("[probe] CRIU barrier up (pid {}), waiting for {}", pid, go);
             while (!go.exists()) Thread.sleep(200);
-            final String json = new String(
-                java.nio.file.Files.readAllBytes(go.toPath()),
-                StandardCharsets.UTF_8);
+            final String json = new String(java.nio.file.Files.readAllBytes(go.toPath()), StandardCharsets.UTF_8);
             final String seed = jsonField(json, "seed");
             if (seed == null) throw new IllegalStateException("go.json missing \"seed\": " + json);
             final String jOrder = jsonField(json, "order");
@@ -181,7 +183,8 @@ public class WorldgenProbe {
                 break;
             }
         }
-        if (propertyManager == null) throw new IllegalStateException("no PropertyManager field on " + server.getClass());
+        if (propertyManager == null)
+            throw new IllegalStateException("no PropertyManager field on " + server.getClass());
         for (java.lang.reflect.Field f : propertyManager.getClass()
             .getDeclaredFields()) {
             if (java.util.Properties.class.isAssignableFrom(f.getType())) {
@@ -275,9 +278,7 @@ public class WorldgenProbe {
             final long t0 = System.currentTimeMillis();
             String error = null;
             try {
-                final String json = new String(
-                    java.nio.file.Files.readAllBytes(job.toPath()),
-                    StandardCharsets.UTF_8);
+                final String json = new String(java.nio.file.Files.readAllBytes(job.toPath()), StandardCharsets.UTF_8);
                 // {"save": "true"} job: persist the CURRENT world completely (save + drain async IO + flush)
                 // while the JVM lives — shutdown-path saves lose queued region writes to System.exit.
                 if ("true".equals(jsonField(json, "save"))) {
@@ -289,10 +290,10 @@ public class WorldgenProbe {
                     if (curSh instanceof net.minecraft.world.storage.SaveHandler) {
                         java.lang.reflect.Method lockM;
                         try {
-                            lockM = net.minecraft.world.storage.SaveHandler.class
-                                .getDeclaredMethod("setSessionLock");
+                            lockM = net.minecraft.world.storage.SaveHandler.class.getDeclaredMethod("setSessionLock");
                         } catch (NoSuchMethodException e) {
-                            lockM = net.minecraft.world.storage.SaveHandler.class.getDeclaredMethod("func_75766_h"); // reobf name
+                            lockM = net.minecraft.world.storage.SaveHandler.class.getDeclaredMethod("func_75766_h"); // reobf
+                                                                                                                     // name
                         }
                         lockM.setAccessible(true);
                         lockM.invoke(curSh);
@@ -514,8 +515,7 @@ public class WorldgenProbe {
 
     private static String outFor(String template, long seed) {
         if (template.contains("{seed}")) return template.replace("{seed}", Long.toString(seed));
-        if (template.endsWith(".json"))
-            return template.substring(0, template.length() - 5) + "-" + seed + ".json";
+        if (template.endsWith(".json")) return template.substring(0, template.length() - 5) + "-" + seed + ".json";
         return template + "-" + seed;
     }
 
@@ -624,8 +624,7 @@ public class WorldgenProbe {
         final java.lang.reflect.Field popF = cofhWh.getDeclaredField("populatingChunks");
         popF.setAccessible(true);
         final java.util.Collection<?> popChunks = (java.util.Collection<?>) popF.get(null);
-        if (!popChunks.isEmpty())
-            LOG.info("[probe] clearing {} stale CoFH populatingChunks entries", popChunks.size());
+        if (!popChunks.isEmpty()) LOG.info("[probe] clearing {} stale CoFH populatingChunks entries", popChunks.size());
         popChunks.clear();
         final Object cofhInst = cofhWh.getField("instance")
             .get(null);
@@ -720,13 +719,7 @@ public class WorldgenProbe {
             server.isHardcore(),
             worldType);
         settings.func_82750_a(genOpts == null ? "" : genOpts);
-        final WorldServer over = new WorldServer(
-            server,
-            sh,
-            server.getFolderName(),
-            0,
-            settings,
-            server.theProfiler);
+        final WorldServer over = new WorldServer(server, sh, server.getFolderName(), 0, settings, server.theProfiler);
         // probe.dim0only: skip recreating the ~12 non-overworld static dims per slot. Overworld probing never
         // touches them, and each recreated WorldServerMulti set stays pinned by mod dim-bookkeeping (measured
         // ~12 leaked worlds/slot in the 20-cycle jmap check) — dim0-only keeps long daemon batches flat.
@@ -762,8 +755,8 @@ public class WorldgenProbe {
                 .getDeclaredField("oregenPattern");
             f.setAccessible(true);
             final Object v = f.get(null);
-            if (v == null || !"EQUAL_SPACING".equals(((Enum<?>) v).name()))
-                throw new IllegalStateException("GT oregenPattern is " + v + " on a fresh world (expected EQUAL_SPACING)");
+            if (v == null || !"EQUAL_SPACING".equals(((Enum<?>) v).name())) throw new IllegalStateException(
+                "GT oregenPattern is " + v + " on a fresh world (expected EQUAL_SPACING)");
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("could not verify GT oregenPattern", e);
         }
@@ -944,8 +937,10 @@ public class WorldgenProbe {
                 final TileEntity te = (TileEntity) o;
                 final String key = te.xCoord + "," + te.yCoord + "," + te.zCoord;
                 if (!teMatchesBlock(fc, te)) {
-                    tes.put(key, "FILTERED " + te.getClass()
-                        .getSimpleName());
+                    tes.put(
+                        key,
+                        "FILTERED " + te.getClass()
+                            .getSimpleName());
                     continue;
                 }
                 final NBTTagCompound tag = new NBTTagCompound();
@@ -1133,10 +1128,7 @@ public class WorldgenProbe {
             sb.append("{\"s\": ")
                 .append(i)
                 .append(", \"id\": \"")
-                .append(
-                    jsonEscape(
-                        String.valueOf(
-                            net.minecraft.item.Item.itemRegistry.getNameForObject(st.getItem()))))
+                .append(jsonEscape(String.valueOf(net.minecraft.item.Item.itemRegistry.getNameForObject(st.getItem()))))
                 .append("\", \"d\": ")
                 .append(st.getItemDamage())
                 .append(", \"n\": ")
@@ -1273,17 +1265,41 @@ public class WorldgenProbe {
             } else {
                 sec.update((byte) 1);
                 all.update((byte) 1);
-                sec.update(ebs.getBlockLSBArray());
-                all.update(ebs.getBlockLSBArray());
-                final NibbleArray msb = ebs.getBlockMSBArray();
-                if (msb != null) {
-                    sec.update(msb.data);
-                    all.update(msb.data);
-                }
-                final NibbleArray meta = ebs.getMetadataArray();
-                if (meta != null) {
-                    sec.update(meta.data);
-                    all.update(meta.data);
+                if (ENDLESS_IDS) {
+                    // EndlessIDs hard-crashes the raw LSB/MSB array accessors; hash through the
+                    // per-block API instead. Different digest values than the raw path — never
+                    // compare probe JSONs across the two paths.
+                    final byte[] buf = new byte[16 * 16 * 16 * 6];
+                    int p = 0;
+                    for (int y = 0; y < 16; y++) {
+                        for (int z = 0; z < 16; z++) {
+                            for (int x = 0; x < 16; x++) {
+                                final int id = net.minecraft.block.Block.getIdFromBlock(ebs.getBlockByExtId(x, y, z));
+                                final int m = ebs.getExtBlockMetadata(x, y, z);
+                                buf[p++] = (byte) (id >>> 24);
+                                buf[p++] = (byte) (id >>> 16);
+                                buf[p++] = (byte) (id >>> 8);
+                                buf[p++] = (byte) id;
+                                buf[p++] = (byte) (m >>> 8);
+                                buf[p++] = (byte) m;
+                            }
+                        }
+                    }
+                    sec.update(buf);
+                    all.update(buf);
+                } else {
+                    sec.update(ebs.getBlockLSBArray());
+                    all.update(ebs.getBlockLSBArray());
+                    final NibbleArray msb = ebs.getBlockMSBArray();
+                    if (msb != null) {
+                        sec.update(msb.data);
+                        all.update(msb.data);
+                    }
+                    final NibbleArray meta = ebs.getMetadataArray();
+                    if (meta != null) {
+                        sec.update(meta.data);
+                        all.update(meta.data);
+                    }
                 }
             }
             out.append("\"")
@@ -1409,9 +1425,8 @@ public class WorldgenProbe {
                                             && !java.util.Collection.class.isAssignableFrom(g.getType())) continue;
                                         g.setAccessible(true);
                                         final Object gv = g.get(v);
-                                        if (gv != null) logIfInterestingCollection(
-                                            cls + "." + f.getName() + ">" + g.getName(),
-                                            gv);
+                                        if (gv != null)
+                                            logIfInterestingCollection(cls + "." + f.getName() + ">" + g.getName(), gv);
                                     }
                                 }
                             } catch (Throwable ignored) {}
@@ -1459,7 +1474,12 @@ public class WorldgenProbe {
             size,
             keyCls,
             String.valueOf(firstKey)
-                .substring(0, Math.min(60, String.valueOf(firstKey).length())));
+                .substring(
+                    0,
+                    Math.min(
+                        60,
+                        String.valueOf(firstKey)
+                            .length())));
     }
 
     /** Logs every non-empty Map/Collection instance field on owner (its class hierarchy) — bisect diagnostic. */

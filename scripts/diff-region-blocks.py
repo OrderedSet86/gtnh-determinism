@@ -77,6 +77,15 @@ def section_blocks(sec):
     else:
         data = sec["Data"]
         metas = [(data[i >> 1] >> ((i & 1) * 4)) & 0xF for i in range(4096)]
+        if "Data1High" in sec:  # EndlessIDs (2.9.0+/daily): metadata bits 4-7
+            hi = sec["Data1High"]
+            for i in range(4096):
+                nib = (hi[i >> 1] >> ((i & 1) * 4)) & 0xF
+                metas[i] |= nib << 4
+        if "Data2" in sec:  # EndlessIDs: metadata bits 8-15 (GT ore rework materials live here)
+            d2 = sec["Data2"]
+            for i in range(4096):
+                metas[i] |= d2[i] << 8
     return ids, metas
 
 
