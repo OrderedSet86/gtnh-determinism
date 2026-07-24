@@ -13,6 +13,9 @@
 #               2.8.4 memory: slots leak ~0.5G each — use PROBE_XMX=10G with batches of ~10.
 #
 # Output: <out-dir>/seed-<seed>.json (+ gtmats.json once), resume-safe (existing files skipped).
+#
+# For shared-machine / elastic runs prefer scripts/criu-pool.sh (RAM-reserve-gated CRIU restores,
+# zero idle footprint); this warm-batch path remains the max-throughput choice for dedicated boxes.
 set -euo pipefail
 
 SERVER_DIR=$1

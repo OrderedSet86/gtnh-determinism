@@ -44,6 +44,8 @@ level-type=rwg
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1
+server-port=${PROBE_PORT:-25565}
+server-ip=127.0.0.1
 motd=worldgen probe (criu)
 EOF
   echo "eula=true" > eula.txt
@@ -55,7 +57,7 @@ EOF
   # every restore overrides them from go.json. ulimit soft=hard: see header (unprivileged restore).
   ulimit -n "$(ulimit -Hn)"
   setsid "$JAVA_BIN" $JAVA_ARGS \
-    -Xmx6G -Xms6G -XX:-UsePerfData \
+    -Xmx"${PROBE_XMX:-6G}" -Xms"${PROBE_XMX:-6G}" -XX:-UsePerfData \
     -Dprobe.criu="$CTL" -Dprobe.order=rows -Dprobe.radius=4 -Dprobe.out=placeholder.json \
     -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
     -jar "$LAUNCH_JAR" nogui < /dev/null > "$IMAGES_DIR/boot.log" 2>&1 &
@@ -68,7 +70,30 @@ EOF
   [ -f "$CTL/ready" ] || { echo "barrier never reached" >&2; exit 1; }
   PID=$(cat "$CTL/ready")
   echo "barrier reached (pid $PID), dumping…"
+  # Enumerate every regular file the JVM holds a WRITABLE fd on: criu validates their
+  # sizes/presence at every restore, but restored runs append to them and clean exits even delete
+  # .lck files — so each restore must first reset them to dump-time state. The fd table must be
+  # read BEFORE the dump (criu may kill the tree at dump completion); the tar happens AFTER, when
+  # the sizes are final. Derived from the live fd table, not a curated list.
+  MUT_LIST="$IMAGES_DIR/mutable-files.list"
+  : > "$MUT_LIST"
+  for fd in /proc/$PID/fd/*; do
+    tgt=$(readlink "$fd" 2>/dev/null) || continue
+    [ -f "$tgt" ] || continue
+    flags=$(awk '/^flags:/{print $2}' "/proc/$PID/fdinfo/$(basename "$fd")" 2>/dev/null) || continue
+    [ -n "$flags" ] || continue
+    case $((8#$flags & 3)) in 1|2) echo "${tgt#/}" >> "$MUT_LIST" ;; esac
+  done
+  # Also capture file-backed mmaps under the server dir: mods extract native libs there at boot,
+  # map them, and DELETE them on clean exit (OpenComputers' libjnlua .so) — a restore then fails
+  # opening the vma. mmaps don't appear in the fd table; /proc/PID/maps has them.
+  SD_ABS=$(cd "$SERVER_DIR" && pwd)
+  awk -v sd="$SD_ABS/" 'NF>=6 && index($6, sd) == 1 { print substr($6, 2) }' "/proc/$PID/maps" >> "$MUT_LIST"
+  sort -u "$MUT_LIST" -o "$MUT_LIST"
+  [ -s "$MUT_LIST" ] || { echo "fd-table scan found no writable files — aborting (would break repeat restores)" >&2; exit 1; }
   criu dump -t "$PID" --images-dir "$IMAGES_DIR" --file-locks --shell-job --unprivileged -v1
+  tar -C / -cf "$IMAGES_DIR/mutable.pristine.tar" -T "$MUT_LIST"
+  echo "snapshotted $(wc -l < "$MUT_LIST") mutable files"
   # this criu leaves the dumped tree STOPPED (not killed): a stopped JVM still holds .probe.lock and
   # still races restores for go.json — kill it explicitly (SIGKILL only lands after SIGCONT thaws it)
   if kill -0 "$PID" 2>/dev/null; then
@@ -77,6 +102,12 @@ EOF
     for i in $(seq 1 10); do kill -0 "$PID" 2>/dev/null || break; sleep 1; done
     kill -0 "$PID" 2>/dev/null && { echo "dumped JVM $PID would not die" >&2; exit 1; }
   fi
+  # The image holds open append-mode fds on boot.log (stdout) and the server's logs/ files, and
+  # criu validates each file's SIZE at restore — but every restored run APPENDS to them, so
+  # without these snapshots each image restores exactly once. Keep dump-time copies and restore
+  # them before every run.
+  cp "$IMAGES_DIR/boot.log" "$IMAGES_DIR/boot.log.pristine"
+  tar -C "$SERVER_DIR" -cf "$IMAGES_DIR/logs.pristine.tar" logs
   echo "checkpoint complete: $IMAGES_DIR"
   ;;
 run)
@@ -90,6 +121,15 @@ run)
   flock -n 9 || { echo "another criu run active in $SERVER_DIR; aborting" >&2; exit 1; }
   # the image holds an open fd on .probe.lock — criu reopens it BY PATH, so the file must exist
   [ -f .probe.lock ] || touch .probe.lock
+  # reset all dump-time-writable files to dump-time state (restored runs append to / delete them;
+  # criu validates sizes and presence at restore)
+  if [ -f "$IMAGES_DIR/mutable.pristine.tar" ]; then
+    tar -C / -xpf "$IMAGES_DIR/mutable.pristine.tar"
+  else
+    # legacy images (pre-manifest): best-effort reset of the known mutable set
+    [ -f "$IMAGES_DIR/boot.log.pristine" ] && cp -f "$IMAGES_DIR/boot.log.pristine" "$IMAGES_DIR/boot.log"
+    [ -f "$IMAGES_DIR/logs.pristine.tar" ] && { rm -rf logs; tar -C "$SERVER_DIR" -xf "$IMAGES_DIR/logs.pristine.tar"; }
+  fi
   rm -rf World world
   rm -f "$OUT"
   printf '{"seed": %s, "order": "%s", "radius": %s, "out": "%s", "search": "%s", "dim0only": "%s", "nohash": "%s"}\n' \
@@ -100,7 +140,7 @@ run)
   # restores fail on rlimit/SO_*FORCE, which need init-userns CAP_SYS_RESOURCE/CAP_NET_ADMIN).
   # criu (no -d) parents the restored JVM, so this command returns when the probe run finishes and
   # the server exits. Sequential restores only (PID + port live in the shared namespaces).
-  criu restore --images-dir "$IMAGES_DIR" --file-locks --shell-job --unprivileged -v1 \
+  criu restore --images-dir "$IMAGES_DIR" --file-locks --shell-job --unprivileged --skip-file-rwx-check -v1 \
     --log-file "$IMAGES_DIR/restore.log" \
     || { echo "restore failed; see $IMAGES_DIR/restore.log" >&2; rm -f "$CTL/go.json"; exit 1; }
   rm -f "$CTL/go.json"
