@@ -4,10 +4,13 @@
 # Usage: seed-search.sh <server-dir> <seed-file> <out-dir> [radius] [batch-size]
 #   seed-file:  one seed per line (or comma/space separated)
 #   radius:     chunks around spawn-region origin to report on (default 15 — chest sweep range)
-#   batch-size: seeds per JVM boot (default 25). NOTE: until the cross-seed ore-TE contamination
-#               bug (HANDOFF "Harness speed session") is root-caused, ore host-stone variants from
-#               slot 2+ may carry noise; ore MATERIAL (m%1000), chests, villages, biomes, water/clay
-#               were unaffected in all observed cases. Set batch-size=1 for fully clean ore variants.
+#   batch-size: seeds per JVM boot (default 25). NOTE: batch-size=1 is NOT a cold boot — every
+#               batch boots on seed 1 and RECREATES per seed (warm mechanics). With probe >=0.6
+#               (ChestGenHooks pre/post-server snapshot restore) warm slots are certified
+#               byte-identical to true cold runs (4 seeds / 189 chests, 2.8.4); with older probe
+#               jars, spawn-window structure chests roll post-ServerStarting loot tables = wrong
+#               vs real worlds. Residual known noise: ore host-stone variants (HANDOFF).
+#               2.8.4 memory: slots leak ~0.5G each — use PROBE_XMX=10G with batches of ~10.
 #
 # Output: <out-dir>/seed-<seed>.json (+ gtmats.json once), resume-safe (existing files skipped).
 set -euo pipefail

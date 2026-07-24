@@ -26,6 +26,16 @@ loot profile (iridium shards / binding agent markers) instead of altitude — ca
 sunken ruins, excludes Roguelike. `--rank a,b` sorts by a subset while still
 displaying all `--items`.
 
+## Corpus facts (GTNH 2.8.4)
+
+- Village chests DO contain GT ingots on 2.8.4 (steel, bronze, brass — brass is
+  village-only in practice); bronze in chests is ~10× richer than 2.7.4.
+- Spawn-window quirk (all real 2.8.4 worlds): dungeon chests inside the spawn
+  preload roll the pre-`FMLServerStarting` loot table (TooMuchLoot's rewrite hasn't
+  run yet — 119 vs 139 dungeonChest entries, no stainless/aluminium ingot entries);
+  chests generated later use the full table. Probe reports (probe >= 0.6) reproduce
+  this faithfully.
+
 ## Corpus facts (seedlib-0.4-60seeds, GTNH 2.7.4, radius-15 spawn window)
 
 - Village chests contain **zero** GT ingots (241 chests / 60 seeds checked) — chest

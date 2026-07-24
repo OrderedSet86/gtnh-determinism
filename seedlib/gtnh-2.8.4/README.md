@@ -1,15 +1,22 @@
-# Seed library: GTNH 2.8.4, 0.4 jar, 100 random seeds
+# Seed library: GTNH 2.8.4 — regeneration pending
 
-Per-seed probe search reports (radius-15 spawn window: chest inventories, GT ore
-histograms, biomes, water/clay, villages, witchery) for the **2.8.4 server pack**
-(latest stable) with the release 0.4 fix jar. Query with scripts/searchlib.py or
-seedsearch/ingot-hunt.py.
+The first 100-seed corpus (warm batches, probe 5b42e54) was **withdrawn**: warm slots
+generated their spawn preload with post-`FMLServerStarting` loot tables, while real
+worlds (and cold boots) fill spawn-region chests BEFORE TooMuchLoot rewrites the
+tables at ServerStarting (`dungeonChest` 119→139 entries). Every spawn-window
+structure chest rolled deterministic-but-wrong loot (~17 chests/seed).
+
+Probe `worldgenprobe-0.6` fixes warm mode: it snapshots ChestGenHooks at
+FMLLoadComplete (pre-server) and post-boot, restoring the pre-server tables around
+each slot's recreate/preload and the post-boot tables for the walk. **Certified
+warm == true-cold byte-identical** on 4 seeds / 189 chests (seed 4403169046063099793
++ 3 others, content and existence).
+
+Regeneration of the 100-seed corpus (seeds: ../gtnh-2.8.4-seeds-100.txt) with the
+fixed probe is scheduled; until then no tarball is published here.
 
 - pack: GT_New_Horizons_2.8.4_Server_Java_17-25.zip
-- fix jar: gtnhdeterminism-0.4pre.jar md5 044d86ca21f8596775be3250d0579add (= release 0.4)
-- probe jar: worldgenprobe-5b42e54 (EndlessIDs-conditional build; 2.8.4 uses the NEID raw path)
-- seeds: 100 random 64-bit (../gtnh-2.8.4-seeds-100.txt, generated 2026-07-24 via secrets)
-- run mode: WARM batches (25 seeds/JVM) — chests/villages/witchery/biomes/water/clay
-  are cold-parity-clean; ore host-STONE-variant digits in slot 2+ may carry the known
-  cross-seed contamination noise (ore MATERIAL unaffected). Use cold runs to verify
-  finalists.
+- fix jar: gtnhdeterminism 0.4 (md5 044d86ca21f8596775be3250d0579add)
+- NOTE for routing: in every real 2.8.4 world, spawn-region dungeon chests roll the
+  smaller pre-ServerStarting loot table (fewer GT ingots, no stainless/aluminium
+  entries); chests generated outside the spawn preload use the full table.

@@ -128,6 +128,18 @@ public class WorldgenProbe {
 
     @Mod.EventHandler
     public void loadComplete(FMLLoadCompleteEvent event) {
+        // Pre-ServerStarting loot-table snapshot: cold boots generate the SPAWN REGION during loadAllWorlds,
+        // BEFORE FMLServerStartingEvent mutates ChestGenHooks (TooMuchLoot rewrites categories there). Warm
+        // recreates run their replicated spawn preload long after that mutation, so spawn-region chests roll
+        // post-TML loot — deterministically different from every real/cold world (the 2.8.4 warm chest
+        // contamination: 17 wrong chests, all inside the preload radius). Captured here (post-init, pre-server)
+        // and restored around each warm recreate so preload-time table state matches a cold boot exactly.
+        try {
+            lootSnapPre = captureLootTables();
+            LOG.info("[probe] pre-server loot snapshot: {} categories", lootSnapPre.size());
+        } catch (Throwable t) {
+            LOG.warn("[probe] pre-server loot snapshot failed: {}", t.toString());
+        }
         final String ctl = System.getProperty("probe.criu");
         if (ctl == null) return;
         try {
@@ -343,9 +355,12 @@ public class WorldgenProbe {
                 setOrClear("probe.cz", jsonField(json, "cz"));
                 final long seed = Long.parseLong(seedS);
                 clearPopSeq();
+                ensurePostBootLootSnapshot();
                 teardownAllWorlds(server);
                 resetStatics();
+                restoreLootTables(lootSnapPre, "pre-server");
                 recreateWorlds(server, seed, worldType, genOpts);
+                restoreLootTables(lootSnapPost, "post-boot");
                 final WorldServer over = DimensionManager.getWorld(0);
                 if (over == null || over.getSeed() != seed)
                     throw new IllegalStateException("recreated overworld missing or wrong seed");
@@ -477,12 +492,15 @@ public class WorldgenProbe {
         final WorldType worldType = bootInfo.getTerrainType();
         final String genOpts = bootInfo.getGeneratorOptions();
         LOG.info("[probe] warm batch: {} seeds, worldType={}", seeds.length, worldType.getWorldTypeName());
+        ensurePostBootLootSnapshot();
         for (int i = 0; i < seeds.length; i++) {
             final long t0 = System.currentTimeMillis();
             clearPopSeq();
             teardownAllWorlds(server);
             resetStatics();
+            restoreLootTables(lootSnapPre, "pre-server"); // spawn preload must see cold-boot table state
             recreateWorlds(server, seeds[i], worldType, genOpts);
+            restoreLootTables(lootSnapPost, "post-boot"); // the walk generates with fully-loaded tables
             final WorldServer over = DimensionManager.getWorld(0);
             if (over == null || over.getSeed() != seeds[i])
                 throw new IllegalStateException("recreated overworld missing or wrong seed");
@@ -683,6 +701,126 @@ public class WorldgenProbe {
                 "[probe] gtnhdeterminism fix jar NOT installed — warm-mode results are only meaningful with the fixes");
         }
         LOG.info("[probe] static reset done (TC maze+nodes, witchery list, GT veins, RWG saveddata, oracle)");
+    }
+
+    /**
+     * ChestGenHooks loot tables are static, add-only, and mutated at runtime (TML rewrites at ServerStarting;
+     * some mods re-register per world). A table that drifts between warm slots changes chest CONTENTS while
+     * leaving placement draws untouched (selection walks accumulated weights; the draw count stays the same) —
+     * observed as the 2.8.4 warm-slot chest-loot contamination (same chest positions, different items). Snapshot
+     * every category's contents list at the FIRST between-seed reset (post-boot state = what a cold run's walk
+     * starts from) and restore before each slot, logging any drift so the mutating mod is named in the log.
+     */
+    private static java.util.Map<String, java.util.List<Object>> lootSnapPre; // at FMLLoadComplete (pre-TML)
+    private static java.util.Map<String, java.util.List<Object>> lootSnapPost; // post-boot (post-TML)
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, net.minecraftforge.common.ChestGenHooks> chestInfo() throws Exception {
+        final java.lang.reflect.Field infoF = net.minecraftforge.common.ChestGenHooks.class
+            .getDeclaredField("chestInfo");
+        infoF.setAccessible(true);
+        return (Map<String, net.minecraftforge.common.ChestGenHooks>) infoF.get(null);
+    }
+
+    private static java.lang.reflect.Field lootContentsField() throws Exception {
+        final java.lang.reflect.Field f = net.minecraftforge.common.ChestGenHooks.class.getDeclaredField("contents");
+        f.setAccessible(true);
+        return f;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.Map<String, java.util.List<Object>> captureLootTables() throws Exception {
+        final java.lang.reflect.Field contentsF = lootContentsField();
+        final java.util.Map<String, java.util.List<Object>> snap = new java.util.HashMap<>();
+        for (Map.Entry<String, net.minecraftforge.common.ChestGenHooks> e : chestInfo().entrySet()) {
+            snap.put(e.getKey(), new ArrayList<>((java.util.List<Object>) contentsF.get(e.getValue())));
+        }
+        return snap;
+    }
+
+    /** Ensure the post-boot snapshot exists; call once before any warm slot mutates table state. */
+    private static void ensurePostBootLootSnapshot() throws Exception {
+        if (lootSnapPost != null) return;
+        lootSnapPost = captureLootTables();
+        LOG.info("[probe] post-boot loot snapshot: {} categories", lootSnapPost.size());
+        if (lootSnapPre != null) {
+            for (Map.Entry<String, java.util.List<Object>> e : lootSnapPost.entrySet()) {
+                final java.util.List<Object> pre = lootSnapPre.get(e.getKey());
+                if (pre != null && !lootDigest(pre).equals(lootDigest(e.getValue()))) {
+                    LOG.info(
+                        "[probe][loot] category {} is mutated between load-complete and server-started "
+                            + "({} -> {} entries) — spawn-preload chests roll the FORMER in cold boots:",
+                        e.getKey(),
+                        pre.size(),
+                        e.getValue()
+                            .size());
+                    logLootDiff(e.getKey(), pre, e.getValue());
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void restoreLootTables(java.util.Map<String, java.util.List<Object>> snap, String label)
+        throws Exception {
+        if (snap == null) {
+            LOG.warn("[probe][loot] {} snapshot missing — cannot restore", label);
+            return;
+        }
+        final java.lang.reflect.Field contentsF = lootContentsField();
+        for (Map.Entry<String, net.minecraftforge.common.ChestGenHooks> e : chestInfo().entrySet()) {
+            final java.util.List<Object> live = (java.util.List<Object>) contentsF.get(e.getValue());
+            final java.util.List<Object> want = snap.get(e.getKey());
+            if (want == null) continue; // category appeared later; leave as-is
+            live.clear();
+            live.addAll(want);
+        }
+    }
+
+    private static String lootDigest(java.util.List<Object> contents) {
+        final StringBuilder sb = new StringBuilder();
+        for (Object o : contents) sb.append(describeLootEntry(o))
+            .append(";");
+        return Integer.toHexString(
+            sb.toString()
+                .hashCode())
+            + ":"
+            + contents.size();
+    }
+
+    private static String describeLootEntry(Object o) {
+        try {
+            final net.minecraft.util.WeightedRandomChestContent c = (net.minecraft.util.WeightedRandomChestContent) o;
+            final net.minecraft.item.ItemStack s = c.theItemId;
+            return net.minecraft.item.Item.itemRegistry.getNameForObject(s.getItem()) + "@"
+                + s.getItemDamage()
+                + "w"
+                + c.itemWeight
+                + "n"
+                + c.theMinimumChanceToGenerateItem
+                + "-"
+                + c.theMaximumChanceToGenerateItem
+                + (o.getClass() == net.minecraft.util.WeightedRandomChestContent.class ? ""
+                    : "!" + o.getClass()
+                        .getSimpleName());
+        } catch (Throwable t) {
+            return o.getClass()
+                .getName();
+        }
+    }
+
+    private static void logLootDiff(String cat, java.util.List<Object> snap, java.util.List<Object> live) {
+        final java.util.Map<String, Integer> a = new java.util.HashMap<>(), b = new java.util.HashMap<>();
+        for (Object o : snap) a.merge(describeLootEntry(o), 1, Integer::sum);
+        for (Object o : live) b.merge(describeLootEntry(o), 1, Integer::sum);
+        for (Map.Entry<String, Integer> e : b.entrySet()) {
+            final int extra = e.getValue() - a.getOrDefault(e.getKey(), 0);
+            if (extra > 0) LOG.warn("[probe][loot]   {} +{}x {}", cat, extra, e.getKey());
+        }
+        for (Map.Entry<String, Integer> e : a.entrySet()) {
+            final int missing = e.getValue() - b.getOrDefault(e.getKey(), 0);
+            if (missing > 0) LOG.warn("[probe][loot]   {} -{}x {}", cat, missing, e.getKey());
+        }
     }
 
     private static void clearMapField(Object owner, String name) throws Exception {
@@ -1412,6 +1550,7 @@ public class WorldgenProbe {
                                 final Object v = f.get(null);
                                 if (v == null) continue;
                                 logIfInterestingCollection(cls + "." + f.getName(), v);
+                                logIfRandom(cls + "." + f.getName(), v);
                                 // one-level descent: static singletons whose INSTANCE fields hold the real cache
                                 final String vc = v.getClass()
                                     .getName();
@@ -1438,6 +1577,23 @@ public class WorldgenProbe {
             }
         }
         LOG.info("[probe][staticsweep] scanned {} classes", scanned);
+    }
+
+    /** Sweep helper: log static java.util.Random-typed fields (lazily-seeded static RNGs leak across warm slots). */
+    private static void logIfRandom(String label, Object v) {
+        if (!(v instanceof java.util.Random)) return;
+        String state = "?";
+        try {
+            final java.lang.reflect.Field seedF = java.util.Random.class.getDeclaredField("seed");
+            seedF.setAccessible(true);
+            state = String.valueOf(((java.util.concurrent.atomic.AtomicLong) seedF.get(v)).get());
+        } catch (Throwable ignored) {}
+        LOG.info(
+            "[probe][staticsweep] RANDOM {} = {} (scrambled-seed {})",
+            label,
+            v.getClass()
+                .getName(),
+            state);
     }
 
     /** Sweep helper: log a Map/Collection if positional-keyed (any size) or sizeable (>=10 entries). */
