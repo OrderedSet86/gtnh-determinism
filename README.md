@@ -1,18 +1,13 @@
 # gtnh-determinism
 
-Same-seed world generation for GT: New Horizons 2.7.4 (1.7.10), made reproducible — so speedruns can
-be routed, seeds can be shared, and set-seed categories can be verified.
+Speedrun mod for GT: New Horizons 2.7.4+. Makes worldgen fully deterministic based on seed.
 
-Companion to the audit report (docs/gtnh-determinism-audit.html) and the `#run-determinism` Discord archive.
+Discord: https://discord.gg/PbMWTcnZgC
 
 ## The fix jar
 
-**Grab `gtnhdeterminism-0.4.jar` from [Releases](../../releases) and drop it into `mods/` of a stock
-GTNH 2.7.4 instance. No other changes, no config.**
-
-One jar carries every fix: a reflection fix for Forge/FML plus 23 late mixins, each gated on its
-target mod being present (the jar is safe on modified packs — a fix simply deactivates if its mod is
-absent).
+**Grab `gtnhdeterminism-0.4.jar` (or latest) from [Releases](../../releases) and drop it into `mods/` of a stock
+GTNH 2.7.4+ stable instance.**
 
 | Target | What was wrong | What the jar fixes |
 |---|---|---|
@@ -31,9 +26,9 @@ absent).
 
 ## Verification
 
-Every claim is tested headless against the actual GTNH 2.7.4 server pack with the WorldgenProbe
+Tested headless against the actual GTNH 2.7.4 server pack with the WorldgenProbe
 harness in this repo, and ground truth is the **persisted world** (region-file blocks + full
-tile-entity NBT, including chest contents), not just live hashes:
+tile-entity NBT, including chest contents):
 
 - **Launch tests** — same seed, two fresh JVMs, identical walk order: persisted worlds are
   **byte-identical** (primary seed: 1,184 chunks, 372,026 tile entities, zero differences —
@@ -43,9 +38,7 @@ tile-entity NBT, including chest contents), not just live hashes:
   chest contents identical.
 - **Balance evidence** — a 60-seed A/B corpus (stock vs fixed, cold runs) shows vein materials,
   small ores, village pieces, and witchery counts statistically equivalent (±10% bounds); a
-  500k-draw Monte-Carlo over the shipped loot tables certifies rare chest items. Two disclosed,
-  mechanistic deltas: one high-altitude vein type is ~15% more common (stock rerolled it away on
-  live terrain), and dungeon-placement semantics shift the chest-loot mix slightly.
+  500k-draw Monte-Carlo over the shipped loot tables certifies rare chest items.
 
 Known remaining variance (the fine print):
 
@@ -53,19 +46,16 @@ Known remaining variance (the fine print):
   endemic 1.7.10 behavior, not practically fixable per-mod. The routing layer is order-robust.
 - Whether a *deep* dungeon chest exists at all can depend on approach route (later lava-lake
   population can carve it) — surviving chests' contents never change. A fix (deferring dungeon
-  construction to tick time) is designed but changes when dungeons appear; pending a community call.
+  construction to tick time) is designed but not yet applied
 - Witchery village walls build on a delayed timer after generation; shape is still timing-dependent.
 - A few tens of blocks of deep underground (y1–4) dirt/gravel patches toggle per launch, one
-  contested flower position, and a rare sky-height anomaly — all under investigation, none
-  routing-relevant. GT ore tile-entity bookkeeping jitters in diffs without changing blocks.
+  contested flower position, and a rare sky-height anomaly
 
 **Adopting the jar re-rolls seeds once per jar version.** The fixes change how randomness is
 derived, so a seed produces a different — now canonical — world than stock (and than earlier jar
-versions). Old seed notes reset once, then hold for every runner, every launch. Existing saves are
-safe: only newly generated chunks are affected.
+versions). Existing saves are safe: only newly generated chunks are affected.
 
-**Reporting a worldgen bug?** Include the jar's md5 (`md5sum gtnhdeterminism-*.jar`) along with the
-seed and coordinates — it distinguishes stale copies from real regressions in one message.
+**Reporting a worldgen bug?** Please include the jar version, seed, and coordinates.
 
 ## Repo layout
 
@@ -100,9 +90,4 @@ Batch tooling (boot the 200-mod pack once, then ~10 s per world):
 - `scripts/effects-ab.sh` + `scripts/effects-report.py` + `scripts/balance-report.py` — stock-vs-fixed
   effects and balance-equivalence evidence
 
-All probe scripts need `PROBE_JAVA` pointed at a Java 17 runtime (the pack's supported range).
-
-## Releasing
-
-Actions → "Release jars" → enter a version (e.g. `0.4`). CI tags `v<version>`, builds both jars on
-the tag, and attaches them to a GitHub release.
+All probe scripts need `PROBE_JAVA` pointed at a Java 17-21 runtime (the pack's supported range).
