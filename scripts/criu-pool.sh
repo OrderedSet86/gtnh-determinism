@@ -116,7 +116,10 @@ run-batch)
   mkdir -p "$OUT_DIR"; OUT_DIR=$(cd "$OUT_DIR" && pwd)
   HEAP=$(cat "$POOL/heap" 2>/dev/null || echo 6G)
   HEAP_MB=$(( ${HEAP%G} * 1024 ))
-  RESERVE_MB=$(( ${RESERVE_GB:-24} * 1024 ))
+  # User policy (2026-07-24): the reserve on this system is never below 20G — clamp, don't trust flags.
+  RGB=${RESERVE_GB:-24}
+  if [ "$RGB" -lt 20 ]; then echo "RESERVE_GB=$RGB below the 20G floor — clamping to 20" >&2; RGB=20; fi
+  RESERVE_MB=$(( RGB * 1024 ))
   JOB_MB=${PER_JOB_MB:-$((HEAP_MB + 2048))}
   PROG=$OUT_DIR/pool-progress.txt
   rm -f "$POOL/stop"

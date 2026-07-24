@@ -497,10 +497,63 @@ public class WorldgenProbe {
         LOG.info("[probe] warm batch: {} seeds, worldType={}", seeds.length, worldType.getWorldTypeName());
         ensurePostBootLootSnapshot();
         for (int i = 0; i < seeds.length; i++) {
+            // one seed per METHOD CALL: the previous slot's WorldServer local must not linger in this
+            // frame's stack slots (JIT keeps loop locals live until overwritten — the last bounded
+            // ~390MB retainer the path hunter could not reach from any static/thread root)
+            runWarmSlot(server, seeds, i, order, radius, outTemplate, worldType, genOpts);
+        }
+    }
+
+    private void runWarmSlot(MinecraftServer server, long[] seeds, int i, String order, int radius, String outTemplate,
+        WorldType worldType, String genOpts) throws Exception {
+        {
             final long t0 = System.currentTimeMillis();
             clearPopSeq();
             teardownAllWorlds(server);
             resetStatics();
+            // -Dprobe.leakcheck=true: measure heap RETAINED after the old world is fully torn down and
+            // statics reset — a growing per-slot value is the warm-batch leak (~0.5G/slot on 2.8.4).
+            if (Boolean.getBoolean("probe.leakcheck")) {
+                System.gc();
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {}
+                System.gc();
+                final Runtime rt = Runtime.getRuntime();
+                LOG.info(
+                    "[probe][leak] slot {}: retained heap after teardown+reset+GC = {} MB",
+                    i + 1,
+                    (rt.totalMemory() - rt.freeMemory()) >> 20);
+                leakForensics();
+                // -Dprobe.leakpaths=true: BFS the live reference graph from every static field (all
+                // jars incl. forge/minecraft) + thread fields/ThreadLocals to any WEAKLY-TRACKED dead
+                // world that survived GC, and print the exact retention chain.
+                if (Boolean.getBoolean("probe.leakpaths")) {
+                    final List<Object> alive = new ArrayList<>();
+                    for (java.lang.ref.WeakReference<Object> wr : LEAK_TRACK) {
+                        final Object o = wr.get();
+                        if (o != null) alive.add(o);
+                    }
+                    LOG.info("[probe][leak] {} dead worlds still strongly reachable — hunting paths…", alive.size());
+                    if (!alive.isEmpty()) findPathsToTargets(alive);
+                }
+                // -Dprobe.leakdump=/path.hprof: write a LIVE heap dump at this exact point (post-
+                // teardown/reset/GC) on slot 3 — reflective walkers can't see every GC root; MAT can.
+                final String dumpPath = System.getProperty("probe.leakdump");
+                if (dumpPath != null && i + 1 == 3) {
+                    try {
+                        final com.sun.management.HotSpotDiagnosticMXBean hs = java.lang.management.ManagementFactory
+                            .newPlatformMXBeanProxy(
+                                java.lang.management.ManagementFactory.getPlatformMBeanServer(),
+                                "com.sun.management:type=HotSpotDiagnostic",
+                                com.sun.management.HotSpotDiagnosticMXBean.class);
+                        hs.dumpHeap(dumpPath, true);
+                        LOG.info("[probe][leak] heap dump written: {}", dumpPath);
+                    } catch (Throwable t) {
+                        LOG.warn("[probe][leak] heap dump failed: {}", t.toString());
+                    }
+                }
+            }
             restoreLootTables(lootSnapPre, "pre-server"); // spawn preload must see cold-boot table state
             recreateWorlds(server, seeds[i], worldType, genOpts);
             restoreLootTables(lootSnapPost, "post-boot"); // the walk generates with fully-loaded tables
@@ -541,9 +594,15 @@ public class WorldgenProbe {
     }
 
     /** Mirrors MinecraftServer.stopServer() minus saving: Unload events, flush, deregister, drain IO, delete save. */
+    /** leakcheck: weakly track torn-down dim0 worlds so surviving ones can be path-hunted. */
+    private static final List<java.lang.ref.WeakReference<Object>> LEAK_TRACK = new ArrayList<>();
+
     private static void teardownAllWorlds(MinecraftServer server) throws Exception {
         final File worldDir = new File(server.getFolderName());
         for (WorldServer ws : DimensionManager.getWorlds()) {
+            if (Boolean.getBoolean("probe.leakcheck") && ws.provider.dimensionId == 0) {
+                LEAK_TRACK.add(new java.lang.ref.WeakReference<Object>(ws));
+            }
             MinecraftForge.EVENT_BUS.post(new WorldEvent.Unload(ws));
             ws.flush();
             DimensionManager.setWorld(ws.provider.dimensionId, null);
@@ -664,6 +723,68 @@ public class WorldgenProbe {
                     ((java.util.Collection<?>) q).clear();
                 }
             }
+        }
+        // === Dead-world retainers (2026-07-24 leak forensics: ~372 MB/slot on 2.8.4, one full dead
+        // WorldServer chunk map per slot). Named by the leakcheck bus-walker; pruned every slot. ===
+        // THE dominant leak (found by the in-JVM path hunter): SpecialMobs queues every worldgen-
+        // spawned mob for replacement in a static ArrayDeque processed on server ticks — the probe
+        // barely ticks, so ~190 entries/slot accumulate, each pinning entity -> world -> chunk map.
+        try {
+            final java.lang.reflect.Field esF = Class.forName("toast.specialMobs.TickHandler")
+                .getDeclaredField("entityStack");
+            esF.setAccessible(true);
+            final java.util.Collection<?> es = (java.util.Collection<?>) esF.get(null);
+            if (!es.isEmpty()) {
+                LOG.info("[probe] clearing {} queued SpecialMobs entity replacements (world retainers)", es.size());
+                es.clear();
+            }
+        } catch (ClassNotFoundException e) {
+            LOG.warn("[probe] SpecialMobs TickHandler not present — skipping entityStack reset");
+        }
+        // AE2's tick handler keeps a Map<World, Queue> of scheduled callbacks and never evicts
+        // unloaded worlds — secondary retainer.
+        final Object aeTick = findBusListenerInstance("appeng.hooks.TickHandler");
+        if (aeTick != null) {
+            final int nAe = pruneDeadWorldKeys(aeTick.getClass(), aeTick, "callQueue");
+            if (nAe > 0) LOG.info("[probe] pruned {} dead-world entries from AE2 TickHandler.callQueue", nAe);
+        }
+        // ForgeChunkManager's world-keyed statics accumulate dead-world keys across warm slots.
+        try {
+            final Class<?> fcm = Class.forName("net.minecraftforge.common.ForgeChunkManager");
+            for (String fn : new String[] { "tickets", "forcedChunks", "dormantChunkCache" }) {
+                final int nF = pruneDeadWorldKeys(fcm, null, fn);
+                if (nF > 0) LOG.info("[probe] pruned {} dead-world keys from ForgeChunkManager.{}", nF, fn);
+            }
+        } catch (ClassNotFoundException ignored) {}
+        // ServerUtilities' Universe pins the BOOT overworld forever (never re-pointed on our warm
+        // recreate). Null it; the probe never ticks ServerUtilities logic between recreate and walk.
+        final Object universe = findBusListenerInstance("serverutils.lib.data.Universe");
+        if (universe != null) {
+            try {
+                final java.lang.reflect.Field wf = universe.getClass()
+                    .getDeclaredField("world");
+                wf.setAccessible(true);
+                if (wf.get(universe) != null) {
+                    wf.set(universe, null);
+                    LOG.info("[probe] released ServerUtilities Universe.world (pinned boot overworld)");
+                }
+            } catch (Throwable t) {
+                LOG.warn("[probe] Universe.world release failed: {}", t.toString());
+            }
+        }
+        // Gadomancy's maze-generation fake world (static GEN) buffers every generated maze chunk in a
+        // plain HashMap and never clears it — steady per-slot growth in warm batches.
+        try {
+            final java.lang.reflect.Field genF = Class.forName("makeo.gadomancy.common.utils.world.TCMazeHandler")
+                .getDeclaredField("GEN");
+            genF.setAccessible(true);
+            final Object gen = genF.get(null);
+            if (gen != null) {
+                clearMapField(gen, "chunks");
+                clearMapField(gen, "gettedTE");
+            }
+        } catch (ClassNotFoundException e) {
+            LOG.warn("[probe] Gadomancy TCMazeHandler not present — skipping fake-world buffer reset");
         }
         // GT++ Everglades keeps its own validOreveins cache (Long-keyed) — defensively cleared for the same reason.
         try {
@@ -1573,6 +1694,7 @@ public class WorldgenProbe {
                                 if (v == null) continue;
                                 logIfInterestingCollection(cls + "." + f.getName(), v);
                                 logIfRandom(cls + "." + f.getName(), v);
+                                logIfWorldRetainer(cls + "." + f.getName(), v);
                                 // one-level descent: static singletons whose INSTANCE fields hold the real cache
                                 final String vc = v.getClass()
                                     .getName();
@@ -1599,6 +1721,315 @@ public class WorldgenProbe {
             }
         }
         LOG.info("[probe][staticsweep] scanned {} classes", scanned);
+    }
+
+    /**
+     * In-JVM path-to-root hunter: BFS the reference graph from every static field of every class in
+     * every jar (mods + forge + minecraft_server) plus live Thread fields and ThreadLocals, looking for
+     * identity matches with the targets. Prints the field-by-field retention chain. Bounded (5M nodes).
+     */
+    private static void findPathsToTargets(List<Object> targets) {
+        final java.util.IdentityHashMap<Object, Object> visited = new java.util.IdentityHashMap<>();
+        final java.util.IdentityHashMap<Object, Object[]> parent = new java.util.IdentityHashMap<>(); // obj ->
+                                                                                                      // {parentObj,
+                                                                                                      // edgeLabel}
+        final java.util.ArrayDeque<Object> queue = new java.util.ArrayDeque<>();
+        final java.util.IdentityHashMap<Object, Object> targetSet = new java.util.IdentityHashMap<>();
+        for (Object t : targets) targetSet.put(t, t);
+
+        final ClassLoader loader = WorldgenProbe.class.getClassLoader();
+        final List<File> jars = new ArrayList<>();
+        final File[] modJars = new File("mods").listFiles((d, n) -> n.endsWith(".jar"));
+        if (modJars != null) jars.addAll(java.util.Arrays.asList(modJars));
+        final File[] rootJars = new File(".").listFiles((d, n) -> n.endsWith(".jar"));
+        if (rootJars != null) jars.addAll(java.util.Arrays.asList(rootJars));
+        int rootFields = 0;
+        for (File jar : jars) {
+            try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(jar)) {
+                final java.util.Enumeration<? extends java.util.zip.ZipEntry> en = zf.entries();
+                while (en.hasMoreElements()) {
+                    final String name = en.nextElement()
+                        .getName();
+                    if (!name.endsWith(".class") || name.contains("$$")) continue;
+                    try {
+                        final Class<?> c = Class.forName(
+                            name.substring(0, name.length() - 6)
+                                .replace('/', '.'),
+                            false,
+                            loader);
+                        for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                            if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                            if (f.getType()
+                                .isPrimitive()) continue;
+                            try {
+                                f.setAccessible(true);
+                                final Object v = f.get(null);
+                                if (v == null || visited.containsKey(v)) continue;
+                                visited.put(v, v);
+                                parent.put(v, new Object[] { null, c.getName() + "." + f.getName() });
+                                queue.add(v);
+                                rootFields++;
+                            } catch (Throwable ignored) {}
+                        }
+                    } catch (Throwable ignored) {}
+                }
+            } catch (Exception ignored) {}
+        }
+        // thread roots (fields + ThreadLocals)
+        for (Thread t : Thread.getAllStackTraces()
+            .keySet()) {
+            if (!visited.containsKey(t)) {
+                visited.put(t, t);
+                parent.put(t, new Object[] { null, "THREAD:" + t.getName() });
+                queue.add(t);
+                rootFields++;
+            }
+        }
+        LOG.info("[probe][leak] BFS from {} static/thread roots…", rootFields);
+
+        int expanded = 0;
+        final int NODE_CAP = 5_000_000;
+        while (!queue.isEmpty() && visited.size() < NODE_CAP) {
+            final Object cur = queue.poll();
+            expanded++;
+            for (Object[] edge : probeReferencesOf(cur)) {
+                final Object next = edge[0];
+                if (next == null || visited.containsKey(next)) continue;
+                visited.put(next, next);
+                parent.put(next, new Object[] { cur, edge[1] });
+                if (targetSet.containsKey(next)) {
+                    final StringBuilder path = new StringBuilder(
+                        "TARGET " + next.getClass()
+                            .getSimpleName());
+                    Object p = next;
+                    int hops = 0;
+                    while (p != null && hops++ < 30) {
+                        final Object[] pe = parent.get(p);
+                        if (pe == null) break;
+                        path.insert(0, pe[1] + " -> ");
+                        p = pe[0];
+                    }
+                    LOG.info("[probe][leak] PATH: {}", path);
+                    targetSet.remove(next);
+                    if (targetSet.isEmpty()) {
+                        LOG.info("[probe][leak] all paths found ({} nodes visited)", visited.size());
+                        return;
+                    }
+                } else {
+                    queue.add(next);
+                }
+            }
+        }
+        LOG.info(
+            "[probe][leak] BFS finished: {} nodes visited, {} targets NOT reached (JNI/stack-local roots?)",
+            visited.size(),
+            targetSet.size());
+    }
+
+    /** Outgoing references of an object: instance fields (all superclasses) + array elements. */
+    private static List<Object[]> probeReferencesOf(Object o) {
+        final List<Object[]> out = new ArrayList<>();
+        try {
+            final Class<?> c = o.getClass();
+            if (c == String.class || c == Class.class || o instanceof java.lang.ref.Reference) return out;
+            if (c.isArray()) {
+                if (!c.getComponentType()
+                    .isPrimitive()) {
+                    final Object[] arr = (Object[]) o;
+                    for (int i = 0; i < arr.length; i++) {
+                        if (arr[i] != null) out.add(new Object[] { arr[i], "[" + i + "]" });
+                    }
+                }
+                return out;
+            }
+            for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
+                for (java.lang.reflect.Field f : k.getDeclaredFields()) {
+                    if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                    if (f.getType()
+                        .isPrimitive()) continue;
+                    try {
+                        f.setAccessible(true);
+                        final Object v = f.get(o);
+                        if (v != null) out.add(new Object[] { v, k.getSimpleName() + "." + f.getName() });
+                    } catch (Throwable ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+        return out;
+    }
+
+    /** Find a registered event-bus listener instance by exact class name (any of the four busses). */
+    private static Object findBusListenerInstance(String className) {
+        try {
+            final Object[] busses = { MinecraftForge.EVENT_BUS, MinecraftForge.ORE_GEN_BUS,
+                MinecraftForge.TERRAIN_GEN_BUS, cpw.mods.fml.common.FMLCommonHandler.instance()
+                    .bus() };
+            for (Object bus : busses) {
+                final java.lang.reflect.Field lf = bus.getClass()
+                    .getDeclaredField("listeners");
+                lf.setAccessible(true);
+                for (Object owner : ((Map<?, ?>) lf.get(bus)).keySet()) {
+                    if (owner != null && owner.getClass()
+                        .getName()
+                        .equals(className)) return owner;
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    /** Remove map entries keyed by DEAD worlds from a (static or instance) Map field. Returns removals. */
+    private static int pruneDeadWorldKeys(Class<?> cls, Object instance, String fieldName)
+        throws NoSuchFieldException, IllegalAccessException {
+        final java.lang.reflect.Field f = cls.getDeclaredField(fieldName);
+        f.setAccessible(true);
+        final Object v = f.get(instance);
+        if (!(v instanceof Map)) return 0;
+        int removed = 0;
+        final java.util.Iterator<?> it = ((Map<?, ?>) v).keySet()
+            .iterator();
+        while (it.hasNext()) {
+            final Object k = it.next();
+            if (k instanceof net.minecraft.world.World && probeWorldDead((net.minecraft.world.World) k)) {
+                it.remove();
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /** A world is dead if the DimensionManager no longer maps its dimension id to this exact instance. */
+    private static boolean probeWorldDead(net.minecraft.world.World w) {
+        try {
+            return DimensionManager.getWorld(w.provider.dimensionId) != w;
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /**
+     * Deep leak forensics (leakcheck mode): the static sweep only sees mod-jar statics — the usual
+     * strong holders of dead worlds are EVENT-BUS LISTENER INSTANCES (registered per world, never
+     * unregistered) and Forge's world-keyed chunk-manager maps. Walk both and name names.
+     */
+    private static void leakForensics() {
+        // 1) event-bus listener owners whose instance fields reference a DEAD world
+        try {
+            final Object[] busses = { MinecraftForge.EVENT_BUS, MinecraftForge.ORE_GEN_BUS,
+                MinecraftForge.TERRAIN_GEN_BUS, cpw.mods.fml.common.FMLCommonHandler.instance()
+                    .bus() };
+            for (Object bus : busses) {
+                final java.lang.reflect.Field lf = bus.getClass()
+                    .getDeclaredField("listeners");
+                lf.setAccessible(true);
+                final Map<?, ?> listeners = (Map<?, ?>) lf.get(bus);
+                for (Object owner : listeners.keySet()) {
+                    if (owner == null) continue;
+                    for (java.lang.reflect.Field f : owner.getClass()
+                        .getDeclaredFields()) {
+                        if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+                        if (!net.minecraft.world.World.class.isAssignableFrom(f.getType())
+                            && !Map.class.isAssignableFrom(f.getType())
+                            && !java.util.Collection.class.isAssignableFrom(f.getType())) continue;
+                        f.setAccessible(true);
+                        final Object v = f.get(owner);
+                        if (v instanceof net.minecraft.world.World && probeWorldDead((net.minecraft.world.World) v)) {
+                            LOG.info(
+                                "[probe][leak] BUS-LISTENER {} field {} holds DEAD world dim {}",
+                                owner.getClass()
+                                    .getName(),
+                                f.getName(),
+                                ((net.minecraft.world.World) v).provider.dimensionId);
+                        } else if (v instanceof Map) {
+                            int dead = 0;
+                            for (Object k : ((Map<?, ?>) v).keySet()) {
+                                if (k instanceof net.minecraft.world.World
+                                    && probeWorldDead((net.minecraft.world.World) k)) dead++;
+                            }
+                            if (dead > 0) LOG.info(
+                                "[probe][leak] BUS-LISTENER {} field {} maps {} DEAD worlds",
+                                owner.getClass()
+                                    .getName(),
+                                f.getName(),
+                                dead);
+                        }
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            LOG.warn("[probe][leak] bus walk failed: {}", t.toString());
+        }
+        // 2) ForgeChunkManager world-keyed statics
+        try {
+            final Class<?> fcm = Class.forName("net.minecraftforge.common.ForgeChunkManager");
+            for (String fn : new String[] { "tickets", "forcedChunks", "dormantChunkCache" }) {
+                try {
+                    final java.lang.reflect.Field f = fcm.getDeclaredField(fn);
+                    f.setAccessible(true);
+                    final Object v = f.get(null);
+                    if (v instanceof Map) {
+                        int dead = 0;
+                        for (Object k : ((Map<?, ?>) v).keySet()) {
+                            if (k instanceof net.minecraft.world.World && probeWorldDead((net.minecraft.world.World) k))
+                                dead++;
+                        }
+                        LOG.info(
+                            "[probe][leak] ForgeChunkManager.{}: size {} ({} dead-world keys)",
+                            fn,
+                            ((Map<?, ?>) v).size(),
+                            dead);
+                    }
+                } catch (NoSuchFieldException ignored) {}
+            }
+        } catch (Throwable t) {
+            LOG.warn("[probe][leak] ForgeChunkManager audit failed: {}", t.toString());
+        }
+    }
+
+    /**
+     * Sweep helper: flag static fields that RETAIN WORLD OBJECTS — a direct World reference, or a
+     * collection/map whose sampled keys/values are World/Chunk/TileEntity/Entity instances. One
+     * retained WorldServer keeps its whole chunk map alive: the ~0.5G/slot warm-batch leak signature.
+     */
+    private static void logIfWorldRetainer(String label, Object v) {
+        try {
+            if (v instanceof net.minecraft.world.World) {
+                LOG.info(
+                    "[probe][sweep] WORLD-RETAINER {} = direct {}",
+                    label,
+                    v.getClass()
+                        .getName());
+                return;
+            }
+            java.util.List<Iterable<?>> sides = new ArrayList<>();
+            int size = -1;
+            if (v instanceof Map) {
+                sides.add(((Map<?, ?>) v).keySet());
+                sides.add(((Map<?, ?>) v).values());
+                size = ((Map<?, ?>) v).size();
+            } else if (v instanceof java.util.Collection) {
+                sides.add((java.util.Collection<?>) v);
+                size = ((java.util.Collection<?>) v).size();
+            } else return;
+            if (size == 0) return;
+            for (Iterable<?> side : sides) {
+                int n = 0;
+                for (Object o : side) {
+                    if (o instanceof net.minecraft.world.World || o instanceof net.minecraft.world.chunk.Chunk
+                        || o instanceof net.minecraft.tileentity.TileEntity
+                        || o instanceof net.minecraft.entity.Entity) {
+                        LOG.info(
+                            "[probe][sweep] WORLD-RETAINER {} (size {}) holds {}",
+                            label,
+                            size,
+                            o.getClass()
+                                .getName());
+                        return;
+                    }
+                    if (++n >= 3) break;
+                }
+            }
+        } catch (Throwable ignored) {}
     }
 
     /** Sweep helper: log static java.util.Random-typed fields (lazily-seeded static RNGs leak across warm slots). */
