@@ -136,7 +136,9 @@ run-batch)
   mapfile -t PENDING < <(tr ', ' '\n\n' < "$SEED_FILE" | grep -vE '^\s*$' | while read -r s; do
     [ -f "$OUT_DIR/seed-$s.json" ] || echo "$s"
   done)
-  echo "$(date +%H:%M:%S) ${#PENDING[@]} seeds pending; reserve ${RESERVE_MB}M, per-job ${JOB_MB}M, heap $HEAP" | tee -a "$PROG"
+  TOTAL=$(tr ', ' '\n\n' < "$SEED_FILE" | grep -cvE '^\s*$')
+  done_count() { find "$OUT_DIR" -maxdepth 1 -name 'seed-*.json' 2>/dev/null | wc -l; }
+  echo "$(date +%H:%M:%S) ${#PENDING[@]} seeds pending ($(done_count)/$TOTAL done); reserve ${RESERVE_MB}M, per-job ${JOB_MB}M, heap $HEAP" | tee -a "$PROG"
   [ "${#PENDING[@]}" -eq 0 ] && exit 0
 
   mem_avail_mb() { awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo; }
@@ -174,9 +176,9 @@ run-batch)
       if PROBE_SEARCH=true PROBE_NOHASH=true \
         "$SCRIPT_DIR/criu-harness.sh" "$INST/server" "$INST/images" run "$SEED" rows \
         "$OUT_DIR/seed-$SEED.json" "$RADIUS" > "$INST/last-run.log" 2>&1; then
-        echo "$(date +%H:%M:%S) done  $SEED  ($(basename "$INST"))" >> "$PROG"
+        echo "$(date +%H:%M:%S) done  $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL]" >> "$PROG"
       else
-        echo "$(date +%H:%M:%S) FAILED $SEED  ($(basename "$INST")) — see $INST/last-run.log + images/restore.log" >> "$PROG"
+        echo "$(date +%H:%M:%S) FAILED $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL] — see $INST/last-run.log + images/restore.log" >> "$PROG"
       fi
       rm -f "$INST/busy.pid"
     ) &
