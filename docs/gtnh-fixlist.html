@@ -78,7 +78,7 @@
 <header>
   <p class="eyebrow">GT: New Horizons &middot; Speedrun Community</p>
   <h1>The determinism jar: every fix, and why it was needed</h1>
-  <p class="standfirst">What <code>gtnhdeterminism-0.1.jar</code> changes so that one seed always makes one world. Drop it into <code>mods/</code> of a stock GTNH 2.7.4 instance — nothing else to install or configure. Companion to the <a href="https://claude.ai/code/artifact/8ecf9dbb-314e-4737-ac21-a5ed6fa4d23d">full audit</a>.</p>
+  <p class="standfirst">What <code>gtnhdeterminism-0.4.jar</code> changes so that one seed always makes one world. Drop it into <code>mods/</code> of a stock GTNH 2.7.4 instance — nothing else to install or configure. Companion to the <a href="https://claude.ai/code/artifact/8ecf9dbb-314e-4737-ac21-a5ed6fa4d23d">full audit</a>; source and releases at <a href="https://github.com/OrderedSet86/gtnh-determinism">github.com/OrderedSet86/gtnh-determinism</a>.</p>
 </header>
 
 <p>Nearly every bug is one of four patterns: randomness seeded from the <b>clock</b> instead of the world seed; a <b>conditional branch</b> that consumes random draws only sometimes, shifting everything rolled after it; decisions reading <b>world state that may not exist yet</b>, making the outcome depend on your approach direction; and registries in <b>hash-ordered collections</b> whose iteration order reshuffles every game launch.</p>
@@ -104,16 +104,46 @@
       <td>All rolls use the seeded per-chunk RNG; the site's structure is chosen from a fresh name-sorted copy of the list — a pure function of seed + location; spawner type from the seeded roll.</td>
     </tr>
     <tr>
-      <td class="target">Thaumcraft<span class="scope">nodes, totems, barrows, rings</span></td>
+      <td class="target">Thaumcraft<span class="scope">nodes, totems, barrows</span></td>
       <td>Node types/positions, totems, barrows differed even within one session; barrow urn/crate loot never repeated.</td>
       <td>All surface features shared one RNG stream with extra draws gated on live terrain reads at chunk borders — one flipped check shifted every later roll. Barrow loot used <code>world.rand</code>; bonus nodes went to whichever chunk generated first; ring mazes were built on a background thread racing worldgen.</td>
       <td>Each feature gets its own RNG from seed + chunk + feature id; bonus nodes belong to the chunk containing the feature; maze gen is synchronous and seeded; barrow loot rolls from the generation RNG.</td>
     </tr>
     <tr>
+      <td class="target">Thaumcraft<span class="scope">eldritch rings / obelisks</span></td>
+      <td>A known obelisk was present on one visit and gone on the next — its existence depended on which chunks had generated first (field-reported on seed 88888888).</td>
+      <td>Each candidate ring aborts if any <em>previously generated</em> ring left maze cells within up to a 43&times;43-chunk window. The maze map fills in population order, so ~25+ candidates per window fought a lottery decided by your route. The altar's spawner-type roll also sat behind live-condition-gated cosmetic draws.</td>
+      <td>One seed-pure site per 25&times;25-chunk region at stock density: seeded candidates are tested against <em>regenerated virgin terrain</em> with the stock validity rules; ring spacing statically prevents maze overlap, so the race is gone. Spawner and banners roll from seed + position. The maze minigame itself is untouched.</td>
+    </tr>
+    <tr>
       <td class="target">GregTech<span class="scope">ore vein identity &amp; height</span></td>
       <td>Rarely, a known vein came up as a different ore (copper↔iron) depending on approach direction — one flip could cascade into neighboring veins.</td>
-      <td>Vein placement probed a column of <em>live world blocks</em>; air (cave, ravine, mountainside) rerolled the vein to the next type — and the result was cached for the whole region by whichever chunk generated first.</td>
-      <td>The probe accepts unconditionally: vein identity and height are pure functions of the seed.</td>
+      <td>Vein placement probes a column at the vein's height band; a non-stone hit rerolls to the next vein type, cached region-wide by whichever chunk generated first. The reroll is <em>intended design</em> (high veins skip low ground; mountains matter for tin) — but stock answered the probe from the <b>live world</b>, so other veins' ore, structures, and decoration flipped the answer by route.</td>
+      <td>The same probe, answered from <em>regenerated virgin terrain</em>: the reroll design is preserved exactly, and vein identity/height become pure functions of the seed.</td>
+    </tr>
+    <tr>
+      <td class="target">Roguelike Dungeons<span class="scope">position &amp; carving</span></td>
+      <td>The region's dungeon relocated ~50 blocks and re-rolled its size (133 vs 156 spawners measured) between two approach routes; deep rooms were damaged differently per route.</td>
+      <td>Placement makes up to 50 attempts, each validated by probing live blocks 40–100 blocks away — terrain that may be raw, decorated, or missing depending on your path. Once placed, every carving decision also read the live world.</td>
+      <td>Placement validates against regenerated virgin terrain, and the dungeon builds through an overlay view — it sees its own writes plus virgin terrain, never route noise. Position, settings, and layout are functions of the seed.</td>
+    </tr>
+    <tr>
+      <td class="target">Roguelike Dungeons<span class="scope">floor decoration</span></td>
+      <td>One floor's alcove decorations (chest+spawner vs quartz/iron-bars variants) and its mossy/cracked wall pattern reshuffled every game launch — ~1,600 blocks differed between two launches on the test seed, all on that floor.</td>
+      <td>The middle floor of the default stack is built from a minimum-spanning-tree corridor graph whose edges live in a <code>HashSet</code> — and <code>Edge</code> never defines <code>hashCode</code>, so corridor build order (and every wall-variant roll's alignment) followed memory addresses, reshuffled per launch.</td>
+      <td>The edge set keeps a deterministic order (by length, then coordinates). No randomness added or removed — the same floor now builds identically every launch.</td>
+    </tr>
+    <tr>
+      <td class="target">Roguelike Dungeons<span class="scope">room features &amp; chest loot</span></td>
+      <td>The mess hall's fireplace hopped between walls per launch; storage-room chest alcoves moved; one floor's chests traded item sets between launches while the rest of the dungeon stayed put.</td>
+      <td>Three rooms shuffle their feature/chest placements with <code>Collections.shuffle(list)</code> — the overload that draws from a <b>clock-seeded global</b>. Separately, the loot pass assigned bonus items (specialty gear, enchanted books) by index into the chest list with one shared RNG, so any wobble in chest membership re-dealt a whole floor's picks; one loot method drew everything straight off the shared stream.</td>
+      <td>Shuffles use the room's seeded RNG. Every chest's items come from an RNG forked from seed + chest position; bonus-item picks index a deterministic full chest list, and picks that land on a carved-over chest are simply lost — stock's own loss semantics. Every chest's contents are a pure function of the seed.</td>
+    </tr>
+    <tr>
+      <td class="target">LootGames<span class="scope">puzzle micro-dungeons</span></td>
+      <td>The buried puzzle rooms had a different cracked-brick and broken-lamp pattern every launch (~500 blocks across three rooms on the test seed).</td>
+      <td>Every wall/floor/ceiling "cracked" variant and lamp state is rolled through a static <b>clock-seeded</b> <code>new Random()</code> at generation time. Room placement itself was already seed-pure.</td>
+      <td>Variant rolls draw from an RNG forked from seed + room position — same 10% crack density, pinned pattern. Minigame rewards are rolled when you play, not at worldgen, and are deliberately untouched.</td>
     </tr>
     <tr>
       <td class="target">RWG<span class="scope">overworld decoration</span></td>
@@ -129,7 +159,7 @@
     </tr>
     <tr>
       <td class="target">BiomesO'Plenty<span class="scope">flora + dirt/gravel patches</span></td>
-      <td>The last big launch-to-launch source: flora types swapped and whole underground dirt/gravel patches relocated.</td>
+      <td>Flora types swapped and whole underground dirt/gravel patches relocated between launches.</td>
       <td>Each weighted grass/flower pick rolled with <code>Math.random()</code>, then walked a HashMap in memory-address order. The chosen generator also consumed a different number of draws from the shared decoration RNG — relocating vanilla dirt/gravel patches downstream.</td>
       <td>Flora tables keep registration order; the pick rolls from the seeded decoration RNG.</td>
     </tr>
@@ -156,21 +186,22 @@
 
 <h2>How it was verified</h2>
 <ul>
-  <li><b>Launch tests</b> — generate 289 chunks, restart the game, generate again, compare every block and tile entity: <b>byte-identical worlds</b> on the primary test seed; across a 13-seed sample, zero block, ore-type, or chest-content differences.</li>
-  <li><b>Route tests</b> — same seed generated in three different chunk orders (simulating different walking paths): village buildings/chests and the witchery structure (position <em>and</em> type) byte-identical, verified at a live village site on seed <code>88888888</code>.</li>
-  <li>Community in-game testing caught the witchery type roulette that fixed-route testing couldn't — thanks, and keep reporting.</li>
+  <li><b>Launch tests</b> — generate the world, quit the game process, relaunch, generate again, then compare the <em>saved worlds</em> block-by-block and tile-entity-by-tile-entity (a live-world probe can miss late structure writes; region files can't lie): <b>byte-identical</b> on the primary test seed — 1,184 chunks, 372,026 tile entities, zero differences including every chest slot.</li>
+  <li><b>Route tests</b> — same seed generated in different chunk orders (rows / columns / spiral, simulating different approach paths): structures, layouts, veins, spawners, and all surviving chest contents identical.</li>
+  <li><b>Balance evidence</b> — a 60-seed stock-vs-fixed corpus shows vein materials, small ores, village pieces, and witchery structure counts statistically equivalent (±10% bounds), plus a 500,000-draw Monte-Carlo over the shipped loot tables certifying rare chest items. Two disclosed, understood deltas: one high-altitude vein type is ~15% more common (stock's live-terrain probe used to reroll it away), and dungeon-placement semantics shift the chest-loot mix slightly.</li>
+  <li><b>Community in-game testing</b> caught three bugs the fixed-route harness couldn't (the witchery type roulette, the vanishing obelisk, and a stale-jar loot report that exposed a real gap in the loot pass) — thanks, and keep reporting. When you report, include the jar's <code>md5sum</code> with the seed and coordinates.</li>
 </ul>
 
 <h2>Known remaining variance <span class="chip warn">fine print</span></h2>
 <ul>
   <li><b>Decoration detail</b> — individual grass/flower/tree placement can still differ with your exploration route (1.7.10-wide behavior, not practically fixable per-mod). Structures, chests, veins, spawners, dyes, and bees are route-robust.</li>
+  <li><b>Deep dungeon chests</b> — whether a bottom-floor chest <em>exists</em> can depend on approach route (a later lava lake can carve the room). Surviving chests' contents never change. A full fix is designed but changes when dungeons appear in-game — pending a community decision.</li>
   <li><b>Village piece height</b> — a building can anchor ±1 block of Y depending on approach.</li>
   <li><b>Witchery village walls</b> — built on a delayed timer after generation; shape still timing-dependent.</li>
-  <li><b>Witch counts</b> at witchery structures (entities, not blocks) and internal tile-entity bookkeeping — no effect on blocks or loot.</li>
-  <li>One <b>rare sky-height anomaly</b> observed once in 26 test runs — still being hunted.</li>
+  <li><b>Small residuals under investigation</b> — a few dozen deep-underground (y1–4) dirt/gravel blocks toggle per launch, one contested flower position, and a rare sky-height anomaly. None are routing-relevant. Witch <em>counts</em> at witchery structures (entities, not blocks) and internal tile-entity bookkeeping also vary without affecting blocks or loot.</li>
 </ul>
 
-<div class="note"><b>Adopting the jar re-rolls seeds once.</b> The fixes change how randomness is derived, so a seed produces a different — now canonical — world than stock. Old seed notes reset one time, then hold for every runner, every launch. Existing saves are safe: only newly generated chunks are affected.</div>
+<div class="note"><b>Adopting the jar re-rolls seeds once per jar version.</b> The fixes change how randomness is derived, so a seed produces a different — now canonical — world than stock (and than earlier jar versions: 0.4 worlds differ from 0.3 worlds by design). Old seed notes reset one time, then hold for every runner, every launch. Existing saves are safe: only newly generated chunks are affected.</div>
 
-<footer>gtnhdeterminism-0.1 &middot; GTNH 2.7.4 &middot; one @Mod class + 15 self-gating mixins &middot; sources and per-mod patches: github.com/OrderedSet86 (mod forks, branch determinism-fixes) &middot; 2026-07-22</footer>
+<footer>gtnhdeterminism-0.4 &middot; GTNH 2.7.4 &middot; one @Mod class + 23 self-gating mixins (each inert if its target mod is absent) &middot; sources, releases, and per-mod upstream patches: <a href="https://github.com/OrderedSet86/gtnh-determinism">github.com/OrderedSet86/gtnh-determinism</a> &middot; updated 2026-07-23</footer>
 </div>

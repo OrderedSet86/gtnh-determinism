@@ -216,9 +216,11 @@
   <div class="meta-row">
     <span>scope: overworld structures, TF, GC, biomes</span>
     <span>method: direct source reads + decompiled Witchery/TC4</span>
-    <span>date: 2026-07-22</span>
+    <span>audit: 2026-07-22 &middot; updated: 2026-07-23</span>
   </div>
 </header>
+
+<div class="note"><b>Status — everything below is fixed and shipped.</b> All confirmed findings (F1–F6), plus three more found during fix verification (F8–F9 below and the eldritch-ring race under F3), are fixed in <code>gtnhdeterminism-0.4.jar</code> — a single drop-in mod for stock GTNH 2.7.4, verified by comparing <em>persisted worlds</em> across fresh game launches: byte-identical, including every chest's contents. See the <a href="https://claude.ai/code/artifact/e3736625-f28d-48b2-844e-41bcde029d50">fix list</a> for the player-facing summary and <a href="https://github.com/OrderedSet86/gtnh-determinism">github.com/OrderedSet86/gtnh-determinism</a> for source and releases. The analysis below is preserved as the reference for <em>why</em> each mechanism breaks determinism.</div>
 
 <h2><span class="sec">0</span>Summary</h2>
 <p>Village <em>positions</em> are seed-stable. What breaks routing is everything layered on top: village <em>layouts</em> scramble on every game launch because of a Forge registry bug; Witchery rolls its surface structures off a clock-seeded RNG; Thaumcraft's node and structure gen shifts with chunk exploration order; GregTech veins can still swap identity near caves; Roguelike Dungeons pick their spot by probing terrain that may or may not exist yet. Terrain and biome layout themselves are clean — which matches what runners observe.</p>
@@ -233,8 +235,11 @@
     <tr><td><a href="#f5">F5</a></td><td>Roguelike Dungeons probe neighbor terrain</td><td>Dungeon position within its region</td><td>Chunk-order</td><td><span class="chip crit">confirmed</span></td></tr>
     <tr><td><a href="#f6">F6</a></td><td>RWG tree decoration</td><td>Tree geometry; same-chunk downstream decoration</td><td>Per run + chunk-order</td><td><span class="chip warn">confirmed, low routing impact</span></td></tr>
     <tr><td><a href="#f7">F7</a></td><td>Smaller residuals (NHCore, TF, Forestry, amunra&hellip;)</td><td>Localized block-level differences</td><td>Mixed</td><td><span class="chip warn">triaged</span></td></tr>
+    <tr><td><a href="#f8">F8</a></td><td>Roguelike decoration &amp; loot internals <em>(found post-audit)</em></td><td>MST-floor decoration, room feature walls, chest item assignment</td><td>Per JVM launch</td><td><span class="chip crit">confirmed</span></td></tr>
+    <tr><td><a href="#f9">F9</a></td><td>LootGames clock-seeded room variants <em>(found post-audit)</em></td><td>Puzzle-room cracked walls / lamp states</td><td>Per JVM launch</td><td><span class="chip crit">confirmed</span></td></tr>
   </tbody>
 </table></div>
+<p><small>All of F1–F6, F8, F9 (and the eldritch-ring race, folded into F3's fix) are <b>fixed in 0.4</b>; F7 items are individually triaged in section 5.</small></p>
 
 <h2><span class="sec">1</span>How determinism actually breaks here</h2>
 <p>Forge 1.7.10 re-seeds the shared populate RNG before <em>each</em> registered world generator, so one mod cannot shift another mod's stream directly. Every confirmed bug works through one of four mechanisms:</p>
@@ -303,7 +308,7 @@
   <p>Modern GT5U worldgen is otherwise exemplary — every entry point reseeds from <code>worldSeed + coordinates</code> and vein geometry is cached so all chunks of a vein agree. But the placement-attempt loop survives from the old code: <code>testWorldgenChunkified</code> probes a 9-block column of <em>live world blocks</em> at the triggering chunk's center (<span class="file">WorldgenGTOreLayer.java:239-251</span>); fewer than 5 stone hits returns <code>NO_OVERLAP_AIR_BLOCK</code>, and the driver retries with the <em>next</em> vein type (<span class="file">GTWorldgenerator.java:465-478</span>). The first chunk of the vein region to generate caches the winner for the whole vein.</p>
   <p>So when some chunks of a vein region have cavey/exposed probe columns and others don't, the vein's identity (and its resolved height) depends on which chunk you cause to generate first — i.e., your approach direction. This is exactly the copper&harr;iron reroll Leosha diagnosed and exfret hit in 2023; it's rare because most probe columns are solid stone.</p>
   <h4>Fix</h4>
-  <p>Make the probe seed-pure: drop the world read and accept placement (veins in air pockets are harmless), or probe the chunk's own freshly generated (pre-population) block array instead of the live world. Small, contained change.</p>
+  <p>Make the probe seed-pure. The shipped fix (0.3+) answers the <em>same</em> probe from regenerated virgin terrain — the reroll is intended design (high veins skip low ground; mountains matter for tin), so it's preserved exactly, just fed a seed-pure answer. (0.1's "always accept" variant was simpler but silently disabled the reroll; superseded.)</p>
 </div>
 
 <div class="finding crit" id="f5">
@@ -311,7 +316,7 @@
   <div class="chips"><span class="chip crit">mechanism C</span><span class="chip info">position varies within its region</span><span class="chip info">confidence: verified in source</span></div>
   <p>The spawn <em>region</em> is seed-gated (same grid trick Witchery uses, <span class="file">Dungeon.java:120-143</span>) — but the exact position is found by up to 50 attempts of <code>getNearbyCoord</code>, each candidate 40–100 blocks away, validated by <code>validLocation</code> (<span class="file">:165-211</span>) which reads live blocks over 9&times;9 areas deep inside neighboring chunks. Whether a candidate passes depends on whether those chunks are terrain-only or already decorated — so the dungeon's final position (and therefore its position-seeded layout and loot, via the axis-collapsing <code>seed&nbsp;*&nbsp;x&nbsp;*&nbsp;z</code> at <span class="file">:227-231</span>) is approach-order-dependent.</p>
   <h4>Fix</h4>
-  <p>Validate against seed-pure data (biome + noise-derived height) instead of live blocks, or restrict probing to the triggering chunk. Also worth replacing <code>seed*x*z</code> (zero on axes, x&harr;z symmetric) with a proper hash while in there.</p>
+  <p>The shipped fix (0.3+) validates candidates against regenerated virgin terrain and routes all subsequent carving decisions through an overlay view (the dungeon sees its own writes plus virgin terrain, never route noise) — position, settings, and layout become pure functions of the seed. See F8 for the launch-nondeterminism found <em>inside</em> generation once placement was pinned.</p>
 </div>
 
 <div class="finding warn" id="f6">
@@ -338,6 +343,27 @@
     <li><b>amunra</b> (space dims): <span class="file">Pyramid.java:452-473</span> picks room entrances with <code>Math.random()</code> — pyramid interiors differ per run.</li>
     <li><b>BloodMagic</b>: <code>TEDemonPortal</code> picks buildings via <code>new Random()</code> + HashMap key iteration — but it's ritual-triggered at runtime, not worldgen; irrelevant to seed routing.</li>
   </ul>
+</div>
+
+<div class="finding crit" id="f8">
+  <h3><span class="fid">F8</span>Roguelike internals: hash-ordered corridors, clock shuffles, index-dealt loot <em>(found post-audit)</em></h3>
+  <div class="chips"><span class="chip crit">mechanism A + D</span><span class="chip info">new every launch</span><span class="chip info">confidence: verified in source + saved-world ground truth</span><span class="chip ok">fixed in 0.4</span></div>
+  <p>Fixing F5 exposed three deeper bugs inside dungeon generation, found by diffing <em>saved worlds</em> from paired game launches (the live-probe harness hashed chunks before the multi-chunk dungeon finished writing into them — a measurement lesson in its own right):</p>
+  <ul>
+    <li><b>MST-floor decoration (mechanism D).</b> The middle floor of the default five-floor stack lays corridors from a minimum-spanning-tree graph whose edges sit in a <code>HashSet&lt;Edge&gt;</code> — and <code>Edge</code> never overrides <code>hashCode</code>, so iteration follows memory addresses. Corridor build order, each junction's entrance order, and the alignment of every mossy/cracked wall roll reshuffled per launch: ~1,600 persisted blocks differed between two launches on the test seed, all confined to that one floor (the giveaway — the other four floors use an ArrayList-based generator).</li>
+    <li><b>Room feature shuffles (mechanism A).</b> Three rooms — mess hall (which wall gets the fireplace/supplies/side table), storage room and treasure room (which alcoves get chests) — place their features with <code>Collections.shuffle(list)</code>, the overload that draws from a clock-seeded global. It consumes zero draws from the dungeon's seeded stream, so the flip is perfectly local and invisible to RNG-stream reasoning: found by trace-logging both launches and diffing.</li>
+    <li><b>Loot assignment (mechanism D by proxy).</b> Bonus items (specialty gear, enchanted books) are dealt by index into the floor's chest list off one shared RNG — so any wobble in chest membership re-dealt a whole floor's picks; one of the six loot methods also drew everything from the shared stream. This produced the community-visible "one floor's chests trade item sets between launches."</li>
+  </ul>
+  <h4>Fix</h4>
+  <p>Pin the edge set to a deterministic order (length, then coordinates); route the three shuffles through the room's seeded RNG; fork each chest's items from seed + chest position and deal bonus picks over the full deterministic chest list, dropping picks that land on carved-over chests (stock's own loss semantics). Verified: two fresh launches produce byte-identical persisted worlds — 372,026 tile entities, zero differences, every chest slot equal.</p>
+</div>
+
+<div class="finding crit" id="f9">
+  <h3><span class="fid">F9</span>LootGames rooms roll their looks off the clock <em>(found post-audit)</em></h3>
+  <div class="chips"><span class="chip crit">mechanism A</span><span class="chip info">new every launch</span><span class="chip info">confidence: verified in source + saved-world ground truth</span><span class="chip ok">fixed in 0.4</span></div>
+  <p>The buried puzzle rooms turned up in the same saved-world diffs: every cracked-brick wall variant and broken-lamp state is rolled through a static clock-seeded <code>new Random()</code> (<span class="file">RandHelper.RAND</span>) during generation — ~500 blocks across three rooms differed per launch on the test seed. Room <em>placement</em> was already seed-pure (the same grid trick Witchery and Roguelike use).</p>
+  <h4>Fix</h4>
+  <p>Fork the variant RNG from world seed + room position at generation start. Same 10% crack density, pinned pattern. Minigame rewards are rolled when the player interacts, not at worldgen — inherently session-dependent, and deliberately left alone.</p>
 </div>
 
 <h2><span class="sec">3</span>Audited and cleared</h2>
@@ -371,25 +397,28 @@
     <tr><td><b>Residual bisection</b> (probe v3-v5: block/TE hash split, per-TE detail, forced TE materialization, orphan filter, block-level chunk dumps; 3 seeds)</td><td>Two further sources identified and fixed. <b>TinkersConstruct</b>: <code>SlimeIslandGen.generateIsland</code> uses the clock-seeded field <code>random</code> instead of its seeded <code>rand</code> parameter — island size/altitude/shape re-rolled every launch (fixed: upstream branch + mixin backport). <b>BiomesO'Plenty</b>: <code>getRandomWeightedWorldGenerator</code> rolls flora picks with <code>Math.random()</code> and walks an identity-keyed HashMap — and the pick shifts the shared decoration stream, relocating vanilla dirt/gravel patches (fixed: LinkedHashMap flora tables + seeded roll, via mixin). Separately, GT ore <em>tile-entity map</em> jitter (orphaned/lazily-created TEs) inflates naive diff counts without changing blocks or matched-TE content — a bounded GT quirk worth reporting upstream, not a routing concern (filtered from scoring).</td></tr>
     <tr><td><b>Final state: single testing jar</b> (<code>gtnhdeterminism-0.1.jar</code> — one drop-in file on stock 2.7.4: FML village-handler fix + 13 self-gating mixins, now also covering ProjectRed lily dye colors and Forestry village bee species/frames/flowers)</td><td><span class="chip ok">seed&nbsp;-5093808211664363778: IDENTICAL — 289/289 chunks byte-equal across launches with the single jar alone</span> (was 158 differing stock). Lily seed -123456789: 11 → 2 differing chunks, both tile-entity bookkeeping. Across a 13-seed sample: <b>zero block, ore-type, or chest-content differences</b>; residuals are TE table jitter (doors/chests bookkeeping, gameplay-irrelevant) and one rare unidentified sky-height event under investigation.
       <br><br><b>F2 follow-up (caught by community in-game testing):</b> witchery structure <em>type</em> at a seed-fixed spot still varied per approach path — the generator shuffles a SHARED handler list in place every chunk, so the winner depended on how many chunks generated en route (invisible to fixed-walk launch tests). Fixed (sorted-copy shuffle with the seeded rand) along with the wicker man's spawner mob type (rolled off <code>world.rand</code>). Verified byte-identical across three generation orders at the reporting runner's village site (seed 88888888). Known scope limit: decoration-level detail (individual grass/trees) remains chunk-order sensitive pack-wide — endemic 1.7.10 behavior; the routing layer (structures, chests, veins, spawners, dyes, bees) is order-robust, with village pieces occasionally anchoring ±1 block of Y by approach.</td></tr>
+    <tr><td><b>0.2–0.3</b> (eldritch rings, Roguelike placement, GT probe v2)</td><td>Obelisk lottery replaced with a seed-pure per-region contest at stock density — candidate model verified against the runner's field report; altar + banners byte-identical across generation orders. Roguelike position/carving moved onto virgin-terrain validation plus an overlay editor (the dungeon sees its own writes and virgin terrain, never route noise); GT's vein probe re-answered from regenerated virgin terrain so the intended reroll design survives with a seed-pure answer.</td></tr>
+    <tr><td><b>0.4 (current): F8/F9 + persisted-world methodology</b></td><td>Ground truth switched from live-probe hashes to <b>saved-world comparison</b> (region-file blocks + full tile-entity NBT) after live hashes were shown to miss late multi-chunk structure writes. Result on the primary seed, radius-15 window: <span class="chip ok">two fresh launches byte-identical — 1,184 chunks, 372,026 tile entities, zero differences including every chest slot</span>; route tests (rows vs spiral) identical for all surviving content. A 60-seed stock-vs-fixed balance corpus passes ±10% equivalence on veins, small ores, village pieces, and witchery counts (two understood deltas disclosed: one high-altitude vein ~15% up from the F4 semantics change, a slight chest-loot mix shift from F5 placement semantics), backed by a 500k-draw Monte-Carlo over the shipped loot tables for rare items. Remaining under investigation: a few dozen deep-underground dirt/gravel blocks toggling per launch at fixed positions, one contested flower position, a rare sky-height anomaly — none routing-relevant.</td></tr>
   </tbody>
 </table></div>
-<p>The F1 fix ships two ways: a Hodgepodge mixin (PR-ready, branch <code>determinism-fixes</code>) and a standalone reflection mod <code>villagedeterminism</code> that drops into any pack version. The GT5U vein fix (F4) is built but pends a compatibility test since it replaces a fast-moving mod.</p>
+<p>The F1 fix also ships two other ways: a Hodgepodge mixin (PR-ready, branch <code>determinism-fixes</code>) and a standalone reflection mod <code>villagedeterminism</code> that drops into any pack version.</p>
 
 <h2><span class="sec">6</span>What players will notice</h2>
 <p><b>One-time cost:</b> the fixes change how randomness is derived, so the first generation on fixed jars produces a <em>different</em> world for a given seed than stock did — old seed notes reset once, then the seed is stable forever, for everyone. Existing saves are safe: only newly generated chunks are affected.</p>
-<p><b>What becomes reliable:</b> village layouts (blacksmith/smeltery presence becomes a property of the seed), village chest loot, Witchery covens/wicker men/shacks/goblin huts, RWG tree geometry, GT vein identity near caves, and — with the F3 draft — Thaumcraft nodes, totems, barrows, ring placement, and barrow container types.</p>
-<p><b>What still varies:</b> Witchery village walls (tick-time build), Roguelike dungeon position within its seed-fixed region, block-level border effects from vanilla-class bugs, and the unidentified residual above. Macro placement is stable; individual blocks near chunk seams may not be.</p>
+<p><b>What becomes reliable:</b> village layouts (blacksmith/smeltery presence becomes a property of the seed), village chest loot, Witchery covens/wicker men/shacks/goblin huts (position <em>and</em> type <em>and</em> spawner), Thaumcraft nodes/totems/barrows and obelisk sites, GT vein identity and height, Roguelike dungeon position, layout, every floor's decoration, and every chest's contents, LootGames room placement and looks, RWG tree geometry, slime islands, BOP flora, lily dye colors, and village bees.</p>
+<p><b>What still varies:</b> Witchery village walls (tick-time build); whether a bottom-floor dungeon chest <em>exists</em> when your route lets a lava lake carve its room (surviving chests never change contents — a full fix is designed but changes when dungeons appear, pending a community call); decoration-level detail by route; and the small residuals listed in section 5. Macro placement is stable; individual blocks near chunk seams may not be.</p>
 <p><b>In practice:</b> practice worlds match run worlds; seeds become shareable, verifiable claims; set-seed categories become viable with automated verification (two runners' probe hashes should match chunk-for-chunk minus documented residuals). Determinism is per mod-set — pack version changes still legitimately re-roll seeds.</p>
 
-<h2><span class="sec">7</span>Fix priority</h2>
+<h2><span class="sec">7</span>What's left: upstreaming</h2>
+<p>Every fix above ships in the single jar. The remaining work is getting them into the mods themselves, with the balance-equivalence evidence from section 5 attached, so future pack versions don't need the jar:</p>
 <ol class="fixes">
-  <li><b>VillagerRegistry ordering mixin (F1)</b> — one small Hodgepodge mixin; deterministic village layouts across the whole pack. Highest payoff per line of code, and it's upstream-Forge-clean.</li>
-  <li><b>Witchery RNG redirect (F2)</b> — mixin in WitcheryExtras; seeded grid decisions for surface structures, walls built at gen time.</li>
-  <li><b>GT vein probe (F4)</b> — small GT5U PR; make the air-block probe seed-pure.</li>
-  <li><b>RWG trees (F6)</b> — small RWG PR; fixes the visible tree variance and stops decoration-stream contamination.</li>
-  <li><b>Roguelike validLocation (F5)</b> — medium; seed-pure placement.</li>
-  <li><b>Thaumcraft rework (F3)</b> — largest; stage it through Salis-Arcana, loot rolls first (cheap), node placement second.</li>
+  <li><b>Hodgepodge (F1)</b> — the VillagerRegistry ordering mixin is PR-ready on branch <code>determinism-fixes</code>.</li>
+  <li><b>Roguelike Dungeons (F5 + F8)</b> — one-line class fixes upstream cleanly: <code>Edge.hashCode</code>, the three seeded shuffles, the loot-pass changes; the virgin-terrain placement is a larger discussion.</li>
+  <li><b>GT5-Unofficial (F4)</b> — virgin-terrain probe, with the vein-rate evidence attached (one vein type ~15% up is the intended-design consequence).</li>
+  <li><b>Realistic-World-Gen (F6), TinkersConstruct, WitcheryExtras (F2), Salis-Arcana (F3)</b> — source-level ports exist on the mod forks, branch <code>determinism-fixes</code>.</li>
+  <li><b>LootGames (F9)</b> — a one-line seeded-RNG change.</li>
+  <li><b>Bug reports without fixes</b> — cross-world static leaks found during harness work (BartWorks per-chunk dedup set, CoFH populating-chunks set) and GT's lazy ore tile-entity bookkeeping.</li>
 </ol>
 
-<footer>Prepared from direct source reads across the GTNH mod monorepo collection, decompiled Witchery 0.24.1 and Thaumcraft 4.2.3.5 sources, Forge/FML 1.7.10, and the #run-determinism channel archive (2022–2026). File:line references are to current repo state as of 2026-07-22.</footer>
+<footer>Prepared from direct source reads across the GTNH mod monorepo collection, decompiled Witchery 0.24.1 and Thaumcraft 4.2.3.5 sources, Forge/FML 1.7.10, and the #run-determinism channel archive (2022–2026). Audit 2026-07-22; findings F8–F9, the persisted-world methodology, and the 0.4 results added 2026-07-23. Source, releases, and the verification harness: <a href="https://github.com/OrderedSet86/gtnh-determinism">github.com/OrderedSet86/gtnh-determinism</a>.</footer>
 </div>
