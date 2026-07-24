@@ -55,6 +55,18 @@ public abstract class TreasureManagerMixin {
         return new Random(base ^ key * 0x9E3779B97F4A7C15L);
     }
 
+    @Unique
+    private static boolean tcfix$live(ITreasureChest chest) {
+        return !(chest instanceof ChestPosAccess) || ((ChestPosAccess) chest).tcfix$isLive();
+    }
+
+    @Unique
+    private static List<ITreasureChest> tcfix$liveOnly(List<ITreasureChest> in) {
+        final java.util.ArrayList<ITreasureChest> out = new java.util.ArrayList<>(in.size());
+        for (final ITreasureChest c : in) if (tcfix$live(c)) out.add(c);
+        return out;
+    }
+
     /**
      * @author GTNH speedrun determinism audit
      * @reason Per-chest position-forked loot rand (see class doc). Selection semantics unchanged.
@@ -63,6 +75,7 @@ public abstract class TreasureManagerMixin {
     public void addItemToAll(Random rand, Treasure type, int level, IWeighted<ItemStack> item, int amount) {
         final long base = rand.nextLong();
         for (final ITreasureChest chest : this.getChests(type, level)) {
+            if (!tcfix$live(chest)) continue; // carved-over chest: no block left, must not shift loot
             final Random cr = tcfix$chestRand(base, chest);
             for (int i = 0; i < amount; ++i) {
                 chest.setRandomEmptySlot(item.get(cr));
@@ -78,6 +91,7 @@ public abstract class TreasureManagerMixin {
     public void addItemToAll(Random rand, int level, IWeighted<ItemStack> item, int amount) {
         final long base = rand.nextLong();
         for (final ITreasureChest chest : this.getChests(level)) {
+            if (!tcfix$live(chest)) continue;
             final Random cr = tcfix$chestRand(base, chest);
             for (int i = 0; i < amount; ++i) {
                 chest.setRandomEmptySlot(item.get(cr));
@@ -93,6 +107,7 @@ public abstract class TreasureManagerMixin {
     public void addItemToAll(Random rand, Treasure type, IWeighted<ItemStack> item, int amount) {
         final long base = rand.nextLong();
         for (final ITreasureChest chest : this.getChests(type)) {
+            if (!tcfix$live(chest)) continue;
             final Random cr = tcfix$chestRand(base, chest);
             for (int i = 0; i < amount; ++i) {
                 chest.setRandomEmptySlot(item.get(cr));
@@ -107,7 +122,7 @@ public abstract class TreasureManagerMixin {
      */
     @Overwrite
     public void addItem(Random rand, int level, IWeighted<ItemStack> item, int amount) {
-        final List<ITreasureChest> list = getChests(level);
+        final List<ITreasureChest> list = tcfix$liveOnly(getChests(level));
         if (list.isEmpty()) return;
         for (int i = 0; i < amount; ++i) {
             final ITreasureChest chest = list.get(rand.nextInt(list.size()));
@@ -121,7 +136,7 @@ public abstract class TreasureManagerMixin {
      */
     @Overwrite
     public void addItem(Random rand, Treasure type, IWeighted<ItemStack> item, int amount) {
-        final List<ITreasureChest> list = getChests(type);
+        final List<ITreasureChest> list = tcfix$liveOnly(getChests(type));
         if (list.isEmpty()) return;
         for (int i = 0; i < amount; ++i) {
             final ITreasureChest chest = list.get(rand.nextInt(list.size()));

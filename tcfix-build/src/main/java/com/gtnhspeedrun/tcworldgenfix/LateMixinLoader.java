@@ -49,12 +49,22 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (loadedMods.contains("Forestry")) {
             mixins.add("ComponentVillageBeeHouseMixin");
         }
+        if (loadedMods.contains("lootgames")) {
+            mixins.add("LootGamesStructureGeneratorMixin");
+        }
         if (loadedMods.contains("Roguelike")) {
             mixins.add("WorldEditorMixin");
             mixins.add("DungeonMixin");
             mixins.add("TreasureChestMixin");
             mixins.add("TreasureManagerMixin");
             mixins.add("InventoryMixin");
+            mixins.add("MinimumSpanningTreeMixin");
+            mixins.add("RoguelikeRoomShuffleMixin");
+            if (Boolean.getBoolean("gtnhdet.traceseg")) {
+                mixins.add("SegmentBaseTraceMixin");
+                mixins.add("SegmentFirePlaceTraceMixin");
+                mixins.add("SegmentGeneratorTraceMixin");
+            }
         }
         return mixins;
     }

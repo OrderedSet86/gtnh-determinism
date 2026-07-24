@@ -12,4 +12,6 @@ dependencies {
     compileOnly('com.github.GTNewHorizons:ForestryMC:4.11.31:dev')
     // 1.6.0-GTNH (shipped in 2.7.4) is purged from the maven; 1.6.2 has identical Dungeon/WorldEditor (verified)
     compileOnly('com.github.GTNewHorizons:Roguelike-Dungeons:1.6.2-GTNH:dev')
+    // transitive=false: LootGames pulls Yamcl 0.6.0, purged from the GTNH maven
+    compileOnly('com.github.GTNewHorizons:LootGames:2.1.4:dev') { transitive = false }
 }

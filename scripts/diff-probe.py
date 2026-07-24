@@ -20,6 +20,12 @@ def main() -> int:
     if a["seed"] != b["seed"]:
         print(f"WARNING: seeds differ ({a['seed']} vs {b['seed']}) — comparison is meaningless")
 
+    # merge the always-generated spawn-region extra hashes when both runs carry them
+    if a.get("spawnextra") and b.get("spawnextra"):
+        a["chunks"] = {**a["chunks"], **a["spawnextra"]}
+        b["chunks"] = {**b["chunks"], **b["spawnextra"]}
+        print(f"(including {len(a['spawnextra'])} spawn-region chunks outside the main window)")
+
     keys = sorted(set(a["chunks"]) | set(b["chunks"]), key=lambda k: tuple(map(int, k.split(","))))
     v3 = keys and isinstance(a["chunks"][keys[0]], dict)
 

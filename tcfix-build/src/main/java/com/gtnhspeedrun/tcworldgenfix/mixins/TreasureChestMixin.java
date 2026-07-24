@@ -30,8 +30,34 @@ public abstract class TreasureChestMixin implements ChestPosAccess {
             | (pos.getZ() + 30000000 & 0x3FFFFF);
     }
 
+    @Unique
+    private net.minecraft.tileentity.TileEntityChest tcfix$te;
+
+    @Inject(method = "generate", at = @At("RETURN"))
+    private void tcfix$captureTe(IWorldEditor editor, Random rand, Coord pos, int level, boolean trapped,
+        CallbackInfoReturnable<ITreasureChest> cir) {
+        if (cir.getReturnValue() != null) {
+            final Object te = editor.getTileEntity(pos);
+            if (te instanceof net.minecraft.tileentity.TileEntityChest)
+                tcfix$te = (net.minecraft.tileentity.TileEntityChest) te;
+        }
+    }
+
     @Override
     public long tcfix$posKey() {
         return tcfix$posKey;
+    }
+
+    /**
+     * True iff the chest BLOCK still exists at this chest's position. Dungeon carving overwrites some placed
+     * chests; the leftover TE can linger in the chunk map un-invalidated, so the block is the only reliable
+     * witness. (F5 follow-up: stranded chests shifted membership-indexed loot picks per launch.)
+     */
+    @Override
+    public boolean tcfix$isLive() {
+        if (tcfix$te == null) return false;
+        final net.minecraft.world.World w = tcfix$te.getWorldObj();
+        if (w == null) return true; // no world to ask — do not over-filter
+        return w.getBlock(tcfix$te.xCoord, tcfix$te.yCoord, tcfix$te.zCoord) instanceof net.minecraft.block.BlockChest;
     }
 }

@@ -1,0 +1,66 @@
+name: Release jars
+
+# Manual trigger only: Actions tab -> "Release jars" -> Run workflow, enter the version
+# (e.g. 0.4). Builds the community fix jar (tcfix-build -> gtnhdeterminism) and the test
+# harness jar (probe-build -> worldgenprobe), tags v<version>, and attaches both to a
+# GitHub release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.4)"
+        required: true
+      prerelease:
+        description: "Mark as pre-release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Tag before building so GTNHGradle's git-describe version stamps the jars with it
+      - name: Tag
+        run: |
+          git config user.name "OrderedSet86"
+          git config user.email "orderedset86@users.noreply.github.com"
+          git tag "v${{ inputs.version }}"
+
+      - name: Build fix jar (gtnhdeterminism)
+        working-directory: tcfix-build
+        run: ./gradlew build -x test -x spotlessCheck
+
+      - name: Build probe jar (worldgenprobe)
+        working-directory: probe-build
+        run: ./gradlew build -x test -x spotlessCheck
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          cp $(ls tcfix-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
+             "dist/gtnhdeterminism-${{ inputs.version }}.jar"
+          cp $(ls probe-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
+             "dist/worldgenprobe-${{ inputs.version }}.jar"
+          ls -la dist/
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push origin "v${{ inputs.version }}"
+          gh release create "v${{ inputs.version }}" dist/*.jar \
+            --title "gtnhdeterminism ${{ inputs.version }}" \
+            ${{ inputs.prerelease && '--prerelease' || '' }} \
+            --notes "Community testing jar gtnhdeterminism-${{ inputs.version }}.jar (install in mods/). worldgenprobe-${{ inputs.version }}.jar is the headless worldgen test harness, not needed for normal play."

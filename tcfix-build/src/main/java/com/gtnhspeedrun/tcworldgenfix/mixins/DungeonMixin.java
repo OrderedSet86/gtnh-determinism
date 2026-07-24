@@ -47,6 +47,20 @@ public abstract class DungeonMixin {
     private IWorldEditor editor;
 
     /**
+     * The "Statistics" starter book embeds the editor's block-placement counters, which count every transient
+     * placement (later carved over) and therefore vary per launch even when the final dungeon is byte-identical.
+     * Pin them to zero so the book NBT is deterministic; pure flavor text, no gameplay value.
+     */
+    @org.spongepowered.asm.mixin.injection.Redirect(
+        method = "generate(Lgreymerk/roguelike/dungeon/settings/ISettings;II)V",
+        at = @org.spongepowered.asm.mixin.injection.At(
+            value = "INVOKE",
+            target = "Lgreymerk/roguelike/worldgen/IWorldEditor;getStat(Lnet/minecraft/block/Block;)I"))
+    private int tcfix$fixedStats(IWorldEditor ed, Block block) {
+        return 0;
+    }
+
+    /**
      * @author GTNH speedrun determinism audit
      * @reason Replace live-world validity probes (route-dependent) with virgin-terrain reads (seed-pure) so
      *         dungeon position, settings and loot become functions of the seed. Check structure preserved.
