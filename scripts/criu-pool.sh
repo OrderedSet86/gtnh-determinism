@@ -55,6 +55,10 @@ checkpoint_inst() { # instdir port heap
   PROBE_PORT=$PORT PROBE_XMX=$HEAP "$SCRIPT_DIR/criu-harness.sh" "$INST/server" "$INST/images" checkpoint
 }
 
+jar_fingerprint() { # dir -> md5 over the determinism-relevant jars in dir/mods
+  (cd "$1/mods" && md5sum *probe*.jar *determinism*.jar 2>/dev/null | awk '{print $1}' | sort | md5sum | cut -d' ' -f1)
+}
+
 smoke_inst() { # instdir seed out -> prints seconds, rc 1 on failure
   local INST=$1 SEED=$2 OUT=$3 T0 T1
   T0=$(date +%s)
@@ -76,7 +80,12 @@ build-images)
     local HEAP=$1 i rc=0
     local pids=()
     for i in $(seq 0 $((N - 1))); do
+      # ALWAYS re-clone from the template: a surviving instance dir silently pins the OLD jars
+      # (bit us 2026-07-24 — rebuilt images ran a stale probe). Clone is cheap (hardlinks).
+      rm -rf "$POOL/inst-$i/server"
       clone_server "$TEMPLATE" "$POOL/inst-$i/server"
+      [ "$(jar_fingerprint "$TEMPLATE")" = "$(jar_fingerprint "$POOL/inst-$i/server")" ] \
+        || { echo "inst-$i mods/ out of sync with template after clone" >&2; return 1; }
     done
     for i in $(seq 0 $((N - 1))); do
       (checkpoint_inst "$POOL/inst-$i" $((25700 + i)) "$HEAP" > "$POOL/inst-$i/checkpoint.log" 2>&1) &

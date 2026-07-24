@@ -1056,6 +1056,21 @@ public class WorldgenProbe {
                 materializeTileEntities(world, world.getChunkFromChunkCoords(cx + x, cz + z));
             }
         }
+        // The search report covers ALL loaded chunks (cascade ring included), so their TEs must exist too.
+        // Runs AFTER the window loop, in sorted order, so the established materialize sequence — and therefore
+        // the hash section — is byte-unchanged.
+        {
+            final List<Chunk> extra = new ArrayList<>();
+            for (Object o : world.theChunkProviderServer.loadedChunks) {
+                final Chunk c = (Chunk) o;
+                if (Math.abs(c.xPosition - cx) <= radius && Math.abs(c.zPosition - cz) <= radius) continue;
+                extra.add(c);
+            }
+            extra.sort(
+                java.util.Comparator.<Chunk>comparingInt(ch -> ch.xPosition)
+                    .thenComparingInt(ch -> ch.zPosition));
+            for (Chunk c : extra) materializeTileEntities(world, c);
+        }
         if (!noHash) {
             for (int x = -radius; x <= radius; x++) {
                 for (int z = -radius; z <= radius; z++) {
@@ -1290,12 +1305,22 @@ public class WorldgenProbe {
             .append(", ")
             .append(sp.posZ)
             .append("],\n    \"chunks\": {\n");
+        // Every chunk that exists in the world at walk time is reported (spec: generated data is never thrown
+        // away). The walk is radius+1 and population cascade generates terrain beyond that; those chunks are
+        // already paid for. Decoration-pending chunks are flagged "populated": false (terrain-only — no
+        // ores/chests yet) so "empty" is distinguishable from "not decorated". Sorted by (x,z): the report is
+        // independent of loadedChunks iteration order.
+        final List<Chunk> loadedChunks = new ArrayList<>();
+        for (Object o : world.theChunkProviderServer.loadedChunks) loadedChunks.add((Chunk) o);
+        loadedChunks.sort(
+            java.util.Comparator.<Chunk>comparingInt(ch -> ch.xPosition)
+                .thenComparingInt(ch -> ch.zPosition));
         boolean firstChunk = true;
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
-                final Chunk c = world.getChunkFromChunkCoords(cx + x, cz + z);
+        {
+            for (final Chunk c : loadedChunks) {
+                final int ccx = c.xPosition, ccz = c.zPosition;
                 final net.minecraft.world.biome.BiomeGenBase biome = world
-                    .getBiomeGenForCoords(((cx + x) << 4) + 8, ((cz + z) << 4) + 8);
+                    .getBiomeGenForCoords((ccx << 4) + 8, (ccz << 4) + 8);
                 int water = 0, clay = 0;
                 // Section-array scan (counts are order-independent): null sections skip 4096 blocks at a time.
                 for (final ExtendedBlockStorage ebs : c.getBlockStorageArray()) {
@@ -1332,9 +1357,9 @@ public class WorldgenProbe {
                 if (!firstChunk) sb.append(",\n");
                 firstChunk = false;
                 sb.append("      \"")
-                    .append(cx + x)
+                    .append(ccx)
                     .append(",")
-                    .append(cz + z)
+                    .append(ccz)
                     .append("\": {\"biome\": \"")
                     .append(jsonEscape(biome.biomeName))
                     .append("\", \"biomeId\": ")
@@ -1343,6 +1368,7 @@ public class WorldgenProbe {
                     .append(water)
                     .append(", \"clay\": ")
                     .append(clay);
+                if (!c.isTerrainPopulated) sb.append(", \"populated\": false");
                 if (!ores.isEmpty()) {
                     sb.append(", \"ores\": {");
                     boolean f1 = true;
