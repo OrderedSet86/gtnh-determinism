@@ -20,13 +20,12 @@ JAVA_BIN=${PROBE_JAVA:-java}
 
 cd "$SERVER_DIR"
 
-# Don't start while a previous server instance is still alive/shutting down
-for i in $(seq 1 60); do
-  pgrep -f "lwjgl3ify-forgePatches.jar" >/dev/null || break
-  sleep 2
-done
-if pgrep -f "lwjgl3ify-forgePatches.jar" >/dev/null; then
-  echo "A server instance is still running; aborting" >&2
+# Serialize against other users of THIS server dir only (probe-queue daemons take the same
+# lock). The old global pgrep guard falsely serialized parallel instances in separate dirs
+# and aborted when an unrelated server ran anywhere on the machine.
+exec 9>".probe.lock"
+if ! flock -w 600 9; then
+  echo "Server dir $SERVER_DIR is locked by another probe run; aborting" >&2
   exit 1
 fi
 
