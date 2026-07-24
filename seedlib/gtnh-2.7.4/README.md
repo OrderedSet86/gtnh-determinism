@@ -1,5 +1,8 @@
 # Seed library: 0.4 release jar, 60 seeds
 
+Tarball `seedlib-0.4-60seeds.tar.gz` lives in
+[OrderedSet86/gtnh-seedlib](https://github.com/OrderedSet86/gtnh-seedlib) (git LFS).
+
 Per-seed probe search reports (radius-15 spawn window: chest inventories with names, GT ore
 histograms, biomes, water/clay, villages, witchery) generated with the RELEASE jar — these
 describe the canonical worlds the 0.4 jar produces. Query with scripts/searchlib.py.

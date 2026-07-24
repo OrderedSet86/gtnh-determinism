@@ -8,3 +8,4 @@ results/
 docs/HANDOFF*
 .env
 scripts/__pycache__/
+seedlib/**/*.tar.gz
