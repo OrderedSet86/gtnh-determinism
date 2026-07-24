@@ -195,9 +195,9 @@ run-batch)
       if PROBE_SEARCH=true PROBE_NOHASH=true \
         "$SCRIPT_DIR/criu-harness.sh" "$INST/server" "$INST/images" run "$SEED" rows \
         "$OUT_DIR/seed-$SEED.json" "$RADIUS" > "$INST/last-run.log" 2>&1; then
-        echo "$(date +%H:%M:%S) done  $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL]" >> "$PROG"
+        echo "$(date +%H:%M:%S) done  $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL]" | tee -a "$PROG"
       else
-        echo "$(date +%H:%M:%S) FAILED $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL] — see $INST/last-run.log + images/restore.log" >> "$PROG"
+        echo "$(date +%H:%M:%S) FAILED $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL] — see $INST/last-run.log + images/restore.log" | tee -a "$PROG"
       fi
       rm -f "$INST/busy.pid"
     ) &
