@@ -47,7 +47,7 @@ JAVA_ARGS=""
 if [ -f java9args.txt ]; then JAVA_ARGS="@java9args.txt"; fi
 
 "$JAVA_BIN" $JAVA_ARGS \
-  -Xmx6G -Xms6G \
+  -Xmx"${PROBE_XMX:-6G}" -Xms"${PROBE_XMX:-6G}" \
   -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.seeds="$SEEDS" \
   -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" -Dprobe.dim0only="${PROBE_DIM0ONLY:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_STATICSWEEP:+-Dprobe.staticsweep=$PROBE_STATICSWEEP} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
