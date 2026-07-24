@@ -83,8 +83,13 @@ run)
   require_criu
   SEED=$4; ORDER=$5; OUT=$6; RADIUS=${7:-12}
   cd "$SERVER_DIR"
-  exec 9>".probe.lock"
-  flock -n 9 || { echo "another probe run holds $SERVER_DIR/.probe.lock; aborting" >&2; exit 1; }
+  # NOT .probe.lock: the image contains the checkpoint JVM's flock on .probe.lock and criu re-acquires
+  # it during restore — holding it here deadlocks the restore against ourselves. The restored JVM's own
+  # lock provides the against-other-probes guarantee; this one only serializes concurrent `run`s.
+  exec 9>".criu-run.lock"
+  flock -n 9 || { echo "another criu run active in $SERVER_DIR; aborting" >&2; exit 1; }
+  # the image holds an open fd on .probe.lock — criu reopens it BY PATH, so the file must exist
+  [ -f .probe.lock ] || touch .probe.lock
   rm -rf World world
   rm -f "$OUT"
   printf '{"seed": %s, "order": "%s", "radius": %s, "out": "%s", "search": "%s", "dim0only": "%s", "nohash": "%s"}\n' \
