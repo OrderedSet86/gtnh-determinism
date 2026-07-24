@@ -14,6 +14,8 @@
 #
 # Env: RESERVE_GB (default 24) — MemAvailable floor the pool must never dip below by dispatching.
 #      PER_JOB_MB (default heap+2048) — per-restore RSS estimate used in the gate.
+#      CPU_MAX_PCT (default 80) — skip dispatching while whole-system CPU busy% (1s sample)
+#        is above this, so restores never crowd out interactive work (user req 2026-07-24).
 #      POOL_RADIUS default 15; PROBE_JAVA as usual.
 #
 # Heap sizing is automatic: image 0 is checkpointed at 4G and smoke-tested; on failure or a
@@ -142,6 +144,15 @@ run-batch)
   [ "${#PENDING[@]}" -eq 0 ] && exit 0
 
   mem_avail_mb() { awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo; }
+  CPU_MAX=${CPU_MAX_PCT:-80}
+  cpu_busy_pct() { # whole-system non-idle % over a 1s sample
+    local i1 t1 i2 t2 dt
+    read -r i1 t1 < <(awk '/^cpu /{i=$5+$6; t=0; for(f=2;f<=NF;f++)t+=$f; print i, t}' /proc/stat)
+    sleep 1
+    read -r i2 t2 < <(awk '/^cpu /{i=$5+$6; t=0; for(f=2;f<=NF;f++)t+=$f; print i, t}' /proc/stat)
+    dt=$((t2 - t1)); [ "$dt" -le 0 ] && { echo 0; return; }
+    echo $(( 100 * (dt - (i2 - i1)) / dt ))
+  }
   free_inst() { # first instance without a live busy marker
     for d in "$POOL"/inst-*; do
       local pidf=$d/busy.pid
@@ -166,8 +177,16 @@ run-batch)
         fi
         sleep 3; continue
       fi
+      CPU=$(cpu_busy_pct)
+      if [ "$CPU" -gt "$CPU_MAX" ]; then
+        if [ "$PAUSED" -eq 0 ]; then
+          echo "$(date +%H:%M:%S) PAUSED: CPU ${CPU}% > ${CPU_MAX}% (CPU_MAX_PCT)" | tee -a "$PROG"
+          PAUSED=1
+        fi
+        sleep 3; continue
+      fi
       if [ "$PAUSED" -eq 1 ]; then
-        echo "$(date +%H:%M:%S) RESUMED: MemAvailable ${AVAIL}M" | tee -a "$PROG"
+        echo "$(date +%H:%M:%S) RESUMED: MemAvailable ${AVAIL}M, CPU ${CPU}%" | tee -a "$PROG"
         PAUSED=0
       fi
       break
