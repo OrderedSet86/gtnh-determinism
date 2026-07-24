@@ -923,15 +923,20 @@ public class WorldgenProbe {
         }
         LOG.info("[probe] generation done in {} ms, hashing…", System.currentTimeMillis() - t0);
 
+        // -Dprobe.nohash=true (seed-search fast path): skip the SHA-256 chunk digests — searchlib only reads the
+        // "search" section. TE materialization still runs (the ore histogram needs GT ore TEs to exist).
+        final boolean noHash = Boolean.getBoolean("probe.nohash");
         final Map<String, String> hashes = new TreeMap<>();
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
                 materializeTileEntities(world, world.getChunkFromChunkCoords(cx + x, cz + z));
             }
         }
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
-                hashes.put((cx + x) + "," + (cz + z), hashChunk(world.getChunkFromChunkCoords(cx + x, cz + z)));
+        if (!noHash) {
+            for (int x = -radius; x <= radius; x++) {
+                for (int z = -radius; z <= radius; z++) {
+                    hashes.put((cx + x) + "," + (cz + z), hashChunk(world.getChunkFromChunkCoords(cx + x, cz + z)));
+                }
             }
         }
 
@@ -947,7 +952,7 @@ public class WorldgenProbe {
                     if (Math.abs(x - cx) <= radius && Math.abs(z - cz) <= radius) continue; // already in main window
                     final Chunk c = world.getChunkFromChunkCoords(x, z);
                     materializeTileEntities(world, c);
-                    try {
+                    if (!noHash) try {
                         spawnExtra.put(x + "," + z, hashChunk(c));
                     } catch (Exception ignored) {}
                 }
@@ -1168,13 +1173,17 @@ public class WorldgenProbe {
                 final net.minecraft.world.biome.BiomeGenBase biome = world
                     .getBiomeGenForCoords(((cx + x) << 4) + 8, ((cz + z) << 4) + 8);
                 int water = 0, clay = 0;
-                for (int lx = 0; lx < 16; lx++) {
-                    for (int lz = 0; lz < 16; lz++) {
-                        for (int y = 0; y < 256; y++) {
-                            final net.minecraft.block.Block b = c.getBlock(lx, y, lz);
-                            if (b == net.minecraft.init.Blocks.water || b == net.minecraft.init.Blocks.flowing_water)
-                                water++;
-                            else if (b == net.minecraft.init.Blocks.clay) clay++;
+                // Section-array scan (counts are order-independent): null sections skip 4096 blocks at a time.
+                for (final ExtendedBlockStorage ebs : c.getBlockStorageArray()) {
+                    if (ebs == null) continue;
+                    for (int ly = 0; ly < 16; ly++) {
+                        for (int lz = 0; lz < 16; lz++) {
+                            for (int lx = 0; lx < 16; lx++) {
+                                final net.minecraft.block.Block b = ebs.getBlockByExtId(lx, ly, lz);
+                                if (b == net.minecraft.init.Blocks.water
+                                    || b == net.minecraft.init.Blocks.flowing_water) water++;
+                                else if (b == net.minecraft.init.Blocks.clay) clay++;
+                            }
                         }
                     }
                 }
@@ -1376,12 +1385,22 @@ public class WorldgenProbe {
     private static void materializeTileEntities(WorldServer world, Chunk chunk) {
         final int baseX = chunk.xPosition << 4;
         final int baseZ = chunk.zPosition << 4;
+        // Same visit order as the original per-column scan (lx, lz, y ascending) — TE materialization order
+        // feeds chunkTileEntityMap iteration order and thus the TE digest. Section-array access (null sections
+        // skipped wholesale, no Chunk.getBlock overhead) cut the scan cost measurably; getBlockByExtId works on
+        // both the NEID raw path and EndlessIDs.
+        final ExtendedBlockStorage[] arr = chunk.getBlockStorageArray();
         for (int lx = 0; lx < 16; lx++) {
             for (int lz = 0; lz < 16; lz++) {
                 for (int y = 0; y < 256; y++) {
-                    final net.minecraft.block.Block b = chunk.getBlock(lx, y, lz);
+                    final ExtendedBlockStorage ebs = arr[y >> 4];
+                    if (ebs == null) {
+                        y |= 15; // skip to the end of this empty 16-block section
+                        continue;
+                    }
+                    final net.minecraft.block.Block b = ebs.getBlockByExtId(lx, y & 15, lz);
                     if (b == net.minecraft.init.Blocks.air) continue;
-                    if (b.hasTileEntity(chunk.getBlockMetadata(lx, y, lz))) {
+                    if (b.hasTileEntity(ebs.getExtBlockMetadata(lx, y & 15, lz))) {
                         world.getTileEntity(baseX + lx, y, baseZ + lz);
                     }
                 }

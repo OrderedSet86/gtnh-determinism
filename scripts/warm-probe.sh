@@ -37,6 +37,8 @@ level-type=rwg
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1
+server-port=${PROBE_PORT:-25565}
+server-ip=127.0.0.1
 motd=worldgen probe (warm)
 EOF
 echo "eula=true" > eula.txt
@@ -47,9 +49,9 @@ JAVA_ARGS=""
 if [ -f java9args.txt ]; then JAVA_ARGS="@java9args.txt"; fi
 
 "$JAVA_BIN" $JAVA_ARGS \
-  -Xmx"${PROBE_XMX:-6G}" -Xms"${PROBE_XMX:-6G}" \
+  -Xmx"${PROBE_XMX:-6G}" -Xms"${PROBE_XMX:-6G}" ${PROBE_JVMFLAGS:-} \
   -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.seeds="$SEEDS" \
-  -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" -Dprobe.dim0only="${PROBE_DIM0ONLY:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_STATICSWEEP:+-Dprobe.staticsweep=$PROBE_STATICSWEEP} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
+  -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" -Dprobe.dim0only="${PROBE_DIM0ONLY:-false}" -Dprobe.nohash="${PROBE_NOHASH:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_STATICSWEEP:+-Dprobe.staticsweep=$PROBE_STATICSWEEP} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
   -jar "$LAUNCH_JAR" nogui < /dev/null
 

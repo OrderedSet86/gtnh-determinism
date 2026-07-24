@@ -25,6 +25,16 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$OUT_DIR"
 OUT_DIR=$(cd "$OUT_DIR" && pwd)
 
+# Writing per-seed JSONs + server logs straight into a Dropbox-synced dir makes the sync daemon compete
+# with worldgen for CPU/IO. Stage on tmpfs and move per batch; resume checks still hit OUT_DIR.
+WORK_DIR=$OUT_DIR
+case "$OUT_DIR" in
+*Dropbox*)
+  WORK_DIR=$(mktemp -d /tmp/seed-search.XXXXXX)
+  trap 'cp -n "$WORK_DIR"/*.json "$OUT_DIR"/ 2>/dev/null || true; rm -rf "$WORK_DIR"' EXIT
+  echo "staging output in $WORK_DIR (Dropbox destination detected)" ;;
+esac
+
 # normalize seeds, drop ones already done
 PENDING=()
 for s in $(tr ', ' '\n\n' < "$SEED_FILE" | grep -vE '^\s*$'); do
@@ -39,8 +49,11 @@ while [ $i -lt $TOTAL ]; do
   CHUNK=("${PENDING[@]:$i:$BATCH}")
   LIST=$(IFS=,; echo "${CHUNK[*]}")
   echo "$(date +%H:%M:%S) batch: $LIST" >> "$OUT_DIR/search-progress.txt"
-  PROBE_SEARCH=true PROBE_DIM0ONLY="${PROBE_DIM0ONLY:-true}" "$SCRIPT_DIR/warm-probe.sh" "$SERVER_DIR" "$LIST" rows "$OUT_DIR/seed.json" "$RADIUS" \
-    > "$OUT_DIR/batch-$i.log" 2>&1 || echo "$(date +%H:%M:%S) BATCH FAILED at offset $i" >> "$OUT_DIR/search-progress.txt"
+  PROBE_SEARCH=true PROBE_DIM0ONLY="${PROBE_DIM0ONLY:-true}" PROBE_NOHASH="${PROBE_NOHASH:-true}" \
+    PROBE_JVMFLAGS="${PROBE_JVMFLAGS:--XX:+UseParallelGC}" \
+    "$SCRIPT_DIR/warm-probe.sh" "$SERVER_DIR" "$LIST" rows "$WORK_DIR/seed.json" "$RADIUS" \
+    > "$WORK_DIR/batch-$i.log" 2>&1 || echo "$(date +%H:%M:%S) BATCH FAILED at offset $i" >> "$OUT_DIR/search-progress.txt"
+  if [ "$WORK_DIR" != "$OUT_DIR" ]; then mv -f "$WORK_DIR"/*.json "$WORK_DIR"/batch-*.log "$OUT_DIR"/ 2>/dev/null || true; fi
   # warm-probe templates seed.json -> seed-<seed>.json per slot
   n_ok=0
   for s in "${CHUNK[@]}"; do [ -f "$OUT_DIR/seed-$s.json" ] && n_ok=$((n_ok+1)); done
