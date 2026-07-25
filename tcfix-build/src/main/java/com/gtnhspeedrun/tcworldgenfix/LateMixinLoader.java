@@ -36,6 +36,8 @@ public class LateMixinLoader implements ILateMixinLoader {
             mixins.add("WorldGenBOPFlowerManagerMixin");
         }
         if (loadedMods.contains("witchery")) {
+            mixins.add("VillageWallMixin");
+            mixins.add("VillageWallGenTileMixin");
             mixins.add("WitcheryWorldGeneratorMixin");
             mixins.add("ComponentWickerManMixin");
         }
@@ -54,6 +56,7 @@ public class LateMixinLoader implements ILateMixinLoader {
         }
         if (loadedMods.contains("Roguelike")) {
             mixins.add("WorldEditorMixin");
+            mixins.add("SpawnerMixin");
             mixins.add("DungeonMixin");
             mixins.add("TreasureChestMixin");
             mixins.add("TreasureManagerMixin");

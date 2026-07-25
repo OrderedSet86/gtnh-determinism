@@ -1,21 +1,21 @@
 package com.gtnhspeedrun.tcworldgenfix.mixins;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import com.gtnhspeedrun.tcworldgenfix.PendingSlices;
 import com.gtnhspeedrun.tcworldgenfix.TerrainOracle;
 import com.gtnhspeedrun.tcworldgenfix.WorldEditorAccess;
 
@@ -24,17 +24,20 @@ import greymerk.roguelike.worldgen.MetaBlock;
 import greymerk.roguelike.worldgen.WorldEditor;
 
 /**
- * Turns Roguelike's per-dungeon WorldEditor into an order-independent OVERLAY view (F5, second pass):
- * block reads return the dungeon's OWN writes where it has written, and VIRGIN terrain ({@link TerrainOracle})
- * everywhere else. Every placement decision in dungeon generation funnels through getBlock/isAirBlock here
- * (canPlace, validGroundBlock, fillDown, spiral stairs, room/secret-room validity, setBlock's own fill gates), so
- * with this view the whole dungeon becomes a function of (seed, trigger region) — it can no longer see
- * route-dependent state (population-stage lava lakes, ores, decoration, other structures), which was still
- * relocating ~12 deep rooms and re-rolling loot between walk orders after the position fix.
+ * Turns Roguelike's per-dungeon WorldEditor into an order-independent OVERLAY (F5): READS return the dungeon's
+ * own writes where it has written and VIRGIN terrain ({@link TerrainOracle}) everywhere else, so placement
+ * decisions cannot see route-dependent population state. WRITES are routed through {@link PendingSlices} (F5
+ * third pass): chunks whose slice-applier already ran get live writes, everything else is buffered and applied
+ * at the END of the target chunk's own mod-worldgen phase — both orderings converge on "dungeon wins over that
+ * chunk's decoration", killing the cross-population write race (launch-/route-dependent deep-chest existence)
+ * with zero pop-in.
  *
+ * <p>
  * One WorldEditor is created per dungeon (DungeonGenerator.generate), so the write-set lifetime matches the
- * dungeon's. Stock getBlock already discards metadata, so the virgin MetaBlock matches stock semantics.
- * getTileEntity stays live (used to fill chests the dungeon just placed).
+ * dungeon's; visibility of OTHER dungeons' buffered writes is intentionally not provided (same per-editor
+ * semantics the 0.3 overlay shipped). getTileEntity returns DETACHED tile entities for buffered container
+ * writes — generation code (chest fill, spawner/skull config) mutates the detached instance and the applier
+ * transplants its NBT when the chunk is ready.
  */
 @Mixin(value = WorldEditor.class, remap = false)
 public abstract class WorldEditorMixin implements WorldEditorAccess {
@@ -48,6 +51,9 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
     @Unique
     private final Set<Long> tcfix$written = new HashSet<>();
 
+    @Unique
+    private final Map<Long, PendingSlices.Write> tcfix$buffered = new HashMap<>();
+
     @Override
     public World tcfix$world() {
         return this.world;
@@ -60,11 +66,14 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
 
     /**
      * @author GTNH speedrun determinism audit
-     * @reason Overlay read: own writes live, everything else virgin — placement decisions become route-independent.
-     *         Stock discarded metadata here too.
+     * @reason Overlay read: own writes (buffered or live), everything else virgin. Stock discarded metadata too.
      */
     @Overwrite
     public MetaBlock getBlock(Coord pos) {
+        final PendingSlices.Write wr = tcfix$buffered.get(tcfix$key(pos));
+        if (wr != null && wr.block != null) {
+            return new MetaBlock(wr.block);
+        }
         if (tcfix$written.contains(tcfix$key(pos))) {
             return new MetaBlock(world.getBlock(pos.getX(), pos.getY(), pos.getZ()));
         }
@@ -77,6 +86,10 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
      */
     @Overwrite
     public boolean isAirBlock(Coord pos) {
+        final PendingSlices.Write wr = tcfix$buffered.get(tcfix$key(pos));
+        if (wr != null && wr.block != null) {
+            return wr.block == Blocks.air;
+        }
         if (tcfix$written.contains(tcfix$key(pos))) {
             return world.isAirBlock(pos.getX(), pos.getY(), pos.getZ());
         }
@@ -85,9 +98,8 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
 
     /**
      * @author GTNH speedrun determinism audit
-     * @reason The fill gates (fillAir/replaceSolid) and the chest/spawner guard must evaluate against the overlay,
-     *         not live state, or carving itself picks up route noise. Faithful to stock otherwise; records actual
-     *         writes so later reads at those positions see them.
+     * @reason Fill gates evaluate against the overlay; the write itself is routed live-or-buffered by chunk
+     *         applier state (PendingSlices) so the dungeon-vs-decoration contest is order-independent.
      */
     @Overwrite
     public boolean setBlock(Coord pos, MetaBlock block, boolean fillAir, boolean replaceSolid) {
@@ -102,12 +114,18 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
         if (!fillAir && isAir) return false;
         if (!replaceSolid && !isAir) return false;
 
-        try {
-            world.setBlock(pos.getX(), pos.getY(), pos.getZ(), block.getBlock(), block.getMeta(), block.getFlag());
-        } catch (NullPointerException npe) {
-            // ignore it. (stock behavior)
+        if (PendingSlices.shouldBuffer(world, pos.getX(), pos.getZ())) {
+            final PendingSlices.Write wr = PendingSlices
+                .buffer(world, pos.getX(), pos.getY(), pos.getZ(), block.getBlock(), block.getMeta(), block.getFlag());
+            tcfix$buffered.put(tcfix$key(pos), wr);
+        } else {
+            try {
+                world.setBlock(pos.getX(), pos.getY(), pos.getZ(), block.getBlock(), block.getMeta(), block.getFlag());
+            } catch (NullPointerException npe) {
+                // ignore it. (stock behavior)
+            }
+            tcfix$written.add(tcfix$key(pos));
         }
-        tcfix$written.add(tcfix$key(pos));
 
         final Block type = block.getBlock();
         final Integer count = stats.get(type);
@@ -116,8 +134,38 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
         return true;
     }
 
-    @Inject(method = "setBlockMetadata", at = @At("RETURN"))
-    private void tcfix$recordMetaWrite(Coord pos, int meta, CallbackInfo ci) {
+    /**
+     * @author GTNH speedrun determinism audit
+     * @reason Metadata writes follow the same routing: update a buffered write in place, buffer a metadata-only
+     *         write for unapplied chunks, else write live.
+     */
+    @Overwrite
+    public void setBlockMetadata(Coord pos, int meta) {
+        final PendingSlices.Write wr = tcfix$buffered.get(tcfix$key(pos));
+        if (wr != null) {
+            wr.meta = meta;
+            return;
+        }
+        if (PendingSlices.shouldBuffer(world, pos.getX(), pos.getZ())) {
+            tcfix$buffered
+                .put(tcfix$key(pos), PendingSlices.buffer(world, pos.getX(), pos.getY(), pos.getZ(), null, meta, 0));
+            return;
+        }
+        world.setBlockMetadataWithNotify(pos.getX(), pos.getY(), pos.getZ(), meta, 2);
         tcfix$written.add(tcfix$key(pos));
+    }
+
+    /**
+     * @author GTNH speedrun determinism audit
+     * @reason Buffered container writes have no world TE yet: hand generation code a detached instance whose NBT
+     *         the applier transplants. Live positions keep stock behavior.
+     */
+    @Overwrite
+    public TileEntity getTileEntity(Coord pos) {
+        final PendingSlices.Write wr = tcfix$buffered.get(tcfix$key(pos));
+        if (wr != null && wr.block != null && wr.block.hasTileEntity(wr.meta)) {
+            return PendingSlices.tileEntityFor(world, wr);
+        }
+        return world.getTileEntity(pos.getX(), pos.getY(), pos.getZ());
     }
 }
