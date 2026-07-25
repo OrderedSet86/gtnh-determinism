@@ -26,6 +26,9 @@ GTNH 2.7.4+ stable instance.**
 | ProjectRed | Lily colors (dye yield!) rolled clock-random at worldgen | Lily colors derived from seed+position |
 | Forestry | Village bee house rolled bee species/frames/flowers off `world.rand` | Village bees seed-stable |
 
+Running tally: **28 fixes** (26 mixins + 2 reflection patches) across **11 mods**, rewiring **54
+worldgen classes**.
+
 ## Verification
 
 Tested headless against the actual GTNH 2.7.4 server pack with the WorldgenProbe
