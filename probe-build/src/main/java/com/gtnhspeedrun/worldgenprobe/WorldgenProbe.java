@@ -236,6 +236,19 @@ public class WorldgenProbe {
                 .initiateShutdown();
             return;
         }
+        final String prefilter = System.getProperty("probe.prefilter");
+        if (prefilter != null) {
+            try {
+                Prefilter.run(prefilter, System.getProperty("probe.prefilter.out", "prefilter.jsonl"));
+            } catch (Exception e) {
+                LOG.error("Prefilter failed", e);
+            }
+            LOG.info("[probe] shutting down server");
+            FMLCommonHandler.instance()
+                .getMinecraftServerInstance()
+                .initiateShutdown();
+            return;
+        }
         final String order = System.getProperty("probe.order");
         if (order == null) return;
         final int radius = Integer.getInteger("probe.radius", 12);
