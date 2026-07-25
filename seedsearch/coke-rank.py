@@ -2,8 +2,10 @@
 """Rank stage-0 prefilter output (scripts/prefilter.sh JSONL) for coke% routing.
 
 Scores each surviving seed by spawn-relative distance to the stage-0-predictable
-coke% ingredients (all distances XZ blocks, capped at --cap so one missing criterion
-doesn't drown the rest; lower total = better):
+coke% ingredients, with all PIECE criteria required from ONE village (a runner works
+a single village; the best village wins, its start-well block coords are printed in
+the "village x,z" column). Distances are XZ blocks from spawn, capped at --cap so a
+missing criterion reads as --cap rather than drowning the rest; lower total = better:
 
   paper    nearest VillageComponentPhotoshop piece (22/25 such chests carry >=4 paper
            in the 2.8.4 corpus - the only surface-predictable paper source)
@@ -69,15 +71,25 @@ def main():
             continue
         px, pz = spawn[0], spawn[2]
 
-        dists = {}
-        for crit, names in CRITERIA.items():
-            best = args.cap
-            for st in d.get("village_starts", []):
-                for m in PIECE_RE.finditer(st.get("pieces", "")):
+        # score each VILLAGE separately (all piece criteria must come from one village —
+        # a runner works a single village, not the best piece from each of several),
+        # then the seed's score = its best village + global water distance
+        best_village = None
+        for st in d.get("village_starts", []):
+            vdists = {crit: args.cap for crit in CRITERIA}
+            for m in PIECE_RE.finditer(st.get("pieces", "")):
+                for crit, names in CRITERIA.items():
                     if m.group(1) in names:
                         x1, _, z1, x2, _, z2 = (int(g) for g in m.groups()[1:])
-                        best = min(best, box_dist_xz(px, pz, x1, z1, x2, z2))
-            dists[crit] = best
+                        vdists[crit] = min(vdists[crit], box_dist_xz(px, pz, x1, z1, x2, z2))
+            vscore = sum(vdists.values())
+            cx, cz = st.get("c", [0, 0])
+            well = (cx * 16 + 2, cz * 16 + 2)  # village start well, block coords
+            if best_village is None or vscore < best_village[0]:
+                best_village = (vscore, well, vdists)
+        if best_village is None:
+            continue
+        vscore, well, dists = best_village
 
         best_w = args.cap
         for row in d.get("terrain", []):
@@ -91,21 +103,21 @@ def main():
                 killed.get("require:" + "+".join(r for r in required if dists[r] >= args.cap), 0) + 1
             continue
 
-        score = sum(dists.values())
-        rows.append((score, d["seed"], spawn, dists))
+        score = vscore + best_w
+        rows.append((score, d["seed"], spawn, well, dists))
 
     rows.sort()
     if killed:
         print("killed:", ", ".join(f"{k}={v}" for k, v in sorted(killed.items())), file=sys.stderr)
-    print(f"{'score':>7}  {'seed':>20}  {'spawn':>14}  "
+    print(f"{'score':>7}  {'seed':>20}  {'spawn x,z':>13}  {'village x,z':>13}  "
           f"{'paper':>6} {'tic':>6} {'furn':>6} {'water':>6}")
-    for score, seed, spawn, dists in rows[:args.top]:
-        print(f"{score:7.0f}  {seed:>20}  {spawn[0]:>6},{spawn[2]:<6}  "
+    for score, seed, spawn, well, dists in rows[:args.top]:
+        print(f"{score:7.0f}  {seed:>20}  {spawn[0]:>6},{spawn[2]:<6}  {well[0]:>6},{well[1]:<6}  "
               f"{dists['paper']:6.0f} {dists['tic']:6.0f} {dists['furnace']:6.0f} "
               f"{dists['water']:6.0f}")
     if args.seeds_out:
         with open(args.seeds_out, "w") as f:
-            for _, seed, _, _ in rows:
+            for _, seed, _, _, _ in rows:
                 f.write(f"{seed}\n")
         print(f"\n{len(rows)} ranked seeds -> {args.seeds_out}", file=sys.stderr)
 
