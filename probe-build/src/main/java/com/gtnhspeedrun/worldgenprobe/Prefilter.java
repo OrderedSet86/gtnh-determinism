@@ -211,12 +211,18 @@ public final class Prefilter {
         private final Field fBaseBiome;
         private final Class<?> biomeArrayType;
 
-        /** per-chunk digest: top block per column, top-solid y per column, water-at-62 flags */
+        /** per-chunk digest: top block per column, top-solid y per column, water-at-62 flags, sand run depth */
         static final class Cols {
 
             net.minecraft.block.Block[] top = new net.minecraft.block.Block[256];
             short[] topSolid = new short[256];
             boolean[] water = new boolean[256];
+            /**
+             * consecutive sand blocks from the top-solid surface downward (deep sand = the coke%
+             * draconic-place technique wants runs of 3-4)
+             */
+            byte[] sandRun = new byte[256];
+            int sandTotal; // all sand blocks in the chunk, for golden comparison vs corpus "sand"
         }
 
         private final Map<Long, Cols> cache = new java.util.HashMap<>();
@@ -290,7 +296,15 @@ public final class Prefilter {
                 }
                 c.topSolid[col] = (short) ts;
                 c.water[col] = blocks[off + 62] == net.minecraft.init.Blocks.water;
+                int run = 0;
+                while (run < ts && blocks[off + ts - run] == net.minecraft.init.Blocks.sand && run < 127) run++;
+                c.sandRun[col] = (byte) run;
             }
+            int sandTotal = 0;
+            for (int i = 0; i < 65536; i++) {
+                if (blocks[i] == net.minecraft.init.Blocks.sand) sandTotal++;
+            }
+            c.sandTotal = sandTotal;
             cache.put(key, c);
             return c;
         }
@@ -594,16 +608,31 @@ public final class Prefilter {
                 for (int cx2 = scx - terrainRadius; cx2 <= scx + terrainRadius; cx2++) {
                     for (int cz2 = scz - terrainRadius; cz2 <= scz + terrainRadius; cz2++) {
                         final RwgTerrain.Cols c = terra.columns(cx2, cz2);
-                        int water = 0, surfMin = 255, surfSum = 0;
+                        int water = 0, surfMin = 255, surfSum = 0, deepSand = 0;
                         for (int col = 0; col < 256; col++) {
                             if (c.water[col]) water++;
+                            if (c.sandRun[col] >= 3) deepSand++;
                             final int ts = c.topSolid[col];
                             if (ts < surfMin) surfMin = ts;
                             surfSum += ts;
                         }
                         waterTotal += water;
-                        digest
-                            .add("[" + cx2 + ", " + cz2 + ", " + water + ", " + surfMin + ", " + (surfSum / 256) + "]");
+                        // row: [cx, cz, waterCols, surfMin, surfAvg, deepSandCols(run>=3), sandBlocksTotal]
+                        digest.add(
+                            "[" + cx2
+                                + ", "
+                                + cz2
+                                + ", "
+                                + water
+                                + ", "
+                                + surfMin
+                                + ", "
+                                + (surfSum / 256)
+                                + ", "
+                                + deepSand
+                                + ", "
+                                + c.sandTotal
+                                + "]");
                     }
                 }
                 final int gateWater2 = Integer.getInteger("probe.prefilter.gate.water", -1);

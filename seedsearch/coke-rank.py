@@ -54,6 +54,10 @@ def main():
                          "village farther than 100 blocks is not worth considering)")
     ap.add_argument("--water-cols", type=int, default=16,
                     help="min water columns for a chunk to count as a water source")
+    ap.add_argument("--sand-cols", type=int, default=4,
+                    help="min deep-sand columns (vertical run >= 3, the draconic-place "
+                         "technique) for a chunk to count as a sand source; sweeps recorded "
+                         "before the sand field score sand as --cap")
     ap.add_argument("--require", default="",
                     help="comma list of criteria that must be under --cap (e.g. paper,tic)")
     ap.add_argument("--seeds-out", help="write ranked seed list (one per line) here")
@@ -102,29 +106,34 @@ def main():
         vscore, well, dists = best_village
 
         best_w = args.cap
+        best_s = args.cap
         for row in d.get("terrain", []):
             cx, cz, water = row[0], row[1], row[2]
+            center = math.hypot(cx * 16 + 8 - px, cz * 16 + 8 - pz)
             if water >= args.water_cols:
-                best_w = min(best_w, math.hypot(cx * 16 + 8 - px, cz * 16 + 8 - pz))
+                best_w = min(best_w, center)
+            if len(row) >= 7 and row[5] >= args.sand_cols:
+                best_s = min(best_s, center)
         dists["water"] = best_w
+        dists["sand"] = best_s
 
         if any(dists[r] >= args.cap for r in required):
             killed["require:" + "+".join(r for r in required if dists[r] >= args.cap)] = \
                 killed.get("require:" + "+".join(r for r in required if dists[r] >= args.cap), 0) + 1
             continue
 
-        score = vscore + best_w
+        score = vscore + best_w + best_s
         rows.append((score, d["seed"], spawn, well, dists))
 
     rows.sort()
     if killed:
         print("killed:", ", ".join(f"{k}={v}" for k, v in sorted(killed.items())), file=sys.stderr)
     print(f"{'score':>7}  {'seed':>20}  {'spawn x,z':>13}  {'village x,z':>13}  "
-          f"{'paper':>6} {'tic':>6} {'furn':>6} {'water':>6}")
+          f"{'paper':>6} {'tic':>6} {'furn':>6} {'water':>6} {'sand':>6}")
     for score, seed, spawn, well, dists in rows[:args.top]:
         print(f"{score:7.0f}  {seed:>20}  {spawn[0]:>6},{spawn[2]:<6}  {well[0]:>6},{well[1]:<6}  "
               f"{dists['paper']:6.0f} {dists['tic']:6.0f} {dists['furnace']:6.0f} "
-              f"{dists['water']:6.0f}")
+              f"{dists['water']:6.0f} {dists['sand']:6.0f}")
     if args.seeds_out:
         with open(args.seeds_out, "w") as f:
             for _, seed, _, _, _ in rows:
