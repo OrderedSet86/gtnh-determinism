@@ -48,6 +48,10 @@ def main():
     ap.add_argument("jsonl")
     ap.add_argument("--top", type=int, default=30)
     ap.add_argument("--cap", type=float, default=512.0)
+    ap.add_argument("--max-village-dist", type=float, default=100.0,
+                    help="village is only eligible if its nearest piece is within this many "
+                         "blocks of spawn (user ruling 2026-07-25: coke%% WR pace ~9:30, a "
+                         "village farther than 100 blocks is not worth considering)")
     ap.add_argument("--water-cols", type=int, default=16,
                     help="min water columns for a chunk to count as a water source")
     ap.add_argument("--require", default="",
@@ -77,17 +81,23 @@ def main():
         best_village = None
         for st in d.get("village_starts", []):
             vdists = {crit: args.cap for crit in CRITERIA}
+            edge = None  # spawn -> nearest piece of this village = the actual walk to reach it
             for m in PIECE_RE.finditer(st.get("pieces", "")):
+                x1, _, z1, x2, _, z2 = (int(g) for g in m.groups()[1:])
+                dist = box_dist_xz(px, pz, x1, z1, x2, z2)
+                edge = dist if edge is None else min(edge, dist)
                 for crit, names in CRITERIA.items():
                     if m.group(1) in names:
-                        x1, _, z1, x2, _, z2 = (int(g) for g in m.groups()[1:])
-                        vdists[crit] = min(vdists[crit], box_dist_xz(px, pz, x1, z1, x2, z2))
+                        vdists[crit] = min(vdists[crit], dist)
+            if edge is None or edge > args.max_village_dist:
+                continue
             vscore = sum(vdists.values())
             cx, cz = st.get("c", [0, 0])
             well = (cx * 16 + 2, cz * 16 + 2)  # village start well, block coords
             if best_village is None or vscore < best_village[0]:
                 best_village = (vscore, well, vdists)
         if best_village is None:
+            killed["village>maxdist"] = killed.get("village>maxdist", 0) + 1
             continue
         vscore, well, dists = best_village
 
