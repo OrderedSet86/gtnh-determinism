@@ -58,6 +58,15 @@ def main():
                     help="min deep-sand columns (vertical run >= 3, the draconic-place "
                          "technique) for a chunk to count as a sand source; sweeps recorded "
                          "before the sand field score sand as --cap")
+    ap.add_argument("--clay-cols", type=int, default=8,
+                    help="min clay-candidate columns (water over a DecoClay-replaceable floor) "
+                         "for a chunk to count as a clay source")
+    ap.add_argument("--gravel-cols", type=int, default=8,
+                    help="min gravel-topped columns (flint source) for a chunk to count")
+    ap.add_argument("--furnace-bonus", type=float, default=25.0,
+                    help="score bonus (blocks) per House2 blacksmith beyond the first in the "
+                         "chosen village — each House2 is 2 furnaces; more parallel furnaces "
+                         "beats a slightly closer single blacksmith")
     ap.add_argument("--require", default="",
                     help="comma list of criteria that must be under --cap (e.g. paper,tic)")
     ap.add_argument("--seeds-out", help="write ranked seed list (one per line) here")
@@ -86,27 +95,30 @@ def main():
         for st in d.get("village_starts", []):
             vdists = {crit: args.cap for crit in CRITERIA}
             edge = None  # spawn -> nearest piece of this village = the actual walk to reach it
+            furnace_houses = 0
             for m in PIECE_RE.finditer(st.get("pieces", "")):
                 x1, _, z1, x2, _, z2 = (int(g) for g in m.groups()[1:])
                 dist = box_dist_xz(px, pz, x1, z1, x2, z2)
                 edge = dist if edge is None else min(edge, dist)
+                if m.group(1) == "House2":
+                    furnace_houses += 1
                 for crit, names in CRITERIA.items():
                     if m.group(1) in names:
                         vdists[crit] = min(vdists[crit], dist)
             if edge is None or edge > args.max_village_dist:
                 continue
-            vscore = sum(vdists.values())
+            # more blacksmiths = more parallel furnaces; reward beyond the first
+            vscore = sum(vdists.values()) - args.furnace_bonus * max(0, furnace_houses - 1)
             cx, cz = st.get("c", [0, 0])
             well = (cx * 16 + 2, cz * 16 + 2)  # village start well, block coords
             if best_village is None or vscore < best_village[0]:
-                best_village = (vscore, well, vdists)
+                best_village = (vscore, well, vdists, furnace_houses)
         if best_village is None:
             killed["village>maxdist"] = killed.get("village>maxdist", 0) + 1
             continue
-        vscore, well, dists = best_village
+        vscore, well, dists, furnace_houses = best_village
 
-        best_w = args.cap
-        best_s = args.cap
+        best_w = best_s = best_c = best_g = args.cap
         for row in d.get("terrain", []):
             cx, cz, water = row[0], row[1], row[2]
             center = math.hypot(cx * 16 + 8 - px, cz * 16 + 8 - pz)
@@ -114,30 +126,40 @@ def main():
                 best_w = min(best_w, center)
             if len(row) >= 7 and row[5] >= args.sand_cols:
                 best_s = min(best_s, center)
+            if len(row) >= 9:
+                if row[7] >= args.clay_cols:
+                    best_c = min(best_c, center)
+                if row[8] >= args.gravel_cols:
+                    best_g = min(best_g, center)
         dists["water"] = best_w
         dists["sand"] = best_s
+        dists["clay"] = best_c
+        dists["gravel"] = best_g
 
         if any(dists[r] >= args.cap for r in required):
             killed["require:" + "+".join(r for r in required if dists[r] >= args.cap)] = \
                 killed.get("require:" + "+".join(r for r in required if dists[r] >= args.cap), 0) + 1
             continue
 
-        score = vscore + best_w + best_s
-        rows.append((score, d["seed"], spawn, well, dists))
+        # gravel is report-only: terrain-stage surface gravel is essentially absent in RWG
+        # (patches are populate decorators), so scoring it would add a flat +cap of noise
+        score = vscore + best_w + best_s + best_c
+        rows.append((score, d["seed"], spawn, well, dists, furnace_houses))
 
     rows.sort()
     if killed:
         print("killed:", ", ".join(f"{k}={v}" for k, v in sorted(killed.items())), file=sys.stderr)
     print(f"{'score':>7}  {'seed':>20}  {'spawn x,z':>13}  {'village x,z':>13}  "
-          f"{'paper':>6} {'tic':>6} {'furn':>6} {'water':>6} {'sand':>6}")
-    for score, seed, spawn, well, dists in rows[:args.top]:
+          f"{'paper':>6} {'tic':>6} {'furn':>9} {'water':>6} {'sand':>6} {'clay':>6} {'gravl':>6}")
+    for score, seed, spawn, well, dists, fh in rows[:args.top]:
+        furn = f"{dists['furnace']:4.0f} x{fh}"
         print(f"{score:7.0f}  {seed:>20}  {spawn[0]:>6},{spawn[2]:<6}  {well[0]:>6},{well[1]:<6}  "
-              f"{dists['paper']:6.0f} {dists['tic']:6.0f} {dists['furnace']:6.0f} "
-              f"{dists['water']:6.0f} {dists['sand']:6.0f}")
+              f"{dists['paper']:6.0f} {dists['tic']:6.0f} {furn:>9} "
+              f"{dists['water']:6.0f} {dists['sand']:6.0f} {dists['clay']:6.0f} {dists['gravel']:6.0f}")
     if args.seeds_out:
         with open(args.seeds_out, "w") as f:
-            for _, seed, _, _, _ in rows:
-                f.write(f"{seed}\n")
+            for row in rows:
+                f.write(f"{row[1]}\n")
         print(f"\n{len(rows)} ranked seeds -> {args.seeds_out}", file=sys.stderr)
 
 

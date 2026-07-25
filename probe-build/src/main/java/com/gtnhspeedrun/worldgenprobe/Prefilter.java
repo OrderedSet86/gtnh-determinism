@@ -223,6 +223,13 @@ public final class Prefilter {
              */
             byte[] sandRun = new byte[256];
             int sandTotal; // all sand blocks in the chunk, for golden comparison vs corpus "sand"
+            /**
+             * water column whose floor is sand/gravel/dirt/grass — exactly the blocks DecoClay
+             * replaces at populate; the candidate area for clay even though the clay itself rolls later
+             */
+            boolean[] clayCand = new boolean[256];
+            /** gravel at the top-solid surface (flint source — best surface head pickup per corpus) */
+            boolean[] gravelTop = new boolean[256];
         }
 
         private final Map<Long, Cols> cache = new java.util.HashMap<>();
@@ -299,6 +306,12 @@ public final class Prefilter {
                 int run = 0;
                 while (run < ts && blocks[off + ts - run] == net.minecraft.init.Blocks.sand && run < 127) run++;
                 c.sandRun[col] = (byte) run;
+                final net.minecraft.block.Block floor = blocks[off + ts];
+                c.gravelTop[col] = floor == net.minecraft.init.Blocks.gravel;
+                c.clayCand[col] = c.water[col]
+                    && (floor == net.minecraft.init.Blocks.sand || floor == net.minecraft.init.Blocks.gravel
+                        || floor == net.minecraft.init.Blocks.dirt
+                        || floor == net.minecraft.init.Blocks.grass);
             }
             int sandTotal = 0;
             for (int i = 0; i < 65536; i++) {
@@ -608,16 +621,19 @@ public final class Prefilter {
                 for (int cx2 = scx - terrainRadius; cx2 <= scx + terrainRadius; cx2++) {
                     for (int cz2 = scz - terrainRadius; cz2 <= scz + terrainRadius; cz2++) {
                         final RwgTerrain.Cols c = terra.columns(cx2, cz2);
-                        int water = 0, surfMin = 255, surfSum = 0, deepSand = 0;
+                        int water = 0, surfMin = 255, surfSum = 0, deepSand = 0, clayCand = 0, gravelTop = 0;
                         for (int col = 0; col < 256; col++) {
                             if (c.water[col]) water++;
                             if (c.sandRun[col] >= 3) deepSand++;
+                            if (c.clayCand[col]) clayCand++;
+                            if (c.gravelTop[col]) gravelTop++;
                             final int ts = c.topSolid[col];
                             if (ts < surfMin) surfMin = ts;
                             surfSum += ts;
                         }
                         waterTotal += water;
-                        // row: [cx, cz, waterCols, surfMin, surfAvg, deepSandCols(run>=3), sandBlocksTotal]
+                        // row: [cx, cz, waterCols, surfMin, surfAvg, deepSandCols(run>=3), sandBlocksTotal,
+                        // clayCandCols(water floor DecoClay-replaceable), gravelTopCols]
                         digest.add(
                             "[" + cx2
                                 + ", "
@@ -632,6 +648,10 @@ public final class Prefilter {
                                 + deepSand
                                 + ", "
                                 + c.sandTotal
+                                + ", "
+                                + clayCand
+                                + ", "
+                                + gravelTop
                                 + "]");
                     }
                 }
