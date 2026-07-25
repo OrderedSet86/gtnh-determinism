@@ -36,8 +36,24 @@ import net.minecraft.world.storage.ISaveHandler;
  * terrain-dependent and lands within a few hundred blocks of origin on RWG).
  * - ocean/river strength at origin.
  *
+ * Coke%-floor modules (2026-07-25):
+ * - village piece layouts: dispatch the generator's real func_151539_a per village cell and read its own
+ * structureMap — full piece class+bbox list per village (Y nominal, XZ exact), same "N pieces: Name@box; …"
+ * string format as the full-gen villages dump so village-hunt.py runs on prefilter output unchanged.
+ * Golden: 8/8 corpus villages piece-exact on the fmt2 corpus.
+ * - terrain columns + spawn: worldless ChunkGeneratorRealistic terrain path (generateTerrain →
+ * replaceBlocksForBiome → caves, exact provideChunk order) + WorldServer.createSpawnPosition walk with
+ * BiomesOPlenty's WorldProviderSurfaceBOP accept test (sand/stone top — NOT vanilla grass) → predicted spawn
+ * block, per-chunk water-column counts (clay proxy) and surface heights near spawn. Surface heights verified
+ * exact vs corpus surf heightmaps.
+ * - staged kill gates (-Dprobe.prefilter.gate.villagedist/pieces/water) make one pass behave as the funnel:
+ * later modules only run for seeds the earlier gates kept.
+ *
  * Usage: -Dprobe.prefilter=@seeds.txt | seed1,seed2,... | random:COUNT[:RNGSEED]
- * -Dprobe.prefilter.out=out.jsonl [-Dprobe.prefilter.radius=64 (chunks around origin for village cells)]
+ * -Dprobe.prefilter.out=out.jsonl
+ * [-Dprobe.prefilter.radius=64 (chunks around origin for village cells)]
+ * [-Dprobe.prefilter.pieces=true (full village piece layouts)]
+ * [-Dprobe.prefilter.terrain=4 (digest radius in chunks around predicted spawn; -1 disables terrain+spawn)]
  */
 public final class Prefilter {
 
@@ -66,6 +82,16 @@ public final class Prefilter {
         @Override
         public Entity getEntityByID(int id) {
             return null;
+        }
+
+        /**
+         * MapGenCaves' Forge-patched digBlock asks the world for the biome; the vanilla path first checks
+         * blockExists → NPE on our null chunk provider. Answer straight from the chunk manager — for
+         * never-generated chunks that is exactly what the vanilla fallback does anyway.
+         */
+        @Override
+        public net.minecraft.world.biome.BiomeGenBase getBiomeGenForCoords(int x, int z) {
+            return getWorldChunkManager().getBiomeGenAt(x, z);
         }
     }
 
@@ -112,7 +138,12 @@ public final class Prefilter {
 
     private static Object VILLAGE_GEN;
     private static java.lang.reflect.Method CAN_SPAWN;
+    private static java.lang.reflect.Method GENERATE; // func_151539_a — the REAL per-chunk entry point
+    private static java.lang.reflect.Method IS_SIZEABLE; // func_75069_d — vanilla's >2-non-road-pieces gate
     private static Field WORLD_OBJ;
+    private static Field STRUCTURE_MAP; // field_75053_d — Long(chunkXZ2Int) → StructureStart
+    private static Field STRUCTURE_DATA; // field_143029_e — per-world NBT cache, must reset per seed
+    private static Field START_COMPONENTS; // field_75075_a
 
     /**
      * The generator the pack actually uses: vanilla MapGenVillage(size=0,distance=24 — RWG's config) run
@@ -127,30 +158,257 @@ public final class Prefilter {
                 new MapGenVillage(m),
                 net.minecraftforge.event.terraingen.InitMapGenEvent.EventType.VILLAGE);
             // runtime classes carry SRG names; MCP names are the dev-environment fallback
-            for (final String name : new String[] { "func_75047_a", "canSpawnStructureAtCoords" }) {
-                for (Class<?> c = VILLAGE_GEN.getClass(); CAN_SPAWN == null && c != null; c = c.getSuperclass()) {
-                    try {
-                        CAN_SPAWN = c.getDeclaredMethod(name, int.class, int.class);
-                    } catch (NoSuchMethodException ignored) {}
-                }
-                if (CAN_SPAWN != null) break;
-            }
-            CAN_SPAWN.setAccessible(true);
-            for (final String name : new String[] { "field_75039_c", "worldObj" }) {
-                for (Class<?> c = VILLAGE_GEN.getClass(); WORLD_OBJ == null && c != null; c = c.getSuperclass()) {
-                    try {
-                        WORLD_OBJ = c.getDeclaredField(name);
-                    } catch (NoSuchFieldException ignored) {}
-                }
-                if (WORLD_OBJ != null) break;
-            }
-            WORLD_OBJ.setAccessible(true);
+            CAN_SPAWN = findMethod(
+                VILLAGE_GEN.getClass(),
+                new String[] { "func_75047_a", "canSpawnStructureAtCoords" },
+                int.class,
+                int.class);
+            GENERATE = findMethod(
+                VILLAGE_GEN.getClass(),
+                new String[] { "func_151539_a", "generate" },
+                net.minecraft.world.chunk.IChunkProvider.class,
+                World.class,
+                int.class,
+                int.class,
+                net.minecraft.block.Block[].class);
+            WORLD_OBJ = findField(VILLAGE_GEN.getClass(), "field_75039_c", "worldObj");
+            STRUCTURE_MAP = findField(VILLAGE_GEN.getClass(), "field_75053_d", "structureMap");
+            STRUCTURE_DATA = findField(VILLAGE_GEN.getClass(), "field_143029_e");
             WorldgenProbe.LOG.info(
                 "[prefilter] village generator class: {}",
                 VILLAGE_GEN.getClass()
                     .getName());
         }
         return VILLAGE_GEN;
+    }
+
+    /**
+     * Worldless RWG terrain columns + vanilla spawn walk. ChunkGeneratorRealistic's terrain path
+     * (generateTerrain → replaceBlocksForBiome) touches the world only via getSeed()/getWorldChunkManager(),
+     * both of which SeedProbeWorld serves; we replicate provideChunk's exact sequence — per-chunk
+     * rand.setSeed(cx*0x4f9939f508 + cz*0x1ef1565bd5), generateTerrain, baseBiome fill, replaceBlocksForBiome —
+     * and skip only the per-biome generateMapGen hook (sole override: tropical-island volcanics, mid-ocean, never
+     * spawnable) and the structure/lighting tail. Reflection by PLAIN names: mod classes are not SRG-renamed.
+     *
+     * Spawn = WorldServer.createSpawnPosition replica: RWG's chunk manager overrides findBiomePosition to null
+     * and getBiomesToSpawnIn to empty (zero RNG draws, bytecode-verified on the shipped 1.5.0 jar), so the walk
+     * is new Random(worldSeed) stepping i += nextInt(64)-nextInt(64) (then z likewise) from (0,0), ≤1000 iters,
+     * y=64 — with the ACCEPT TEST of BiomesOPlenty's WorldProviderSurfaceBOP (which replaces the dim-0
+     * provider): top block must be sand or stone (see bopCanSpawn). Top-block replica: climb from y=63 while
+     * the block above is air-material, exactly like the provider's getTopBlockCoord.
+     * KNOWN APPROXIMATION: the real walk reads live chunks, which can already be populated when the walk
+     * revisits a completed 2x2 neighborhood (decoration on the column can flip the test) — the golden test
+     * quantifies the miss rate vs corpus spawns.
+     */
+    static final class RwgTerrain {
+
+        private final Object gen;
+        private final Object cmr;
+        private final java.lang.reflect.Method mGenTerrain;
+        private final java.lang.reflect.Method mReplace;
+        private final Field fRand;
+        private final Field fTestHeight;
+        private final Field fBaseBiome;
+        private final Class<?> biomeArrayType;
+
+        /** per-chunk digest: top block per column, top-solid y per column, water-at-62 flags */
+        static final class Cols {
+
+            net.minecraft.block.Block[] top = new net.minecraft.block.Block[256];
+            short[] topSolid = new short[256];
+            boolean[] water = new boolean[256];
+        }
+
+        private final Map<Long, Cols> cache = new java.util.HashMap<>();
+
+        private final World world;
+        private final net.minecraft.world.gen.MapGenBase caves;
+
+        RwgTerrain(World world) throws Exception {
+            this.world = world;
+            final Class<?> genCls = Class.forName("rwg.world.ChunkGeneratorRealistic");
+            gen = genCls.getConstructor(World.class, long.class)
+                .newInstance(world, world.getSeed());
+            cmr = world.getWorldChunkManager();
+            // provideChunk runs the caves pass on the raw block array BEFORE the chunk is built — cave mouths
+            // carve away surface grass, which flips getTopBlock and therefore the spawn walk. Same dispatch RWG
+            // uses; the IChunkProvider param is unused by vanilla caves.
+            caves = net.minecraftforge.event.terraingen.TerrainGen.getModdedMapGen(
+                new net.minecraft.world.gen.MapGenCaves(),
+                net.minecraftforge.event.terraingen.InitMapGenEvent.EventType.CAVE);
+            java.lang.reflect.Method gt = null, rp = null;
+            for (final java.lang.reflect.Method m : genCls.getMethods()) {
+                if ("generateTerrain".equals(m.getName())) gt = m;
+                if ("replaceBlocksForBiome".equals(m.getName())) rp = m;
+            }
+            if (gt == null || rp == null) throw new NoSuchMethodException("rwg generateTerrain/replaceBlocksForBiome");
+            mGenTerrain = gt;
+            mReplace = rp;
+            biomeArrayType = gt.getParameterTypes()[5].getComponentType();
+            fRand = findField(genCls, "rand");
+            fTestHeight = findField(genCls, "testHeight");
+            fBaseBiome = findField(biomeArrayType, "baseBiome");
+        }
+
+        Cols columns(int cx, int cz) throws Exception {
+            final long key = ((long) cx << 32) ^ (cz & 0xffffffffL);
+            Cols c = cache.get(key);
+            if (c != null) return c;
+            final Random rnd = (Random) fRand.get(gen);
+            rnd.setSeed((long) cx * 341873128712L + (long) cz * 132897987541L);
+            final net.minecraft.block.Block[] blocks = new net.minecraft.block.Block[65536];
+            final byte[] meta = new byte[65536];
+            final Object biomes = java.lang.reflect.Array.newInstance(biomeArrayType, 256);
+            // shipped 1.5.0: generateTerrain(cmr,cx,cz,blocks,meta,biomes,float[256] noise-out) and the same
+            // local noise buffer feeds replaceBlocksForBiome; dev fork: 6-arg + instance testHeight field
+            final float[] noise = new float[256];
+            final Object noiseArg;
+            if (mGenTerrain.getParameterTypes().length == 7) {
+                mGenTerrain.invoke(gen, cmr, cx, cz, blocks, meta, biomes, noise);
+                noiseArg = noise;
+            } else {
+                mGenTerrain.invoke(gen, cmr, cx, cz, blocks, meta, biomes);
+                noiseArg = fTestHeight.get(gen);
+            }
+            final net.minecraft.world.biome.BiomeGenBase[] base = new net.minecraft.world.biome.BiomeGenBase[256];
+            for (int k = 0; k < 256; k++) {
+                final Object rb = java.lang.reflect.Array.get(biomes, k);
+                base[k] = rb == null ? null : (net.minecraft.world.biome.BiomeGenBase) fBaseBiome.get(rb);
+            }
+            mReplace.invoke(gen, cx, cz, blocks, meta, biomes, base, noiseArg);
+            caves.func_151539_a(null, world, cx, cz, blocks);
+            // digest to ~3 KB before caching (a full Block[] chunk is 512 KB)
+            c = new Cols();
+            for (int col = 0; col < 256; col++) {
+                final int off = col << 8; // col = x*16+z, matching RWG's (j*16+i)*256+k layout
+                int k = 63;
+                while (k < 255 && !isAirLike(blocks[off + k + 1])) k++;
+                c.top[col] = blocks[off + k];
+                int ts = 255;
+                while (ts > 0 && (isAirLike(blocks[off + ts]) || blocks[off + ts] == net.minecraft.init.Blocks.water)) {
+                    ts--;
+                }
+                c.topSolid[col] = (short) ts;
+                c.water[col] = blocks[off + 62] == net.minecraft.init.Blocks.water;
+            }
+            cache.put(key, c);
+            return c;
+        }
+
+        private static boolean isAirLike(net.minecraft.block.Block b) {
+            return b == null || b.getMaterial() == net.minecraft.block.material.Material.air;
+        }
+
+        net.minecraft.block.Block topBlock(int x, int z) throws Exception {
+            final Cols c = columns(x >> 4, z >> 4);
+            return c.top[((x & 15) << 4) | (z & 15)];
+        }
+
+        int chunksGenerated() {
+            return cache.size();
+        }
+    }
+
+    /** WorldProviderSurfaceBOP.canCoordinateBeSpawn, replicated over worldless columns (see call site). */
+    private static boolean bopCanSpawn(World world, RwgTerrain terra, int x, int z) throws Exception {
+        final net.minecraft.block.Block top = terra.topBlock(x, z);
+        if (top == net.minecraft.init.Blocks.sand || top == net.minecraft.init.Blocks.stone) return true;
+        return top == net.minecraft.init.Blocks.snow_layer && world.getWorldChunkManager()
+            .getBiomesToSpawnIn()
+            .contains(world.getBiomeGenForCoords(x, z));
+    }
+
+    private static java.lang.reflect.Method findMethod(Class<?> cls, String[] names, Class<?>... params)
+        throws NoSuchMethodException {
+        for (final String name : names) {
+            for (Class<?> c = cls; c != null; c = c.getSuperclass()) {
+                try {
+                    final java.lang.reflect.Method m = c.getDeclaredMethod(name, params);
+                    m.setAccessible(true);
+                    return m;
+                } catch (NoSuchMethodException ignored) {}
+            }
+        }
+        throw new NoSuchMethodException(cls.getName() + "." + String.join("/", names));
+    }
+
+    private static Field findField(Class<?> cls, String... names) throws NoSuchFieldException {
+        for (final String name : names) {
+            for (Class<?> c = cls; c != null; c = c.getSuperclass()) {
+                try {
+                    final Field f = c.getDeclaredField(name);
+                    f.setAccessible(true);
+                    return f;
+                } catch (NoSuchFieldException ignored) {}
+            }
+        }
+        throw new NoSuchFieldException(cls.getName() + "." + String.join("/", names));
+    }
+
+    /**
+     * Full village piece layouts via the REAL entry point: reset the generator's per-world caches, then call
+     * func_151539_a (MapGenBase.generate) once per village cell — the exact rand protocol, canSpawn gate and
+     * getStructureStart the pack runs, zero reimplementation — and read the resulting StructureStarts out of the
+     * generator's own structureMap. (A manual replication of the rand protocol produced self-stable but
+     * real-divergent layouts — dispatch, don't reimplement.) The Start ctor touches the world only via
+     * getWorldChunkManager(), so the recursion is exact against SeedProbeWorld. Y anchors in the emitted boxes
+     * are pre-terrain placeholders — XZ and piece classes are final; real gen only offsets Y and prunes pieces
+     * whose ground check fails at build time.
+     */
+    private static List<String> villageStarts(Object gen, World world, List<int[]> cells) throws Exception {
+        final Map<?, ?> structureMap = (Map<?, ?>) STRUCTURE_MAP.get(gen);
+        structureMap.clear();
+        STRUCTURE_DATA.set(gen, null); // else func_143027_a reuses the previous seed's NBT cache
+        for (final int[] cell : cells) {
+            GENERATE.invoke(gen, null, world, cell[0], cell[1], null);
+        }
+        final List<String> out = new ArrayList<>();
+        for (final Map.Entry<?, ?> e : ((Map<?, ?>) STRUCTURE_MAP.get(gen)).entrySet()) {
+            final long key = ((Number) e.getKey()).longValue(); // ChunkCoordIntPair.chunkXZ2Int
+            final int cx = (int) key, cz = (int) (key >> 32);
+            final Object start = e.getValue();
+            try {
+                if (IS_SIZEABLE == null) {
+                    IS_SIZEABLE = findMethod(start.getClass(), new String[] { "func_75069_d", "isSizeableStructure" });
+                }
+                if (START_COMPONENTS == null) {
+                    START_COMPONENTS = findField(start.getClass(), "field_75075_a", "components");
+                }
+                final boolean sizeable = (Boolean) IS_SIZEABLE.invoke(start);
+                final List<?> comps = (List<?>) START_COMPONENTS.get(start);
+                final List<String> parts = new ArrayList<>();
+                for (final Object comp : comps) {
+                    parts.add(
+                        comp.getClass()
+                            .getSimpleName() + "@"
+                            + WorldgenProbe.bboxOf(comp));
+                }
+                java.util.Collections.sort(parts); // same canonical order as the full-gen villages dump
+                final StringBuilder sb = new StringBuilder(64 + 64 * parts.size());
+                sb.append("{\"c\": [")
+                    .append(cx)
+                    .append(", ")
+                    .append(cz)
+                    .append("], \"sizeable\": ")
+                    .append(sizeable)
+                    .append(", \"pieces\": \"")
+                    .append(parts.size())
+                    .append(" pieces: ")
+                    .append(String.join("; ", parts))
+                    .append("\"}");
+                out.add(sb.toString());
+            } catch (Exception ex) {
+                out.add(
+                    "{\"c\": [" + cx
+                        + ", "
+                        + cz
+                        + "], \"error\": \""
+                        + ex.toString()
+                            .replace("\"", "'")
+                        + "\"}");
+            }
+        }
+        return out;
     }
 
     public static void run(String spec, String outPath) throws Exception {
@@ -204,6 +462,12 @@ public final class Prefilter {
         // VillageNames' MapGenVillageVN) — zero reimplementation drift; spacing/salt/biome gates are whatever
         // the pack actually runs.
         final List<int[]> villages = new ArrayList<>();
+        final List<String> starts = new ArrayList<>();
+        final boolean pieces = !"false".equals(System.getProperty("probe.prefilter.pieces"));
+        // staged kill gates: each stage only runs if the previous one kept the seed, so a gated
+        // million-seed sweep pays pieces/terrain cost only for survivors (the funnel in one pass)
+        final int gateVillageDist = Integer.getInteger("probe.prefilter.gate.villagedist", -1);
+        final String gatePieces = System.getProperty("probe.prefilter.gate.pieces");
         try {
             final Object gen = villageGenerator();
             WORLD_OBJ.set(gen, world);
@@ -213,6 +477,32 @@ public final class Prefilter {
                         villages.add(new int[] { cx2, cz2 });
                     }
                 }
+            }
+            if (gateVillageDist >= 0) {
+                boolean ok = false;
+                for (final int[] v : villages) {
+                    if (Math.max(Math.abs(v[0]), Math.abs(v[1])) <= gateVillageDist) {
+                        ok = true;
+                        break;
+                    }
+                }
+                if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"village\"}";
+            }
+            if (pieces && !villages.isEmpty()) {
+                starts.addAll(villageStarts(gen, world, villages));
+            }
+            if (gatePieces != null) {
+                boolean ok = false;
+                for (final String st : starts) {
+                    for (final String name : gatePieces.split(",")) {
+                        if (!name.isEmpty() && st.contains(name.trim() + "@")) {
+                            ok = true;
+                            break;
+                        }
+                    }
+                    if (ok) break;
+                }
+                if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"pieces\"}";
             }
         } catch (Exception e) {
             WorldgenProbe.LOG.warn("[prefilter] village eval failed for {}: {}", seed, e.toString());
@@ -227,6 +517,11 @@ public final class Prefilter {
                 .append("]");
         }
         sb.append("]");
+        if (pieces) {
+            sb.append(", \"village_starts\": [")
+                .append(String.join(", ", starts))
+                .append("]");
+        }
 
         // --- biome histogram on a 16-block grid over the origin window (31x31 samples = radius-15-chunk proxy)
         final Map<String, Integer> biomes = new LinkedHashMap<>();
@@ -249,7 +544,89 @@ public final class Prefilter {
                 .append("\": ")
                 .append(e.getValue());
         }
-        sb.append("}}");
+        sb.append("}");
+
+        // --- terrain columns + spawn prediction (worldless RWG; -Dprobe.prefilter.terrain=-1 disables,
+        // N = digest radius in chunks around the predicted spawn; default 4)
+        final int terrainRadius = Integer.getInteger("probe.prefilter.terrain", 4);
+        if (terrainRadius >= 0) {
+            try {
+                final RwgTerrain terra = new RwgTerrain(world);
+                // vanilla WorldServer.createSpawnPosition replica (see RwgTerrain javadoc). The
+                // findBiomePosition call is the REAL one for draw-parity insurance — RWG returns null
+                // without consuming the rand, but if that ever changes the golden test stays honest.
+                final Random spawnRand = new Random(seed);
+                final net.minecraft.world.ChunkPosition cp = world.getWorldChunkManager()
+                    .findBiomePosition(
+                        0,
+                        0,
+                        256,
+                        world.getWorldChunkManager()
+                            .getBiomesToSpawnIn(),
+                        spawnRand);
+                int sx = 0, sz = 0;
+                if (cp != null) {
+                    sx = cp.chunkPosX;
+                    sz = cp.chunkPosZ;
+                }
+                // the accept test is NOT vanilla's grass check: BiomesOPlenty replaces the dim-0 provider
+                // (WorldProviderSurfaceBOP, bytecode-verified from the shipped 2.1.0.2308 jar) — top block must
+                // be sand or stone, or snow_layer in a getBiomesToSpawnIn biome (empty list on RWG, so never);
+                // its extra "water nearby" loop re-reads the same top block 45 times, i.e. a no-op given the
+                // top-block climb can only end on a non-air block. Hence: beach/desert/bare-rock spawns.
+                int iters = 0;
+                while (!bopCanSpawn(world, terra, sx, sz)) {
+                    sx += spawnRand.nextInt(64) - spawnRand.nextInt(64);
+                    sz += spawnRand.nextInt(64) - spawnRand.nextInt(64);
+                    if (++iters == 1000) break;
+                }
+                sb.append(", \"spawn\": [")
+                    .append(sx)
+                    .append(", 64, ")
+                    .append(sz)
+                    .append("], \"spawn_iters\": ")
+                    .append(iters);
+                // per-chunk digest around spawn: water columns at y62 (DecoClay only fires under water →
+                // shallow-water columns are the clay candidates) + top-solid min/avg (burial/flatness)
+                final int scx = sx >> 4, scz = sz >> 4;
+                final List<String> digest = new ArrayList<>();
+                int waterTotal = 0;
+                for (int cx2 = scx - terrainRadius; cx2 <= scx + terrainRadius; cx2++) {
+                    for (int cz2 = scz - terrainRadius; cz2 <= scz + terrainRadius; cz2++) {
+                        final RwgTerrain.Cols c = terra.columns(cx2, cz2);
+                        int water = 0, surfMin = 255, surfSum = 0;
+                        for (int col = 0; col < 256; col++) {
+                            if (c.water[col]) water++;
+                            final int ts = c.topSolid[col];
+                            if (ts < surfMin) surfMin = ts;
+                            surfSum += ts;
+                        }
+                        waterTotal += water;
+                        digest
+                            .add("[" + cx2 + ", " + cz2 + ", " + water + ", " + surfMin + ", " + (surfSum / 256) + "]");
+                    }
+                }
+                final int gateWater2 = Integer.getInteger("probe.prefilter.gate.water", -1);
+                if (gateWater2 >= 0 && waterTotal < gateWater2) {
+                    return "{\"seed\": " + seed + ", \"kill\": \"water\"}";
+                }
+                sb.append(", \"terrain\": [")
+                    .append(String.join(", ", digest))
+                    .append("], \"water_total\": ")
+                    .append(waterTotal)
+                    .append(", \"terrain_chunks\": ")
+                    .append(terra.chunksGenerated());
+            } catch (Throwable t) {
+                WorldgenProbe.LOG.warn("[prefilter] terrain/spawn eval failed for {}: {}", seed, t.toString());
+                sb.append(", \"terrain_error\": \"")
+                    .append(
+                        t.toString()
+                            .replace("\"", "'"))
+                    .append("\"");
+            }
+        }
+
+        sb.append("}");
         return sb.toString();
     }
 

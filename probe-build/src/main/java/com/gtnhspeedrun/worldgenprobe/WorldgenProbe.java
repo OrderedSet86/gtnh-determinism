@@ -2442,7 +2442,7 @@ public class WorldgenProbe {
         }
     }
 
-    private static String bboxOf(Object component) {
+    static String bboxOf(Object component) {
         try {
             for (Class<?> sc = component.getClass(); sc != null; sc = sc.getSuperclass()) {
                 for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
