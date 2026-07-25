@@ -118,6 +118,15 @@ public class WorldgenProbe {
         }
     }
 
+    /**
+     * Report schema version, bumped on any consumer-visible change so corpora can be versioned instead of
+     * regenerated wholesale. Absent field (pre-versioning corpora) = format 1. History:
+     * 1 — water/clay totals, ores, chests, villages, witchery, populated flag.
+     * 2 — + sand/gravel totals, waterY/clayY/sandY/gravelY per-height histograms, hardenedclay/stainedclay,
+     * "surf" terrain heightmap (slime-island aware), search."eldritch" TC ring-site TE list.
+     */
+    public static final int REPORT_FORMAT = 2;
+
     public static final Object POP_LISTENER = new PopSeqHandler();
 
     private static void clearPopSeq() {
@@ -554,7 +563,46 @@ public class WorldgenProbe {
                     }
                 }
             }
-            restoreLootTables(lootSnapPre, "pre-server"); // spawn preload must see cold-boot table state
+            // -Dprobe.emulateclient=true: headless replica of SSP "create world #2 of a session" — do NOT
+            // restore the pre-server snapshot ourselves; instead fire the real FMLServerAboutToStartEvent
+            // (IntegratedServer.startServer dispatches it right before loadAllWorlds). With a fix jar lacking
+            // F7 the recreate preloads from the mutated post-ServerStarting tables (the client bug); with F7
+            // the jar's own event handler restores them. A/B on the resulting chest reports = headless F7 test.
+            final String emu = System.getProperty("probe.emulateclient");
+            if (emu != null && !emu.isEmpty() && !"false".equals(emu)) {
+                // Emulate SSP "create world #N of a session": invoke @EventHandler(FMLServerAboutToStartEvent)
+                // methods DIRECTLY (value "true" = every subscriber; else comma list of modids for bisection).
+                // Never route through FMLCommonHandler.handleServerAboutToStart on a running server — the
+                // Loader state machine is already past that state, so it QUEUES the dispatch and flushes it
+                // at shutdown, after every world has generated (cost us a full phantom-mutator hunt).
+                final java.util.Set<String> only = "true".equals(emu) ? null
+                    : new java.util.HashSet<>(java.util.Arrays.asList(emu.split(",")));
+                final Object event = new cpw.mods.fml.common.event.FMLServerAboutToStartEvent(server);
+                for (cpw.mods.fml.common.ModContainer mc : cpw.mods.fml.common.Loader.instance()
+                    .getModList()) {
+                    if (only != null && !only.contains(mc.getModId())) continue;
+                    final Object mod = mc.getMod();
+                    if (mod == null) continue;
+                    for (java.lang.reflect.Method meth : mod.getClass()
+                        .getMethods()) {
+                        if (meth.getParameterTypes().length == 1
+                            && meth.getParameterTypes()[0] == cpw.mods.fml.common.event.FMLServerAboutToStartEvent.class
+                            && meth.isAnnotationPresent(cpw.mods.fml.common.Mod.EventHandler.class)) {
+                            try {
+                                meth.invoke(mod, event);
+                                LOG.info("[probe] emulateclient bisect: fired {}.{}", mc.getModId(), meth.getName());
+                            } catch (Throwable t) {
+                                LOG.warn(
+                                    "[probe] emulateclient bisect: {} handler failed: {}",
+                                    mc.getModId(),
+                                    t.toString());
+                            }
+                        }
+                    }
+                }
+            } else {
+                restoreLootTables(lootSnapPre, "pre-server"); // spawn preload must see cold-boot table state
+            }
             recreateWorlds(server, seeds[i], worldType, genOpts);
             restoreLootTables(lootSnapPost, "post-boot"); // the walk generates with fully-loaded tables
             final WorldServer over = DimensionManager.getWorld(0);
@@ -1156,7 +1204,9 @@ public class WorldgenProbe {
         }
 
         final StringBuilder sb = new StringBuilder();
-        sb.append("{\n  \"seed\": ")
+        sb.append("{\n  \"format\": ")
+            .append(REPORT_FORMAT)
+            .append(",\n  \"seed\": ")
             .append(seed)
             .append(",\n  \"order\": \"")
             .append(order)
@@ -1290,10 +1340,12 @@ public class WorldgenProbe {
 
     /**
      * Seed-search report (-Dprobe.search=true): everything the speedrun seed searcher filters on, readable without
-     * re-running the server. Per chunk: biome, water/clay block counts, GT ore TE m-value histogram (material =
-     * m%1000; thousands digit = host-stone variant / small-ore flag — decode offline), and every IInventory tile
-     * entity's full contents (village/dungeon chests: tier-skip loot lives here). Spawn point at the top because
-     * spawn-relative distance is the primary search criterion.
+     * re-running the server. Per chunk: biome, water/clay/sand/gravel block counts plus per-height histograms
+     * (waterY/clayY/sandY/gravelY, sparse {y: count}), hardened/stained clay counts (bbf% clay-dust source), a
+     * slime-island-aware terrain heightmap ("surf", 256 columns hex-encoded — see surfaceY), GT ore TE m-value
+     * histogram (material = m%1000; thousands digit = host-stone variant / small-ore flag — decode offline), and
+     * every IInventory tile entity's full contents (village/dungeon chests: tier-skip loot lives here). Spawn
+     * point at the top because spawn-relative distance is the primary search criterion.
      */
     private static String buildSearchReport(WorldServer world, int radius, int cx, int cz) {
         final StringBuilder sb = new StringBuilder("{\n");
@@ -1310,6 +1362,7 @@ public class WorldgenProbe {
         // already paid for. Decoration-pending chunks are flagged "populated": false (terrain-only — no
         // ores/chests yet) so "empty" is distinguishable from "not decorated". Sorted by (x,z): the report is
         // independent of loadedChunks iteration order.
+        final List<String> eldritch = new ArrayList<>();
         final List<Chunk> loadedChunks = new ArrayList<>();
         for (Object o : world.theChunkProviderServer.loadedChunks) loadedChunks.add((Chunk) o);
         loadedChunks.sort(
@@ -1321,19 +1374,53 @@ public class WorldgenProbe {
                 final int ccx = c.xPosition, ccz = c.zPosition;
                 final net.minecraft.world.biome.BiomeGenBase biome = world
                     .getBiomeGenForCoords((ccx << 4) + 8, (ccz << 4) + 8);
-                int water = 0, clay = 0;
+                int water = 0, clay = 0, sand = 0, gravel = 0, hclay = 0;
+                final Map<Integer, Integer> waterY = new TreeMap<>();
+                final Map<Integer, Integer> clayY = new TreeMap<>();
+                final Map<Integer, Integer> sandY = new TreeMap<>();
+                final Map<Integer, Integer> gravelY = new TreeMap<>();
+                final Map<Integer, Integer> stainedClay = new TreeMap<>(); // dye meta -> count
                 // Section-array scan (counts are order-independent): null sections skip 4096 blocks at a time.
+                // Per-y histograms because flat totals mislead routing: 2000 "water" may be a deep ocean column,
+                // not a swimmable lake — density at a given height is what the seed searcher needs. Same for
+                // clay/sand/gravel (dig targets), and hardened/stained clay grinds to clay dust (bbf%).
                 for (final ExtendedBlockStorage ebs : c.getBlockStorageArray()) {
                     if (ebs == null) continue;
+                    final int baseY = ebs.getYLocation();
                     for (int ly = 0; ly < 16; ly++) {
+                        final int wy = baseY + ly;
                         for (int lz = 0; lz < 16; lz++) {
                             for (int lx = 0; lx < 16; lx++) {
                                 final net.minecraft.block.Block b = ebs.getBlockByExtId(lx, ly, lz);
                                 if (b == net.minecraft.init.Blocks.water
-                                    || b == net.minecraft.init.Blocks.flowing_water) water++;
-                                else if (b == net.minecraft.init.Blocks.clay) clay++;
+                                    || b == net.minecraft.init.Blocks.flowing_water) {
+                                    water++;
+                                    waterY.merge(wy, 1, Integer::sum);
+                                } else if (b == net.minecraft.init.Blocks.clay) {
+                                    clay++;
+                                    clayY.merge(wy, 1, Integer::sum);
+                                } else if (b == net.minecraft.init.Blocks.sand) {
+                                    sand++;
+                                    sandY.merge(wy, 1, Integer::sum);
+                                } else if (b == net.minecraft.init.Blocks.gravel) {
+                                    gravel++;
+                                    gravelY.merge(wy, 1, Integer::sum);
+                                } else if (b == net.minecraft.init.Blocks.hardened_clay) {
+                                    hclay++;
+                                } else if (b == net.minecraft.init.Blocks.stained_hardened_clay) {
+                                    stainedClay.merge(ebs.getExtBlockMetadata(lx, ly, lz), 1, Integer::sum);
+                                }
                             }
                         }
+                    }
+                }
+                // Terrain heightmap, one byte per column (row-major z*16+x, hex-encoded). Not the sky-visible
+                // heightmap: vegetation/structures don't count as ground, and thin runs floating over a big air
+                // gap (TiC slime islands) are skipped — see surfaceY().
+                final StringBuilder surfHex = new StringBuilder(512);
+                for (int lz = 0; lz < 16; lz++) {
+                    for (int lx = 0; lx < 16; lx++) {
+                        surfHex.append(String.format("%02x", surfaceY(c, lx, lz)));
                     }
                 }
                 final Map<Integer, Integer> ores = new TreeMap<>();
@@ -1352,7 +1439,15 @@ public class WorldgenProbe {
                         } catch (Exception ignored) {}
                     } else if (te instanceof net.minecraft.inventory.IInventory) {
                         chests.add(dumpInventory((net.minecraft.inventory.IInventory) te, te));
-                    }
+                    } else if (te.getClass()
+                        .getSimpleName()
+                        .startsWith("TileEldritch")) {
+                            // TC eldritch ring/obelisk sites (obelisk/altar/crab-spawner TEs) — recorded so
+                            // corpora can validate lottery-v2 density against stock and route to obelisks.
+                            eldritch.add(
+                                "\"" + te.getClass()
+                                    .getSimpleName() + "@" + te.xCoord + "," + te.yCoord + "," + te.zCoord + "\"");
+                        }
                 }
                 if (!firstChunk) sb.append(",\n");
                 firstChunk = false;
@@ -1367,7 +1462,26 @@ public class WorldgenProbe {
                     .append(", \"water\": ")
                     .append(water)
                     .append(", \"clay\": ")
-                    .append(clay);
+                    .append(clay)
+                    .append(", \"sand\": ")
+                    .append(sand)
+                    .append(", \"gravel\": ")
+                    .append(gravel);
+                if (hclay > 0) sb.append(", \"hardenedclay\": ")
+                    .append(hclay);
+                if (!stainedClay.isEmpty()) sb.append(", \"stainedclay\": ")
+                    .append(jsonIntMap(stainedClay));
+                if (!waterY.isEmpty()) sb.append(", \"waterY\": ")
+                    .append(jsonIntMap(waterY));
+                if (!clayY.isEmpty()) sb.append(", \"clayY\": ")
+                    .append(jsonIntMap(clayY));
+                if (!sandY.isEmpty()) sb.append(", \"sandY\": ")
+                    .append(jsonIntMap(sandY));
+                if (!gravelY.isEmpty()) sb.append(", \"gravelY\": ")
+                    .append(jsonIntMap(gravelY));
+                sb.append(", \"surf\": \"")
+                    .append(surfHex)
+                    .append("\"");
                 if (!c.isTerrainPopulated) sb.append(", \"populated\": false");
                 if (!ores.isEmpty()) {
                     sb.append(", \"ores\": {");
@@ -1390,8 +1504,65 @@ public class WorldgenProbe {
                 sb.append("}");
             }
         }
-        sb.append("\n    }\n  }");
+        sb.append("\n    },\n    \"eldritch\": [")
+            .append(String.join(", ", eldritch))
+            .append("]\n  }");
         return sb.toString();
+    }
+
+    private static String jsonIntMap(Map<Integer, Integer> m) {
+        final StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<Integer, Integer> e : m.entrySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append("\"")
+                .append(e.getKey())
+                .append("\": ")
+                .append(e.getValue());
+        }
+        return sb.append("}")
+            .toString();
+    }
+
+    /**
+     * Ground, for the surface heightmap: solid AND not vegetation/structure material. Wood excludes tree trunks,
+     * chests and village-house planks; leaves/cactus/gourd exclude canopies and desert props; glass excludes
+     * greenhouse roofs. Water is not ground (a seabed chest is reachable without digging — its burial depth
+     * should be 0, the water column is visible separately in waterY).
+     */
+    private static boolean isTerrain(net.minecraft.block.Block b) {
+        if (b == net.minecraft.init.Blocks.air) return false;
+        final net.minecraft.block.material.Material m = b.getMaterial();
+        if (!m.isSolid()) return false;
+        return m != net.minecraft.block.material.Material.wood && m != net.minecraft.block.material.Material.leaves
+            && m != net.minecraft.block.material.Material.cactus
+            && m != net.minecraft.block.material.Material.gourd
+            && m != net.minecraft.block.material.Material.glass;
+    }
+
+    // Surface detection: a terrain run counts as the surface unless it is BOTH thin (< SURF_THICK) and floating
+    // over a big air gap (>= SURF_GAP) — that combination is a TiC slime island (or a stray floating ledge),
+    // where the true surface is whatever lies below. Mountains over caves/ravines keep their summit: the summit
+    // run is thick. Values in blocks; islands are ~5-10 thick and hover 30+ over terrain, caves under a summit
+    // leave >16 of rock above them.
+    private static final int SURF_THICK = 16;
+    private static final int SURF_GAP = 16;
+
+    private static int surfaceY(Chunk c, int lx, int lz) {
+        int y = 255;
+        while (y >= 0) {
+            while (y >= 0 && !isTerrain(c.getBlock(lx, y, lz))) y--;
+            if (y < 0) return 0;
+            final int top = y;
+            while (y >= 0 && isTerrain(c.getBlock(lx, y, lz))) y--;
+            final int thickness = top - y;
+            int below = y;
+            while (below >= 0 && !isTerrain(c.getBlock(lx, below, lz))) below--;
+            if (thickness >= SURF_THICK || y - below < SURF_GAP || below < 0) return top;
+            y = below; // thin run floating over a big gap: slime island — keep scanning underneath
+        }
+        return 0;
     }
 
     private static String dumpInventory(net.minecraft.inventory.IInventory inv, TileEntity te) {
