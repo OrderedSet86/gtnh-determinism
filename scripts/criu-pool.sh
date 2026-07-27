@@ -61,6 +61,14 @@ jar_fingerprint() { # dir -> md5 over the determinism-relevant jars in dir/mods
   (cd "$1/mods" && md5sum *probe*.jar *determinism*.jar 2>/dev/null | awk '{print $1}' | sort | md5sum | cut -d' ' -f1)
 }
 
+# CRIU images do not survive a REBOOT. A dumped thread blocked in a timed wait carries an absolute
+# CLOCK_MONOTONIC deadline; this restore takes no time namespace (timens_offsets stays 0 0), so once a
+# reboot resets monotonic to ~0 the restored probe re-arms that deadline in the OLD boot's timeline and
+# sleeps out the difference — hours to days, silently, parked at the go.json barrier with the images
+# and jars all perfectly valid. Cost a 2.5h no-op batch on 2026-07-25 (images from the 2026-07-24 23:00
+# boot, box rebooted 11:10). Images are stamped with the boot that produced them and refused in any other.
+boot_id() { cat /proc/sys/kernel/random/boot_id; }
+
 smoke_inst() { # instdir seed out -> prints seconds, rc 1 on failure
   local INST=$1 SEED=$2 OUT=$3 T0 T1
   T0=$(date +%s)
@@ -76,6 +84,13 @@ build-images)
   TEMPLATE=$2; POOL=$3; N=$4
   mkdir -p "$POOL"; POOL=$(cd "$POOL" && pwd)
   SMOKE_OUT=$POOL/smoke-seed.json
+  # run-batch dispatches to every inst-* it finds, so a rebuild at a SMALLER N must delete the
+  # leftovers — otherwise the pool silently keeps serving jobs from images this build never refreshed.
+  for d in "$POOL"/inst-*; do
+    [ -d "$d" ] || continue
+    i=${d##*/inst-}
+    [ "$i" -ge "$N" ] 2>/dev/null && { echo "removing orphan $(basename "$d") (pool is now $N wide)"; rm -rf "$d"; }
+  done
 
   build_all() { # heap — all N clone+checkpoints in PARALLEL (boots are independent; needs
                 # roughly N x (heap+2G) MemAvailable during the build)
@@ -117,8 +132,9 @@ build-images)
     echo "== 6G smoke OK (${SECS}s) — pool heap = 6G"
   fi
   echo "$HEAP" > "$POOL/heap"
+  boot_id > "$POOL/boot-id"
   rm -f "$SMOKE_OUT"
-  echo "pool ready: $N images at $HEAP under $POOL"
+  echo "pool ready: $N images at $HEAP under $POOL (boot $(boot_id))"
   ;;
 
 run-batch)
@@ -127,6 +143,13 @@ run-batch)
   mkdir -p "$OUT_DIR"; OUT_DIR=$(cd "$OUT_DIR" && pwd)
   HEAP=$(cat "$POOL/heap" 2>/dev/null || echo 6G)
   HEAP_MB=$(( ${HEAP%G} * 1024 ))
+  # Stale-image guard (see boot_id above): a post-reboot restore hangs at the barrier instead of failing.
+  STAMP=$(cat "$POOL/boot-id" 2>/dev/null || echo "")
+  if [ "$STAMP" != "$(boot_id)" ]; then
+    echo "pool images are from another boot (stamp '${STAMP:-none}', now $(boot_id)) — restores would hang at the" >&2
+    echo "go.json barrier for hours. Rebuild first:  criu-pool.sh build-images <template-server-dir> $POOL <N>" >&2
+    exit 1
+  fi
   # User policy (2026-07-24): the reserve on this system is never below 20G — clamp, don't trust flags.
   RGB=${RESERVE_GB:-24}
   if [ "$RGB" -lt 20 ]; then echo "RESERVE_GB=$RGB below the 20G floor — clamping to 20" >&2; RGB=20; fi
@@ -192,12 +215,27 @@ run-batch)
       break
     done
     (
+      # Watchdog: a wedged restore holds ~heap+2G of RAM doing nothing, which drags MemAvailable under
+      # the reserve and PAUSES the dispatcher indefinitely — one hung job silently stalls the whole
+      # batch (2026-07-25: 4 hung jobs, 0 of 300 seeds in 2.5h). Seeds take ~10s; anything past
+      # JOB_TIMEOUT is wedged, so kill the tree and record a FAILED the run log can be grepped for.
       if PROBE_SEARCH=true PROBE_NOHASH=true \
+        timeout -k 10 "${JOB_TIMEOUT:-300}" \
         "$SCRIPT_DIR/criu-harness.sh" "$INST/server" "$INST/images" run "$SEED" rows \
         "$OUT_DIR/seed-$SEED.json" "$RADIUS" > "$INST/last-run.log" 2>&1; then
         echo "$(date +%H:%M:%S) done  $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL]" | tee -a "$PROG"
       else
-        echo "$(date +%H:%M:%S) FAILED $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL] — see $INST/last-run.log + images/restore.log" | tee -a "$PROG"
+        RC=$?
+        if [ "$RC" -eq 124 ]; then
+          # timeout only signals criu-harness.sh; the criu restore and the restored JVM are separate
+          # processes that would outlive it. Kill everything bound to this instance dir by path.
+          pkill -9 -f "criu-harness.sh $INST/server" 2>/dev/null || true
+          pkill -9 -f "images-dir $INST/images" 2>/dev/null || true
+          pkill -9 -f "probe.criu=$INST/server/.criu-ctl" 2>/dev/null || true
+          echo "$(date +%H:%M:%S) FAILED $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL] — TIMEOUT after ${JOB_TIMEOUT:-300}s, instance killed" | tee -a "$PROG"
+        else
+          echo "$(date +%H:%M:%S) FAILED $SEED  ($(basename "$INST"))  [$(done_count)/$TOTAL] — see $INST/last-run.log + images/restore.log" | tee -a "$PROG"
+        fi
       fi
       rm -f "$INST/busy.pid"
     ) &
