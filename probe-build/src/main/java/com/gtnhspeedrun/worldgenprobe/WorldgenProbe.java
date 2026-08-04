@@ -124,8 +124,11 @@ public class WorldgenProbe {
      * 1 — water/clay totals, ores, chests, villages, witchery, populated flag.
      * 2 — + sand/gravel totals, waterY/clayY/sandY/gravelY per-height histograms, hardenedclay/stainedclay,
      * "surf" terrain heightmap (slime-island aware), search."eldritch" TC ring-site TE list.
+     * 3 — + per-column dig metrics "sandRun"/"gravelBurial"/"clayBurial" (+ "sandRunHist"). The per-height
+     * histograms cannot express single-column depth, so consumers were inferring it from the sandY span and
+     * reading a thin blanket on a hillside as a deep pit; these measure it directly.
      */
-    public static final int REPORT_FORMAT = 2;
+    public static final int REPORT_FORMAT = 3;
 
     public static final Object POP_LISTENER = new PopSeqHandler();
 
@@ -1430,10 +1433,46 @@ public class WorldgenProbe {
                 // Terrain heightmap, one byte per column (row-major z*16+x, hex-encoded). Not the sky-visible
                 // heightmap: vegetation/structures don't count as ground, and thin runs floating over a big air
                 // gap (TiC slime islands) are skipped — see surfaceY().
+                //
+                // Alongside it, three per-column dig metrics on the same row-major layout. A per-height
+                // histogram cannot express how deep any single column is: a 4-block sand blanket draped over a
+                // 13-block hillside has a 13-level sandY span, and every span- or footprint-based estimate
+                // reads that as a deep pit. Measured per column instead, so gravity-farm depth and overburden
+                // are exact rather than inferred:
+                // sandRun — consecutive sand downward from the surface (0 = surface is not sand)
+                // gravelBurial — overburden above the topmost gravel (0 = exposed at the surface)
+                // clayBurial — same for clay (0 = riverbed/surface clay)
+                // Burial scans stop DIG_PROBE_DEPTH below the surface (deeper is not a speedrun dig target)
+                // and report NO_REACH there.
                 final StringBuilder surfHex = new StringBuilder(512);
+                final StringBuilder sandRunHex = new StringBuilder(512);
+                final StringBuilder gravelBurialHex = new StringBuilder(512);
+                final StringBuilder clayBurialHex = new StringBuilder(512);
+                final Map<Integer, Integer> sandRunHist = new TreeMap<>();
+                int maxSandRun = 0, minGravelBurial = NO_REACH, minClayBurial = NO_REACH;
                 for (int lz = 0; lz < 16; lz++) {
                     for (int lx = 0; lx < 16; lx++) {
-                        surfHex.append(String.format("%02x", surfaceY(c, lx, lz)));
+                        final int ts = surfaceY(c, lx, lz);
+                        surfHex.append(String.format("%02x", ts));
+                        int run = 0;
+                        while (run < NO_REACH - 1 && ts - run >= 0
+                            && c.getBlock(lx, ts - run, lz) == net.minecraft.init.Blocks.sand) {
+                            run++;
+                        }
+                        if (run > maxSandRun) maxSandRun = run;
+                        if (run > 0) sandRunHist.merge(run, 1, Integer::sum);
+                        sandRunHex.append(String.format("%02x", run));
+                        int gb = NO_REACH, cb = NO_REACH;
+                        final int floor = Math.max(0, ts - DIG_PROBE_DEPTH);
+                        for (int y = ts; y >= floor && (gb == NO_REACH || cb == NO_REACH); y--) {
+                            final net.minecraft.block.Block b = c.getBlock(lx, y, lz);
+                            if (gb == NO_REACH && b == net.minecraft.init.Blocks.gravel) gb = ts - y;
+                            if (cb == NO_REACH && b == net.minecraft.init.Blocks.clay) cb = ts - y;
+                        }
+                        if (gb < minGravelBurial) minGravelBurial = gb;
+                        if (cb < minClayBurial) minClayBurial = cb;
+                        gravelBurialHex.append(String.format("%02x", gb));
+                        clayBurialHex.append(String.format("%02x", cb));
                     }
                 }
                 final Map<Integer, Integer> ores = new TreeMap<>();
@@ -1495,6 +1534,20 @@ public class WorldgenProbe {
                 sb.append(", \"surf\": \"")
                     .append(surfHex)
                     .append("\"");
+                // Emitted only where they carry signal — an all-sentinel array costs 512 chars per chunk and
+                // says nothing. The histogram is always cheap and is enough to rank a chunk; the full array is
+                // for adjacency (gravity farming needs a contiguous block of columns, not scattered depth).
+                if (!sandRunHist.isEmpty()) sb.append(", \"sandRunHist\": ")
+                    .append(jsonIntMap(sandRunHist));
+                if (maxSandRun >= 2) sb.append(", \"sandRun\": \"")
+                    .append(sandRunHex)
+                    .append("\"");
+                if (minGravelBurial <= GRAVEL_REPORT_BURIAL) sb.append(", \"gravelBurial\": \"")
+                    .append(gravelBurialHex)
+                    .append("\"");
+                if (minClayBurial < NO_REACH) sb.append(", \"clayBurial\": \"")
+                    .append(clayBurialHex)
+                    .append("\"");
                 if (!c.isTerrainPopulated) sb.append(", \"populated\": false");
                 if (!ores.isEmpty()) {
                     sb.append(", \"ores\": {");
@@ -1553,6 +1606,15 @@ public class WorldgenProbe {
             && m != net.minecraft.block.material.Material.gourd
             && m != net.minecraft.block.material.Material.glass;
     }
+
+    // Per-column dig metrics (format 3). Burial scans stop DIG_PROBE_DEPTH below the surface: gravel 20 blocks
+    // down is not a flint source in a sub-10-minute run, and scanning to bedrock on every column would cost
+    // ~4x the getBlock calls for data nobody routes on. NO_REACH marks "nothing within reach" and doubles as
+    // the byte cap, so every metric fits one hex pair. GRAVEL_REPORT_BURIAL gates emission of the full gravel
+    // array — nearly every chunk has gravel somewhere, but only near-surface gravel is worth 512 chars.
+    private static final int DIG_PROBE_DEPTH = 64;
+    private static final int NO_REACH = 0xff;
+    private static final int GRAVEL_REPORT_BURIAL = 16;
 
     // Surface detection: a terrain run counts as the surface unless it is BOTH thin (< SURF_THICK) and floating
     // over a big air gap (>= SURF_GAP) — that combination is a TiC slime island (or a stray floating ledge),

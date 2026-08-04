@@ -171,8 +171,11 @@ minimal ISaveHandler (null worldInfo → fresh `WorldInfo(settings, name)`), a
   new worlds); `oreveinSeed = (worldSeed<<16) ^ (dim<<56 | oreseedX<<28 | oreseedZ)`;
   `new XSTR(seed).nextInt(100) < chance`; attempt i layer via
   `WorldgenQuery.veins().findRandom(rng seeded Fnv1a64(oreveinSeed, i))`
-  (`GTWorldgenerator.java:309-402`). Terrain reroll gate not evaluable ⇒ "attempt-1 vein
-  (probable) + fallback order".
+  (`GTWorldgenerator.java:309-402`). Gate-less this gives "attempt-1 vein (probable) +
+  fallback order"; the reroll gate IS evaluable with modest work — see HANDOFF
+  "Worldless GT vein prediction: REASSESSED as feasible (2026-08-03)". NOTE the
+  `Fnv1a64` form above is GT 54.x; the 2.7.4/2.8.4 line draws attempts sequentially off
+  one `oreveinRNG` (`forks/...:343-346`).
 - Roguelike trigger grid: `Dungeon.canSpawnInChunk` (`Dungeon.java:112-144`), same
   setRandomSeed salt; read `RogueConfig` live.
 - Eldritch ring candidates: fix jar `EldritchRingLottery.candidates(worldSeed, rm, rn)`
@@ -186,8 +189,12 @@ thread-safe — one per worker thread. Estimate 50-200 seeds/s/thread ⇒ **10�
 seeds/hour** in one warm JVM vs ~40/hour full-gen.
 
 ### C.4 Cannot prefilter (finalists get full runs)
-Chest contents, vein terrain rerolls + Y, village piece layout/Y, ring winners (virgin
-5-column test), Roguelike validLocation/loot, TC nodes/trees, decoration-level anything.
+Chest contents, ring winners (virgin 5-column test), Roguelike validLocation/loot, TC
+nodes/trees, decoration-level anything.
+SUPERSEDED entries: village piece layout (done — coke%-floor modules, golden 8/8 piece-exact);
+vein terrain rerolls + Y (reassessed feasible 2026-08-03, see HANDOFF — `veinMinY` was always
+pure RNG, and the gate's virgin-terrain input is already computed then discarded at
+`Prefilter.java:300`).
 Golden test: for 3 seeds assert predictions appear in full-gen probe JSON.
 
 ---

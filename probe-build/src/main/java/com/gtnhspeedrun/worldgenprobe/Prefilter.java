@@ -230,6 +230,13 @@ public final class Prefilter {
             boolean[] clayCand = new boolean[256];
             /** gravel at the top-solid surface (flint source — best surface head pickup per corpus) */
             boolean[] gravelTop = new boolean[256];
+            // No gravel-burial field here on purpose. Stage-0 runs on pre-population terrain and underground
+            // gravel pockets are a BiomeDecorator WorldGenMinable roll at populate, so a burial scan reads
+            // "nothing" over ordinary ground — verified against the -3013484044701601670 save, where it found
+            // no gravel in chunks the populated world has gravel 9-11 blocks down. Scanning 64 deep per column
+            // to learn that cost ~30% of the terrain digest (0.166 s -> 0.22 s/seed). gravelTop above already
+            // captures the only gravel stage-0 can legitimately see; real burial comes from the full probe's
+            // "gravelBurial" (format 3).
         }
 
         private final Map<Long, Cols> cache = new java.util.HashMap<>();
@@ -622,9 +629,14 @@ public final class Prefilter {
                     for (int cz2 = scz - terrainRadius; cz2 <= scz + terrainRadius; cz2++) {
                         final RwgTerrain.Cols c = terra.columns(cx2, cz2);
                         int water = 0, surfMin = 255, surfSum = 0, deepSand = 0, clayCand = 0, gravelTop = 0;
+                        int sand5 = 0, sand7 = 0, sandMax = 0;
                         for (int col = 0; col < 256; col++) {
                             if (c.water[col]) water++;
-                            if (c.sandRun[col] >= 3) deepSand++;
+                            final int sr = c.sandRun[col];
+                            if (sr >= 3) deepSand++;
+                            if (sr >= 5) sand5++;
+                            if (sr >= 7) sand7++;
+                            if (sr > sandMax) sandMax = sr;
                             if (c.clayCand[col]) clayCand++;
                             if (c.gravelTop[col]) gravelTop++;
                             final int ts = c.topSolid[col];
@@ -633,7 +645,11 @@ public final class Prefilter {
                         }
                         waterTotal += water;
                         // row: [cx, cz, waterCols, surfMin, surfAvg, deepSandCols(run>=3), sandBlocksTotal,
-                        // clayCandCols(water floor DecoClay-replaceable), gravelTopCols]
+                        // clayCandCols(water floor DecoClay-replaceable), gravelTopCols,
+                        // sand5Cols(run>=5), sand7Cols(run>=7), sandMaxRun]
+                        // Fields 9+ are appended, never inserted: index 0-8 stays wire-compatible with the
+                        // corpora already on disk. The run>=3 count alone cannot rank depth — a 4-deep blanket
+                        // and a 10-deep pit both score 256 — which is the whole reason for sand5/sand7/sandMax.
                         digest.add(
                             "[" + cx2
                                 + ", "
@@ -652,6 +668,12 @@ public final class Prefilter {
                                 + clayCand
                                 + ", "
                                 + gravelTop
+                                + ", "
+                                + sand5
+                                + ", "
+                                + sand7
+                                + ", "
+                                + sandMax
                                 + "]");
                     }
                 }
