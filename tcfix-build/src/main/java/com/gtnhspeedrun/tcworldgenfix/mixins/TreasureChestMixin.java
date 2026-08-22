@@ -41,6 +41,14 @@ public abstract class TreasureChestMixin implements ChestPosAccess {
             if (te instanceof net.minecraft.tileentity.TileEntityChest)
                 tcfix$te = (net.minecraft.tileentity.TileEntityChest) te;
         }
+        com.gtnhspeedrun.tcworldgenfix.SliceTrace.log(
+            "chest-generate pos={},{},{} level={} placed={} detached={}",
+            pos.getX(),
+            pos.getY(),
+            pos.getZ(),
+            level,
+            cir.getReturnValue() != null,
+            tcfix$te != null && tcfix$te.getWorldObj() == null);
     }
 
     @Override

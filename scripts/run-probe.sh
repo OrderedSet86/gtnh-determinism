@@ -52,8 +52,11 @@ if [ -z "$LAUNCH_JAR" ]; then echo "No launch jar found in $SERVER_DIR" >&2; exi
 JAVA_ARGS=""
 if [ -f java9args.txt ]; then JAVA_ARGS="@java9args.txt"; fi
 
+# PROBE_EXTRA_ARGS: extra flags passed verbatim to the JVM, for fix-jar A/B levers and traces, e.g.
+#   PROBE_EXTRA_ARGS="-Dgtnhdet.atomicdungeon=false -Dgtnhdet.traceslices=true"
 "$JAVA_BIN" $JAVA_ARGS \
   -Xmx6G -Xms6G \
+  ${PROBE_EXTRA_ARGS:-} \
   -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
   -jar "$LAUNCH_JAR" nogui < /dev/null

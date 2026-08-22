@@ -129,6 +129,12 @@ public abstract class TreasureManagerMixin {
             final ITreasureChest chest = list.get(rand.nextInt(list.size()));
             final ItemStack stack = item.get(tcfix$chestRand(rand.nextLong(), chest));
             if (tcfix$live(chest)) chest.setRandomEmptySlot(stack);
+            com.gtnhspeedrun.tcworldgenfix.SliceTrace.log(
+                "loot-single listSize={} pickKey={} live={} item={}",
+                list.size(),
+                chest instanceof ChestPosAccess ? ((ChestPosAccess) chest).tcfix$posKey() : 0L,
+                tcfix$live(chest),
+                stack == null ? "null" : stack.getUnlocalizedName());
         }
     }
 

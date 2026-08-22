@@ -75,6 +75,8 @@ public class GtnhDeterminism {
 
     @Mod.EventHandler
     public void serverAboutToStart(FMLServerAboutToStartEvent event) {
+        // A worldgen crash can leave a dungeon's atomic slice window open; never let that outlive the world.
+        PendingSlices.resetAtomicWindow();
         if (lootSnapshot == null) {
             LOG.warn("No load-complete loot snapshot — spawn-region loot may drift across worlds this session");
             return;

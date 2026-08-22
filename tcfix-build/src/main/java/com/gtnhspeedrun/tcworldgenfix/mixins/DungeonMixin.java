@@ -61,6 +61,32 @@ public abstract class DungeonMixin {
     }
 
     /**
+     * F5 fourth pass: hold {@link com.gtnhspeedrun.tcworldgenfix.PendingSlices}' atomic window for the whole of
+     * Dungeon.generate — construction AND the loot-rule pass that follows it. Without this, a neighbour chunk
+     * force-loaded by the dungeon's own writes runs its mod-worldgen (and therefore the slice applier)
+     * mid-construction, which both snapshots still-unlooted chests into the world and flips the dungeon's
+     * remaining writes from buffered to live. Which neighbours that hits is a pure function of the player's
+     * route, so it made chest existence and chest contents route-dependent.
+     */
+    @org.spongepowered.asm.mixin.injection.Inject(
+        method = "generate(Lgreymerk/roguelike/dungeon/settings/ISettings;II)V",
+        at = @org.spongepowered.asm.mixin.injection.At("HEAD"))
+    private void tcfix$openWindow(greymerk.roguelike.dungeon.settings.ISettings settings, int inX, int inZ,
+        org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        com.gtnhspeedrun.tcworldgenfix.SliceTrace.log("dungeon BEGIN at {},{}", inX, inZ);
+        com.gtnhspeedrun.tcworldgenfix.PendingSlices.beginAtomic();
+    }
+
+    @org.spongepowered.asm.mixin.injection.Inject(
+        method = "generate(Lgreymerk/roguelike/dungeon/settings/ISettings;II)V",
+        at = @org.spongepowered.asm.mixin.injection.At("RETURN"))
+    private void tcfix$closeWindow(greymerk.roguelike.dungeon.settings.ISettings settings, int inX, int inZ,
+        org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        com.gtnhspeedrun.tcworldgenfix.PendingSlices.endAtomic();
+        com.gtnhspeedrun.tcworldgenfix.SliceTrace.log("dungeon END at {},{}", inX, inZ);
+    }
+
+    /**
      * @author GTNH speedrun determinism audit
      * @reason Replace live-world validity probes (route-dependent) with virgin-terrain reads (seed-pure) so
      *         dungeon position, settings and loot become functions of the seed. Check structure preserved.
