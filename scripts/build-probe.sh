@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Back-compat wrapper: the canonical builder is now build-jar.sh, which handles BOTH the probe
-# (probe-build/worldgenprobe-*.jar) and the fix jar (tcfix-build/gtnhdeterminism-*.jar) under the
+# (probe-build/worldgenprobe-*.jar) and the fix jar (fix-build/gtnhdeterminism-*.jar) under the
 # same clean-build + jar-verification + md5-checked-deploy discipline.
 #
 #   build-probe.sh [--deploy <server-dir> ...]   ==   build-jar.sh probe [--deploy ...]

@@ -7,7 +7,7 @@
 #   build-jar.sh <probe|fix> [--deploy <server-dir> ...]
 #
 #     probe -> probe-build/  -> worldgenprobe-*.jar     (the measurement mod)
-#     fix   -> tcfix-build/  -> gtnhdeterminism-*.jar   (the determinism mod)
+#     fix   -> fix-build/  -> gtnhdeterminism-*.jar   (the determinism mod)
 #
 # `build-probe.sh` is a thin back-compat wrapper for `build-jar.sh probe`.
 #
@@ -31,7 +31,7 @@ case "$PROJECT" in
     RESOURCES=(mixins.worldgenprobe.json mixins.worldgenprobe.late.json)
     ;;
   fix)
-    SUBDIR=tcfix-build; JAR_PREFIX=gtnhdeterminism
+    SUBDIR=fix-build; JAR_PREFIX=gtnhdeterminism
     RESOURCES=(mixins.gtnhdeterminism.json mixins.gtnhdeterminism.late.json)
     ;;
   *)

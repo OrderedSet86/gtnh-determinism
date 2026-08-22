@@ -1,7 +1,7 @@
 name: Release jars
 
 # Manual trigger only: Actions tab -> "Release jars" -> Run workflow, enter the version
-# (e.g. 0.4). Builds the community fix jar (tcfix-build -> gtnhdeterminism) and the test
+# (e.g. 0.4). Builds the community fix jar (fix-build -> gtnhdeterminism) and the test
 # harness jar (probe-build -> worldgenprobe), tags v<version>, and attaches both to a
 # GitHub release.
 on:
@@ -39,7 +39,7 @@ jobs:
           git tag "v${{ inputs.version }}"
 
       - name: Build fix jar (gtnhdeterminism)
-        working-directory: tcfix-build
+        working-directory: fix-build
         run: ./gradlew build -x test -x spotlessCheck
 
       - name: Build probe jar (worldgenprobe)
@@ -49,7 +49,7 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p dist
-          cp $(ls tcfix-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
+          cp $(ls fix-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
              "dist/gtnhdeterminism-${{ inputs.version }}.jar"
           cp $(ls probe-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
              "dist/worldgenprobe-${{ inputs.version }}.jar"
