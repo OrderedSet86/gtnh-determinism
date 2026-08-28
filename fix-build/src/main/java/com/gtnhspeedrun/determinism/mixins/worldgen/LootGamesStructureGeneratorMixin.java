@@ -34,14 +34,14 @@ import ru.timeconqueror.timecore.api.util.RandHelper;
 public abstract class LootGamesStructureGeneratorMixin {
 
     @Unique
-    private static final long TCFIX$SALT = 101L;
+    private static final long GTNHDET$SALT = 101L;
 
     @Unique
     private final ThreadLocal<Random> gtnhdet$rand = new ThreadLocal<>();
 
     @Inject(method = "doGenDungeon", at = @At("HEAD"), remap = false)
     private void gtnhdet$seedRand(World world, int x, int z, CallbackInfoReturnable<Boolean> cir) {
-        this.gtnhdet$rand.set(TcForkUtil.fork(world, x >> 4, z >> 4, TCFIX$SALT));
+        this.gtnhdet$rand.set(TcForkUtil.fork(world, x >> 4, z >> 4, GTNHDET$SALT));
     }
 
     @Redirect(
