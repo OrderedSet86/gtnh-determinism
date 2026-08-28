@@ -1,9 +1,7 @@
 package com.gtnhspeedrun.determinism.mixins.worldgen;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
@@ -48,8 +46,14 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
     @Shadow
     private Map<Block, Integer> stats;
 
+    /**
+     * Positions this editor wrote LIVE, mapped to the block it wrote. The block is recorded rather than re-read
+     * from the world so that a live write and a buffered write answer reads identically: {@link PendingSlices}
+     * routes a write live or buffered by chunk-applier state, which is a function of chunk generation order, and
+     * {@code world.getBlock} would additionally report anything a later writer put on top.
+     */
     @Unique
-    private final Set<Long> gtnhdet$written = new HashSet<>();
+    private final Map<Long, Block> gtnhdet$written = new HashMap<>();
 
     @Unique
     private final Map<Long, PendingSlices.Write> gtnhdet$buffered = new HashMap<>();
@@ -70,12 +74,14 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
      */
     @Overwrite
     public MetaBlock getBlock(Coord pos) {
-        final PendingSlices.Write wr = gtnhdet$buffered.get(gtnhdet$key(pos));
+        final long key = gtnhdet$key(pos);
+        final PendingSlices.Write wr = gtnhdet$buffered.get(key);
         if (wr != null && wr.block != null) {
             return new MetaBlock(wr.block);
         }
-        if (gtnhdet$written.contains(gtnhdet$key(pos))) {
-            return new MetaBlock(world.getBlock(pos.getX(), pos.getY(), pos.getZ()));
+        final Block own = gtnhdet$written.get(key);
+        if (own != null) {
+            return new MetaBlock(own);
         }
         return new MetaBlock(TerrainOracle.block(world, pos.getX(), pos.getY(), pos.getZ()));
     }
@@ -86,12 +92,14 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
      */
     @Overwrite
     public boolean isAirBlock(Coord pos) {
-        final PendingSlices.Write wr = gtnhdet$buffered.get(gtnhdet$key(pos));
+        final long key = gtnhdet$key(pos);
+        final PendingSlices.Write wr = gtnhdet$buffered.get(key);
         if (wr != null && wr.block != null) {
             return wr.block == Blocks.air;
         }
-        if (gtnhdet$written.contains(gtnhdet$key(pos))) {
-            return world.isAirBlock(pos.getX(), pos.getY(), pos.getZ());
+        final Block own = gtnhdet$written.get(key);
+        if (own != null) {
+            return own == Blocks.air;
         }
         return TerrainOracle.block(world, pos.getX(), pos.getY(), pos.getZ()) == Blocks.air;
     }
@@ -124,7 +132,7 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
             } catch (NullPointerException npe) {
                 // ignore it. (stock behavior)
             }
-            gtnhdet$written.add(gtnhdet$key(pos));
+            gtnhdet$written.put(gtnhdet$key(pos), block.getBlock());
         }
 
         final Block type = block.getBlock();
@@ -152,7 +160,12 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
             return;
         }
         world.setBlockMetadataWithNotify(pos.getX(), pos.getY(), pos.getZ(), meta, 2);
-        gtnhdet$written.add(gtnhdet$key(pos));
+        // a metadata write leaves the block id alone; record whatever is there so later reads stay on the
+        // own-write path rather than falling through to virgin terrain
+        final long key = gtnhdet$key(pos);
+        if (!gtnhdet$written.containsKey(key)) {
+            gtnhdet$written.put(key, world.getBlock(pos.getX(), pos.getY(), pos.getZ()));
+        }
     }
 
     /**

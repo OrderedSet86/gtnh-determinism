@@ -3,7 +3,13 @@
 dependencies {
     compileOnly('thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev')
     compileOnly('com.github.GTNewHorizons:TinkersConstruct:1.14.96-GTNH:dev')
-    compileOnly('com.github.GTNewHorizons:GT5-Unofficial:5.09.54.50:dev')
+    // MUST track the line the pack actually ships (2.8.4 = 5.09.51.482, the 5.09.50.119-era ore API).
+    // 5.09.54.x replaced that API wholesale — IOreMaterial instead of the mPrimaryMeta shorts,
+    // veinHeight instead of mMinY/mMaxY, and no TileEntityOres.setOreBlock at all — so an ore mixin
+    // written against 54.x compiles but cannot bind against what runs.
+    // transitive=false: 5.09.51.482 pulls CodeChickenLib 1.3.0, purged from the GTNH maven. Nothing we
+    // touch in GT exposes a CCL type, so the stubs are unnecessary.
+    compileOnly('com.github.GTNewHorizons:GT5-Unofficial:5.09.51.482:dev') { transitive = false }
     compileOnly(rfg.deobf('curse.maven:biomes-o-plenty-220318:2499612'))
     compileOnly(rfg.deobf('curse.maven:witchery-69673:2234410'))
     compileOnly('com.github.GTNewHorizons:Realistic-World-Gen:alpha-1.5.2:dev')

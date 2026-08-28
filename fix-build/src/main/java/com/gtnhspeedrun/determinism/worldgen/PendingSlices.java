@@ -250,7 +250,21 @@ public final class PendingSlices {
      * position-keyed logic (TreasureChest posKey, spawner forks) sees the real location. Generation code
      * configures this instance; apply() transplants its NBT into the world.
      */
+    /**
+     * World seed of the last world to request a detached tile entity. A detached TE has no world, so generation
+     * code holding one cannot reach {@code getWorldObj().getSeed()}; this is the fallback source for position
+     * seeding (see {@code InventoryMixin}). Every detached TE passes through {@link #tileEntityFor}, so the value
+     * is always set before any consumer can need it, and 1.7.10 reports the same level seed for every dimension.
+     */
+    private static volatile long detachedWorldSeed;
+
+    /** @see #detachedWorldSeed */
+    public static long worldSeed() {
+        return detachedWorldSeed;
+    }
+
     public static synchronized TileEntity tileEntityFor(World w, Write wr) {
+        detachedWorldSeed = w.getSeed();
         if (wr.detached == null) {
             wr.detached = wr.block.createTileEntity(w, wr.meta);
             if (wr.detached != null) {

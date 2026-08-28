@@ -27,6 +27,11 @@ import com.gtnhspeedrun.determinism.worldgen.TerrainOracle;
  *
  * Targets GT 5.09.50.x (pack 2.7.4). All isReplaceableOreGen calls inside executeWorldgenChunkified are the probe —
  * ore placement itself uses other paths. (GTNH speedrun determinism audit, finding F4.)
+ *
+ * <p>
+ * NOT covered: {@code setOreBlock}'s per-block live-world read still decides WHERE ore lands, and the
+ * {@code NO_ORE_IN_BOTTOM_LAYER} gate still decides identity from trigger-chunk state. Together those leave ore
+ * worldgen order-dependent — see results/2026-08-27-gt-ore-probe-pinning/README.md.
  */
 @Mixin(value = gregtech.common.WorldgenGTOreLayer.class, remap = false)
 public class WorldgenGTOreLayerMixin {
