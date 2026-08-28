@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# THE canonical builder for BOTH jars in this repo. Every build and deploy goes through here —
+# THE canonical builder for every jar in this repo. Every build and deploy goes through here —
 # the operational rules that used to live in HANDOFF ("--no-configuration-cache clean build",
 # "verify the class landed in the jar", "copy by exact name", "md5-check the copy") are enforced
 # here so nobody has to remember them.
 #
-#   build-jar.sh <probe|fix> [--deploy <server-dir> ...]
+#   build-jar.sh <probe|fix|qol> [--deploy <server-dir> ...]
 #
-#     probe -> probe-build/  -> worldgenprobe-*.jar     (the measurement mod)
-#     fix   -> fix-build/  -> gtnhdeterminism-*.jar   (the determinism mod)
+#     probe -> probe-build/  -> worldgenprobe-*.jar      (the measurement mod)
+#     fix   -> fix-build/    -> gtnhdeterminism-*.jar    (the determinism mod)
+#     qol   -> qol-build/    -> gtnhspeedrunqol-*.jar    (the client quality-of-life mod)
 #
 # `build-probe.sh` is a thin back-compat wrapper for `build-jar.sh probe`.
 #
@@ -34,8 +35,12 @@ case "$PROJECT" in
     SUBDIR=fix-build; JAR_PREFIX=gtnhdeterminism
     RESOURCES=(mixins.gtnhdeterminism.json mixins.gtnhdeterminism.late.json)
     ;;
+  qol)
+    SUBDIR=qol-build; JAR_PREFIX=gtnhspeedrunqol
+    RESOURCES=(mixins.gtnhspeedrunqol.json)
+    ;;
   *)
-    echo "usage: build-jar.sh <probe|fix> [--deploy <server-dir> ...]" >&2; exit 2
+    echo "usage: build-jar.sh <probe|fix|qol> [--deploy <server-dir> ...]" >&2; exit 2
     ;;
 esac
 shift

@@ -66,6 +66,8 @@ versions). Existing saves are safe: only newly generated chunks are affected.
 ## Repo layout
 
 - `fix-build/` — source of the fix jar (mod id `gtnhdeterminism`)
+- `qol-build/` — **GTNH Speedrun QoL** (mod id `gtnhspeedrunqol`), a separate client-side jar that fixes
+  interface friction only. It never changes what the game simulates, so install it with or without the fix jar.
 - `probe-build/` — **WorldgenProbe**, the headless determinism tester (inert without `-Dprobe.*` flags)
 - `scripts/` — verification + evidence tooling (see below)
 - `forks/` — mod forks carrying the same fixes at source level for upstream PRs (branch `determinism-fixes`)

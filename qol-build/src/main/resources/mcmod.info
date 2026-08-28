@@ -1,0 +1,21 @@
+{
+	"modListVersion": 2,
+	"modList": [{
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "Client-side quality-of-life fixes for GTNH speedrunning. Removes interface friction that costs run time without changing what the game simulates: no world generation, no recipes, no drops, no player capabilities.",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/OrderedSet86/gtnh-determinism",
+		"updateUrl": "",
+		"authorList": ["OrderedSet86"],
+		"credits": "",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": [],
+		"dependencies": [],
+		"dependants": [],
+		"useDependencyInformation": false
+	}]
+}
