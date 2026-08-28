@@ -20,4 +20,7 @@ dependencies {
     compileOnly('com.github.GTNewHorizons:Roguelike-Dungeons:1.6.2-GTNH:dev')
     // transitive=false: LootGames pulls Yamcl 0.6.0, purged from the GTNH maven
     compileOnly('com.github.GTNewHorizons:LootGames:2.1.4:dev') { transitive = false }
+    // Deepslate layer band RNG (EtFuturumDeepslateMixin). Mixin's AP resolves targets= at compile time,
+    // so the class must be on the classpath even though the mixin references it only by name.
+    compileOnly('ganymedes01.etfuturum:Et-Futurum-Requiem:2.6.2.25-GTNH:dev') { transitive = false }
 }
