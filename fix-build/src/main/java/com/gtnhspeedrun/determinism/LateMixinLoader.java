@@ -47,6 +47,8 @@ public class LateMixinLoader implements ILateMixinLoader {
         }
         if (loadedMods.contains("etfuturum")) {
             mixins.add("worldgen.EtFuturumDeepslateMixin");
+            mixins.add("worldgen.EtFuturumCaveVineGrowMixin");
+            mixins.add("worldgen.EtFuturumCaveVineTeMixin");
         }
         if (loadedMods.contains("ProjRed|Exploration")) {
             mixins.add("worldgen.TileLilyMixin");
