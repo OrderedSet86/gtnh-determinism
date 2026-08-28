@@ -1,9 +1,10 @@
 name: Release jars
 
 # Manual trigger only: Actions tab -> "Release jars" -> Run workflow, enter the version
-# (e.g. 0.4). Builds the community fix jar (tcfix-build -> gtnhdeterminism) and the test
-# harness jar (probe-build -> worldgenprobe), tags v<version>, and attaches both to a
-# GitHub release.
+# (e.g. 0.4). Builds the community fix jar (fix-build -> gtnhdeterminism), the client
+# quality-of-life jar (qol-build -> gtnhspeedrunqol) and the test harness jar
+# (probe-build -> worldgenprobe), tags v<version>, and attaches all three to a GitHub
+# release.
 on:
   workflow_dispatch:
     inputs:
@@ -39,7 +40,11 @@ jobs:
           git tag "v${{ inputs.version }}"
 
       - name: Build fix jar (gtnhdeterminism)
-        working-directory: tcfix-build
+        working-directory: fix-build
+        run: ./gradlew build -x test -x spotlessCheck
+
+      - name: Build QoL jar (gtnhspeedrunqol)
+        working-directory: qol-build
         run: ./gradlew build -x test -x spotlessCheck
 
       - name: Build probe jar (worldgenprobe)
@@ -49,8 +54,10 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p dist
-          cp $(ls tcfix-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
+          cp $(ls fix-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
              "dist/gtnhdeterminism-${{ inputs.version }}.jar"
+          cp $(ls qol-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
+             "dist/gtnhspeedrunqol-${{ inputs.version }}.jar"
           cp $(ls probe-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
              "dist/worldgenprobe-${{ inputs.version }}.jar"
           ls -la dist/
@@ -63,4 +70,4 @@ jobs:
           gh release create "v${{ inputs.version }}" dist/*.jar \
             --title "gtnhdeterminism ${{ inputs.version }}" \
             ${{ inputs.prerelease && '--prerelease' || '' }} \
-            --notes "Community testing jar gtnhdeterminism-${{ inputs.version }}.jar (install in mods/). worldgenprobe-${{ inputs.version }}.jar is the headless worldgen test harness, not needed for normal play."
+            --notes "Community testing jar gtnhdeterminism-${{ inputs.version }}.jar makes world generation a pure function of the seed (install in mods/). gtnhspeedrunqol-${{ inputs.version }}.jar is an independent client-side quality-of-life jar; install it alone or alongside, it changes nothing the game simulates. worldgenprobe-${{ inputs.version }}.jar is the headless worldgen test harness, not needed for normal play."

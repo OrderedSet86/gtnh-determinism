@@ -3,7 +3,7 @@
 	"modList": [{
 		"modid": "${modId}",
 		"name": "${modName}",
-		"description": "Headless test harness for GT: New Horizons world generation. Generates a region on a dedicated server, then dumps region-file blocks and tile-entity NBT so two runs can be compared byte for byte. The mod is inert unless it is driven by -Dprobe.* flags, so it does nothing during normal play and is not needed to play.",
+		"description": "Client-side quality-of-life fixes for GTNH speedrunning. Removes interface friction that costs run time without changing what the game simulates: no world generation, no recipes, no drops, no player capabilities.",
 		"version": "${modVersion}",
 		"mcversion": "${minecraftVersion}",
 		"url": "https://github.com/OrderedSet86/gtnh-determinism",

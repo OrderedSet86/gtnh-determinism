@@ -3,7 +3,7 @@
 	"modList": [{
 		"modid": "${modId}",
 		"name": "${modName}",
-		"description": "Headless test harness for GT: New Horizons world generation. Generates a region on a dedicated server, then dumps region-file blocks and tile-entity NBT so two runs can be compared byte for byte. The mod is inert unless it is driven by -Dprobe.* flags, so it does nothing during normal play and is not needed to play.",
+		"description": "Makes GT: New Horizons world generation a pure function of the world seed. Fixes 28 sources of per-launch and per-route variance across 11 mods, so the same seed produces the same world on every launch and by every approach route. Adopting the jar re-rolls seeds once per jar version; existing saves are safe, because only newly generated chunks are affected.",
 		"version": "${modVersion}",
 		"mcversion": "${minecraftVersion}",
 		"url": "https://github.com/OrderedSet86/gtnh-determinism",
