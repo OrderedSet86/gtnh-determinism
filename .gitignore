@@ -1,6 +1,21 @@
 forks/
 jars/
-results/
+# results/: track run writeups, repro scripts and diff evidence; keep bulk probe
+# dumps untracked. The dumps total 2.2 GB and one sweep.jsonl is 340 MB, above
+# GitHub's 100 MB per-file limit. The `!results/**/` line un-ignores the
+# directories; without it the extension rules below cannot re-include anything.
+results/**
+!results/**/
+!results/**/*.md
+!results/**/*.csv
+!results/**/*.txt
+!results/**/*.sh
+!results/**/*.py
+# Machine output that carries a whitelisted extension. Raw per-block extractions
+# are named after the .json they came from; the harness dispatch log is a .txt.
+# These rules follow the negations above, because the last match decides.
+results/**/*.json.*
+results/**/*-progress.txt
 */build/
 */.gradle/
 */gtnhShared/

@@ -35,18 +35,26 @@ version is installed, and every other fix targets code that is unchanged across 
 | BiomesO'Plenty | Flora picked with `Math.random()` over an identity-ordered HashMap, shifting the shared decoration stream | Flora + downstream dirt/gravel patches seed-stable |
 | ProjectRed | Lily colors (dye yield!) rolled clock-random at worldgen | Lily colors derived from seed+position |
 | Forestry | Village bee house rolled bee species/frames/flowers off `world.rand` | Village bees seed-stable |
+| Minecraft (villagers) | A village piece is built once per populate window it overlaps, and `spawnVillagers` uses `break` rather than `continue` while bumping its persisted counter *before* spawning. A two-villager building straddling a window boundary (world x/z ≡ 8 mod 16) permanently loses one when the far window builds first | Placement tracked per villager index instead of as a high-water mark, so each villager is placed by whichever window contains it, in any order. Output equals stock's best-case route, so no seed loses a villager it previously had. Also covers Forestry's bee house, Railcraft's workshop and the TiC tool workshop, which call the same method |
+| Minecraft (passive mobs) | `SpawnerAnimals.performWorldGenSpawning` picks the *species* off `world.rand` while every other draw in the method uses the populate-seeded `Random` — the same shadowing shape as the TiC slime bug. Which animals a seed starts with, and therefore the first leather, wool and food on the route, was clock-random | Species drawn from the populate Random. Sheep fleece colour and ocelot kittens, which are rolled later off `worldObj.rand`, derive from world seed + spawn position |
+| Minecraft (horses) | `EntityHorse` rolls type, coat variant, max health, jump strength and movement speed off the clock-seeded `Entity.rand`. Speed spans 0.1125–0.3375, so the same seed gave a horse up to **three times faster** depending on the launch, and donkey-versus-horse — portable storage or not — was a coin flip | All five derived from world seed + spawn position. Variation is preserved, not flattened: 87 distinct speeds and 87 distinct jump strengths across 95 horses on one seed. Horse *breeding* keeps the stock RNG — the fork is armed only while `onSpawnWithEgg` runs |
 
-Running tally: **32 fixes** — 30 mixin-based plus 2 reflection patches — carried by **32 mixin
-classes** across **11 mods and Forge/FML**, rewiring **60 worldgen classes**. Two fixes take two
-mixins each: the GregTech pair are alternatives, exactly one binding per GT version, and the Vis
-Amulet needs both an init-time pin and a per-chest derivation. Three further diagnostic mixins ship
-inert behind `-Dgtnhdet.traceseg` and are not counted here.
+Running tally: **35 fixes** — 33 mixin-based plus 2 reflection patches — carried by **37 mixin
+classes** across **11 mods, Forge/FML and vanilla Minecraft**, rewiring **65 worldgen classes**.
+Three fixes take more than one mixin: the GregTech pair are alternatives, exactly one binding per GT
+version; the Vis Amulet needs both an init-time pin and a per-chest derivation; and the passive-mob
+spawn fix carries one mixin each for the shared spawner, sheep, ocelots and horses. Three further
+diagnostic mixins ship inert behind `-Dgtnhdet.traceseg` and are not counted here.
+
+The five vanilla-targeting mixins are the first in this jar to patch Minecraft itself rather than a
+mod, so they use default `remap` and are registered in the early mixin config rather than through the
+late loader.
 
 ## Verification
 
 Tested headless against actual GTNH server packs with the WorldgenProbe harness in this repo, and
-ground truth is the **persisted world** (region-file blocks + full tile-entity NBT, including chest
-contents):
+ground truth is the **persisted world** (region-file blocks, full tile-entity NBT including chest
+contents, and — from probe format 5 — the entity list):
 
 - **Launch tests** — same seed, two fresh JVMs, identical walk order: persisted worlds are
   **byte-identical** (primary seed: 1,184 chunks, 372,026 tile entities, zero differences —
@@ -54,6 +62,11 @@ contents):
 - **Route tests** — same seed generated in different chunk orders (rows / columns / spiral,
   simulating different approach paths): structures, layouts, veins, spawners, and all surviving
   chest contents identical.
+- **Entity tests** — villager count, position and profession, and the per-animal counts from the
+  vanilla worldgen spawner, are identical across a launch pair on the persisted world. Horse type,
+  coat, health, jump and speed match across launches for all 95 horses of the test seed while keeping
+  87 distinct speed values, so the fix pins the seed without flattening the variety.
+  [results/2026-08-29-villager-spawn-and-animal-determinism](results/2026-08-29-villager-spawn-and-animal-determinism/README.md).
 - **Balance evidence** — a 60-seed A/B corpus (stock vs fixed, cold runs) shows vein materials,
   small ores, village pieces, and witchery counts statistically equivalent (±10% bounds); a
   500k-draw Monte-Carlo over the shipped loot tables certifies rare chest items.
@@ -87,7 +100,20 @@ separately. That needed one more fix: `Thaumcraft.Config.initLoot()` seeds a `Ra
 every launch. It runs before the load-complete loot snapshot, so the existing table-restore fix
 preserved it rather than catching it.
 
-Two rules this project has had to learn the hard way, both in `docs/HANDOFF.md`: **"only NBT differs"
+**Entities** are measured from format 5 onward and are not covered by the block table above, since
+entities are not blocks. With the jar installed, villager count, position and profession are stable
+across a launch pair (`Villager 40/40`), as are the counts of every animal spawned through the vanilla
+worldgen spawner. What remains:
+
+| source | note |
+|---|---|
+| villager trade offers | Nondeterministic by construction and not fixable by measurement: `EntityVillager` rolls its list off the clock-seeded `Entity.rand`, then selects with the no-`Random` `Collections.shuffle` overload backed by a process-global static. Offers are also rolled lazily on first interaction, so no generated world contains them yet |
+| `generic.followRange` on every mob | A `nextGaussian() * 0.05` "Random spawn bonus" from `EntityLiving.onSpawnWithEgg` — ±5% of a 16-block tracking radius. ~99% of all remaining entity NBT differences, and inert |
+| mod-mob variant fields | `RabbitType`, Witchery goblin `Profession`, fox `Equipment` — 45 entities on the measured seed |
+| Witchery wolf/goblin conversion | A compensating `Wolf −4` / `goblin +4` on a launch pair, suggesting an event handler converting wolves off `world.rand` |
+| co-located spawns | Two mobs on the same block share a position-derived roll where stock rolls independently — 5 of 95 horses on the measured seed |
+
+Two rules this project has had to learn the hard way: **"only NBT differs"
 never closes an investigation** — NBT is where chest contents, spawner types and charge levels live —
 and **the category labels above are for prioritising work, never for declaring something benign.**
 
