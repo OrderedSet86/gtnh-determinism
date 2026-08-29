@@ -134,7 +134,15 @@ public class WorldgenProbe {
      * digest self-delimiting via MSB/metadata presence markers. "b"/"s" therefore differ from format 3 — do not
      * compare across the boundary.
      */
-    public static final int REPORT_FORMAT = 4;
+    /**
+     * 5: adds the opt-in "villagers", "entities" and "villagepieces" sections (-Dprobe.entities=true). These are
+     * top-level and additive: "b", "s", "t" and "o" are byte-identical to format 4, and omitting the flag
+     * reproduces a format-4 report exactly. Entities are deliberately NOT folded into the per-chunk digest —
+     * worldgen animal spawns carry a live world.rand defect (SpawnerAnimals.performWorldGenSpawning picks the
+     * species off world.rand while every other draw uses the populate-seeded Random), so a per-chunk entity key
+     * would differ between any two runs and swamp the villager signal it was added to measure.
+     */
+    public static final int REPORT_FORMAT = 5;
 
     public static final Object POP_LISTENER = new PopSeqHandler();
 
@@ -1256,6 +1264,16 @@ public class WorldgenProbe {
         }
         final String structures = dumpVillages(world);
         final String witchery = dumpWitcheryStructures();
+        // Opt-in: entity sections are absent from format-4 corpora, and the worldgen animal-species defect makes
+        // the census differ between any two runs until that is fixed.
+        String villagers = null, entityCensus = null, villagePieces = null;
+        if (Boolean.getBoolean("probe.entities")) {
+            final java.util.List<net.minecraft.entity.Entity> ents = collectEntities(world);
+            villagers = dumpVillagers(ents);
+            entityCensus = dumpEntityCensus(ents);
+            villagePieces = dumpVillagePieces(world, ents);
+            LOG.info("[probe] entities: {} in window, villager lines follow in report", ents.size());
+        }
         final String search = Boolean.getBoolean("probe.search") ? buildSearchReport(world, radius, cx, cz) : null;
         if (search != null) dumpGtMaterialsOnce(new File(out).getParentFile());
         final StringBuilder tedetail = new StringBuilder();
@@ -1360,6 +1378,9 @@ public class WorldgenProbe {
             .append(structures)
             .append(",\n  \"witchery\": ")
             .append(witchery)
+            .append(villagers == null ? "" : ",\n  \"villagers\": " + villagers)
+            .append(villagePieces == null ? "" : ",\n  \"villagepieces\": " + villagePieces)
+            .append(entityCensus == null ? "" : ",\n  \"entities\": " + entityCensus)
             .append(search == null ? "" : ",\n  \"search\": " + search)
             .append(tedetail)
             .append("\n}\n");
@@ -2591,43 +2612,11 @@ public class WorldgenProbe {
      */
     private static String dumpVillages(WorldServer world) {
         try {
-            Object provider = world.theChunkProviderServer.currentChunkProvider;
-            Object villageGen = null;
-            for (java.lang.reflect.Field f : provider.getClass()
-                .getDeclaredFields()) {
-                if (net.minecraft.world.gen.structure.MapGenVillage.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    villageGen = f.get(provider);
-                    break;
-                }
-            }
-            if (villageGen == null) return "\"no MapGenVillage field found\"";
-            Map<?, ?> structureMap = null;
-            Class<?> c = villageGen.getClass();
-            while (c != null && structureMap == null) {
-                for (java.lang.reflect.Field f : c.getDeclaredFields()) {
-                    if (Map.class.isAssignableFrom(f.getType())) {
-                        f.setAccessible(true);
-                        structureMap = (Map<?, ?>) f.get(villageGen);
-                        break;
-                    }
-                }
-                c = c.getSuperclass();
-            }
-            if (structureMap == null) return "\"no structureMap found\"";
+            final Map<?, ?> structureMap = villageStructureMap(world);
+            if (structureMap == null) return "\"no MapGenVillage structureMap found\"";
             final java.util.List<String> villages = new ArrayList<>();
             for (Object start : structureMap.values()) {
-                java.util.List<?> components = null;
-                for (Class<?> sc = start.getClass(); sc != null; sc = sc.getSuperclass()) {
-                    for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
-                        if (java.util.List.class.isAssignableFrom(f.getType())) {
-                            f.setAccessible(true);
-                            components = (java.util.List<?>) f.get(start);
-                            break;
-                        }
-                    }
-                    if (components != null) break;
-                }
+                final java.util.List<?> components = componentsOf(start);
                 if (components == null) continue;
                 final java.util.List<String> parts = new ArrayList<>();
                 for (Object comp : components) {
@@ -2646,6 +2635,51 @@ public class WorldgenProbe {
         }
     }
 
+    /**
+     * The village generator's structureMap of StructureStarts, reached by TYPE rather than by name so it survives
+     * SRG/MCP renames, RWG's modded chunk provider, and VillageNames' MapGenVillageVN (which subclasses
+     * MapGenVillage and is installed over InitMapGenEvent). Returns null when either lookup fails.
+     */
+    private static Map<?, ?> villageStructureMap(WorldServer world) throws Exception {
+        final Object provider = world.theChunkProviderServer.currentChunkProvider;
+        Object villageGen = null;
+        for (java.lang.reflect.Field f : provider.getClass()
+            .getDeclaredFields()) {
+            if (net.minecraft.world.gen.structure.MapGenVillage.class.isAssignableFrom(f.getType())) {
+                f.setAccessible(true);
+                villageGen = f.get(provider);
+                break;
+            }
+        }
+        if (villageGen == null) return null;
+        // Keep walking superclasses when the first Map-typed field holds null — the pre-refactor loop did, and
+        // dropping that would silently return no villages on any generator that declares an unused Map.
+        for (Class<?> c = villageGen.getClass(); c != null; c = c.getSuperclass()) {
+            for (java.lang.reflect.Field f : c.getDeclaredFields()) {
+                if (Map.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    final Object v = f.get(villageGen);
+                    if (v != null) return (Map<?, ?>) v;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The component list of one StructureStart, found by type like {@link #villageStructureMap}. */
+    private static java.util.List<?> componentsOf(Object start) throws Exception {
+        for (Class<?> sc = start.getClass(); sc != null; sc = sc.getSuperclass()) {
+            for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
+                if (java.util.List.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    final Object v = f.get(start);
+                    if (v != null) return (java.util.List<?>) v;
+                }
+            }
+        }
+        return null;
+    }
+
     static String bboxOf(Object component) {
         try {
             for (Class<?> sc = component.getClass(); sc != null; sc = sc.getSuperclass()) {
@@ -2661,6 +2695,254 @@ public class WorldgenProbe {
             }
         } catch (Exception ignored) {}
         return "nobb";
+    }
+
+    /** Expected villager count per village piece class, from the spawnVillagers call site in each. -1 = unknown. */
+    private static int expectedVillagers(String simpleName) {
+        switch (simpleName) {
+            // vanilla StructureVillagePieces, count = last arg of spawnVillagers
+            case "Church": // :387
+            case "House1": // :868
+            case "House2": // :1001, the blacksmith
+            case "House4Garden": // :1308
+            case "WoodHut": // :2013
+                return 1;
+            case "Hall": // :736, butcher + farmer
+            case "House3": // :1174, two farmers
+                return 2;
+            // mod pieces that call the same base method
+            case "ComponentVillageBeeHouse": // Forestry, spawnVillagers(..., 7, 1, 1, 2)
+            case "ComponentWorkshop": // Railcraft, spawnVillagers(..., 0, 0, 0, 2)
+                return 2;
+            case "ComponentToolWorkshop": // TiC, spawnVillagers(..., 3, 1, 3, 1)
+                return 1;
+            default:
+                return -1;
+        }
+    }
+
+    /**
+     * The persisted villager high-water mark ("VCount") of one village component, read by invoking the component's
+     * own NBT writer. The method has no MCP name, so func_143012_a is identical in the deobfuscated and SRG
+     * environments; matching on the numeric part keeps it working if either mapping ever gains one. Returns -1
+     * when the component is not a StructureVillagePieces.Village (roads, wells, VillageNames pieces).
+     */
+    private static int persistedVCount(Object component) {
+        try {
+            for (Class<?> sc = component.getClass(); sc != null; sc = sc.getSuperclass()) {
+                for (java.lang.reflect.Method m : sc.getDeclaredMethods()) {
+                    if (!m.getName()
+                        .contains("143012")) continue;
+                    final Class<?>[] p = m.getParameterTypes();
+                    if (p.length != 1 || !p[0].isAssignableFrom(NBTTagCompound.class)) continue;
+                    m.setAccessible(true);
+                    final NBTTagCompound tag = new NBTTagCompound();
+                    m.invoke(component, tag);
+                    return tag.hasKey("VCount") ? tag.getInteger("VCount") : -1;
+                }
+            }
+        } catch (Exception ignored) {}
+        return -1;
+    }
+
+    /**
+     * Every entity in every LOADED chunk — deliberately not just the walked window.
+     * <p>
+     * The village structureMap that {@link #dumpVillagePieces} reads is global: it holds every start the generator
+     * has created, including those from the spawn preload, which for a typical seed sits hundreds of blocks from
+     * the probe's default centre of chunk 0,0. Scoping entities to the walk window while scoring pieces from that
+     * global map made every out-of-window village report {@code vcount=1 actual=0} — a scope mismatch that reads
+     * exactly like a total villager loss. Collecting from the loaded set keeps the two scopes comparable.
+     * <p>
+     * Loaded-chunk scope is also what makes counts comparable across walk orders: a village straddling the walk
+     * edge would otherwise contribute a different number of entities per arm for reasons unrelated to the defect
+     * being measured.
+     */
+    private static java.util.List<net.minecraft.entity.Entity> collectEntities(WorldServer world) {
+        final java.util.List<net.minecraft.entity.Entity> out = new ArrayList<>();
+        for (Object o : world.loadedEntityList) {
+            if (o instanceof net.minecraft.entity.Entity) out.add((net.minecraft.entity.Entity) o);
+        }
+        return out;
+    }
+
+    /**
+     * Canonical NBT of one entity, with the entity UUID removed. UUIDMost/UUIDLeast come from UUID.randomUUID()
+     * in the Entity constructor, carry no gameplay meaning, and would otherwise make every entity differ in every
+     * pair. Nothing else is dropped: at zero ticks Motion, Age, Rotation, Fire, Air and HealF are all constants,
+     * so keeping them costs nothing and catches anything that moves them.
+     */
+    private static String canonicalEntityNbt(net.minecraft.entity.Entity e) {
+        try {
+            final NBTTagCompound tag = new NBTTagCompound();
+            if (!e.writeToNBTOptional(tag)) return "unsaved:" + e.getClass()
+                .getSimpleName();
+            tag.removeTag("UUIDMost");
+            tag.removeTag("UUIDLeast");
+            return canonicalNbt(tag);
+        } catch (Exception ex) {
+            return "err:" + ex;
+        }
+    }
+
+    private static String shortDigest(String s) throws Exception {
+        return hex(
+            MessageDigest.getInstance("SHA-256")
+                .digest(s.getBytes(StandardCharsets.UTF_8))).substring(0, 10);
+    }
+
+    /**
+     * Villager census: one sorted line per villager-class entity. Everything reported here is decided at
+     * generation time, so two arms of the same seed must agree exactly. Profession comes from the piece class
+     * (a compile-time constant in StructureVillagePieces.getVillagerType), position from getXWithOffset, and
+     * vanilla rotation is the literal 0,0 — none of it is a random draw.
+     */
+    private static String dumpVillagers(java.util.List<net.minecraft.entity.Entity> ents) {
+        final java.util.List<String> lines = new ArrayList<>();
+        for (net.minecraft.entity.Entity e : ents) {
+            final String cls = e.getClass()
+                .getSimpleName();
+            final boolean villagerish = e instanceof net.minecraft.entity.passive.EntityVillager
+                || cls.contains("Villager")
+                || cls.contains("VillageGuard");
+            if (!villagerish) continue;
+            String prof = "-";
+            if (e instanceof net.minecraft.entity.passive.EntityVillager) {
+                prof = Integer.toString(((net.minecraft.entity.passive.EntityVillager) e).getProfession());
+            }
+            final NBTTagCompound tag = new NBTTagCompound();
+            boolean offers = false;
+            int age = 0;
+            try {
+                if (e.writeToNBTOptional(tag)) {
+                    offers = tag.hasKey("Offers");
+                    age = tag.getInteger("Age");
+                }
+            } catch (Exception ignored) {}
+            String dig;
+            try {
+                dig = shortDigest(canonicalEntityNbt(e));
+            } catch (Exception ex) {
+                dig = "err";
+            }
+            lines.add(
+                String.format(
+                    java.util.Locale.ROOT,
+                    "\"%s@%.4f,%.4f,%.4f prof=%s age=%d rot=%.1f,%.1f offers=%s nbt=%s\"",
+                    cls,
+                    e.posX,
+                    e.posY,
+                    e.posZ,
+                    prof,
+                    age,
+                    e.rotationYaw,
+                    e.rotationPitch,
+                    offers ? "y" : "n",
+                    dig));
+        }
+        java.util.Collections.sort(lines);
+        if (lines.isEmpty()) return "[]";
+        return "[\n    " + String.join(",\n    ", lines) + "\n  ]";
+    }
+
+    /**
+     * Per-class entity census: count and a content digest over the sorted canonical NBT of that class. Kept
+     * separate from "villagers" so the known worldgen animal-species defect stays quarantined and separately
+     * reportable instead of drowning the villager signal.
+     */
+    private static String dumpEntityCensus(java.util.List<net.minecraft.entity.Entity> ents) {
+        final Map<String, java.util.List<String>> byClass = new TreeMap<>();
+        for (net.minecraft.entity.Entity e : ents) {
+            byClass.computeIfAbsent(
+                e.getClass()
+                    .getSimpleName(),
+                k -> new ArrayList<>())
+                .add(canonicalEntityNbt(e));
+        }
+        final java.util.List<String> parts = new ArrayList<>();
+        for (Map.Entry<String, java.util.List<String>> en : byClass.entrySet()) {
+            final java.util.List<String> v = en.getValue();
+            java.util.Collections.sort(v);
+            String dig;
+            try {
+                dig = shortDigest(String.join(" ", v));
+            } catch (Exception ex) {
+                dig = "err";
+            }
+            parts.add("\"" + en.getKey() + "\": \"" + v.size() + "/" + dig + "\"");
+        }
+        if (parts.isEmpty()) return "{}";
+        return "{\n    " + String.join(",\n    ", parts) + "\n  }";
+    }
+
+    /**
+     * Per village component: the persisted villager high-water mark, the villagers actually present inside its
+     * bounding box, and the count its spawnVillagers call site asks for. The three-way split is the whole point —
+     * it separates the failure modes that look identical in a raw entity diff:
+     * <ul>
+     * <li>vcount &lt; expect — the spawnVillagers break-ordering loss. The loop breaks rather than continues when
+     * a villager falls outside the current populate window, and bumps the persisted counter before spawning, so a
+     * multi-villager piece straddling a window boundary at x or z congruent to 8 mod 16 permanently loses a
+     * villager when the far window populates first. Route-dependent, no RNG.</li>
+     * <li>actual &lt; vcount — the villager was counted but never entered the world: either the chunkExists guard
+     * in World.spawnEntityInWorld or an EntityJoinWorldEvent cancel by another mod.</li>
+     * <li>both equal but positions differ between arms — something new, and worth stopping for.</li>
+     * </ul>
+     */
+    private static String dumpVillagePieces(WorldServer world, java.util.List<net.minecraft.entity.Entity> ents) {
+        try {
+            final Map<?, ?> structureMap = villageStructureMap(world);
+            if (structureMap == null) return "\"no MapGenVillage structureMap found\"";
+            final java.util.List<String> lines = new ArrayList<>();
+            for (Object start : structureMap.values()) {
+                final java.util.List<?> components = componentsOf(start);
+                if (components == null) continue;
+                for (Object comp : components) {
+                    final String cls = comp.getClass()
+                        .getSimpleName();
+                    final int expect = expectedVillagers(cls);
+                    final int vcount = persistedVCount(comp);
+                    if (expect < 0 && vcount < 0) continue; // roads, wells, and anything that spawns nobody
+                    net.minecraft.world.gen.structure.StructureBoundingBox bb = null;
+                    for (Class<?> sc = comp.getClass(); sc != null && bb == null; sc = sc.getSuperclass()) {
+                        for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
+                            if (net.minecraft.world.gen.structure.StructureBoundingBox.class
+                                .isAssignableFrom(f.getType())) {
+                                f.setAccessible(true);
+                                bb = (net.minecraft.world.gen.structure.StructureBoundingBox) f.get(comp);
+                                break;
+                            }
+                        }
+                    }
+                    int actual = 0;
+                    if (bb != null) {
+                        for (net.minecraft.entity.Entity e : ents) {
+                            if (!(e instanceof net.minecraft.entity.passive.EntityVillager)) continue;
+                            if (bb.isVecInside(
+                                net.minecraft.util.MathHelper.floor_double(e.posX),
+                                net.minecraft.util.MathHelper.floor_double(e.posY),
+                                net.minecraft.util.MathHelper.floor_double(e.posZ))) actual++;
+                        }
+                    }
+                    lines.add(
+                        "\"" + cls
+                            + "@"
+                            + bboxOf(comp)
+                            + " vcount="
+                            + vcount
+                            + " actual="
+                            + actual
+                            + " expect="
+                            + expect
+                            + "\"");
+                }
+            }
+            java.util.Collections.sort(lines);
+            if (lines.isEmpty()) return "[]";
+            return "[\n    " + String.join(",\n    ", lines) + "\n  ]";
+        } catch (Exception e) {
+            return "\"error: " + e + "\"";
+        }
     }
 
     @SuppressWarnings("unchecked")

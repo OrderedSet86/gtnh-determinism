@@ -5,7 +5,13 @@
   "refmap": "mixins.gtnhdeterminism.refmap.json",
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
-  "mixins": [],
+  "mixins": [
+    "worldgen.SpawnVillagersMixin",
+    "worldgen.SpawnerAnimalsMixin",
+    "worldgen.EntitySheepMixin",
+    "worldgen.EntityOcelotMixin",
+    "worldgen.EntityHorseMixin"
+  ],
   "client": [],
   "server": []
 }

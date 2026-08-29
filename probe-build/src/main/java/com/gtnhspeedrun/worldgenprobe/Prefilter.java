@@ -389,6 +389,131 @@ public final class Prefilter {
      * are pre-terrain placeholders — XZ and piece classes are final; real gen only offsets Y and prunes pieces
      * whose ground check fails at build time.
      */
+    /**
+     * Villagers a village piece will spawn: profession and exact X/Z, computed worldlessly.
+     * <p>
+     * This is free once the piece layout is known. {@code spawnVillagers} draws no random numbers — the count and
+     * offsets are literals at each call site, the profession is a compile-time constant returned by
+     * {@code getVillagerType}, and the position is arithmetic on the component's bounding box and
+     * {@code coordBaseMode} (see {@code StructureComponent.getXWithOffset}/{@code getZWithOffset}). So a seed sweep
+     * can answer "is there a blacksmith within N chunks of spawn" without generating anything.
+     * <p>
+     * Y is NOT emitted. {@code getYWithOffset} adds {@code boundingBox.minY}, which real generation sets from
+     * {@code getAverageGroundLevel} — a mean of {@code getTopSolidOrLiquidBlock} over the footprint — so it needs
+     * terrain. XZ and profession are exact; treat the list as a superset, since a piece whose ground check fails at
+     * build time is pruned, exactly as the sibling {@code pieces} field already warns.
+     */
+    private static List<String> predictVillagers(Object comp) {
+        final String cls = comp.getClass()
+            .getSimpleName();
+        // {xOff, yOff, zOff, count}, then professions per index. From the spawnVillagers call site in each class.
+        final int[] call;
+        final int[] profs;
+        switch (cls) {
+            case "Church":
+                call = new int[] { 2, 1, 2, 1 };
+                profs = new int[] { 2 };
+                break;
+            case "Hall":
+                call = new int[] { 4, 1, 2, 2 };
+                profs = new int[] { 4, 0 };
+                break;
+            case "House1":
+                call = new int[] { 2, 1, 2, 1 };
+                profs = new int[] { 1 };
+                break;
+            case "House2":
+                call = new int[] { 7, 1, 1, 1 };
+                profs = new int[] { 3 };
+                break;
+            case "House3":
+                call = new int[] { 4, 1, 2, 2 };
+                profs = new int[] { 0, 0 };
+                break;
+            case "House4Garden":
+                call = new int[] { 1, 1, 2, 1 };
+                profs = new int[] { 0 };
+                break;
+            case "WoodHut":
+                call = new int[] { 1, 1, 2, 1 };
+                profs = new int[] { 0 };
+                break;
+            // Mod pieces: offsets are known, professions are mod-registered ids that vary by pack, so they are
+            // reported as -1 rather than guessed.
+            case "ComponentVillageBeeHouse":
+                call = new int[] { 7, 1, 1, 2 };
+                profs = new int[] { -1, -1 };
+                break;
+            case "ComponentWorkshop":
+                call = new int[] { 0, 0, 0, 2 };
+                profs = new int[] { -1, -1 };
+                break;
+            case "ComponentToolWorkshop":
+                call = new int[] { 3, 1, 3, 1 };
+                profs = new int[] { -1 };
+                break;
+            default:
+                return java.util.Collections.emptyList();
+        }
+        final List<String> out = new ArrayList<>(call[3]);
+        try {
+            final net.minecraft.world.gen.structure.StructureBoundingBox bb = bboxField(comp);
+            if (bb == null) return out;
+            final int mode = coordBaseMode(comp);
+            for (int i = 0; i < call[3]; i++) {
+                final int lx = call[0] + i, lz = call[2];
+                final int wx, wz;
+                switch (mode) { // StructureComponent.getXWithOffset / getZWithOffset
+                    case 0:
+                        wx = bb.minX + lx;
+                        wz = bb.minZ + lz;
+                        break;
+                    case 1:
+                        wx = bb.maxX - lz;
+                        wz = bb.minZ + lx;
+                        break;
+                    case 2:
+                        wx = bb.minX + lx;
+                        wz = bb.maxZ - lz;
+                        break;
+                    case 3:
+                        wx = bb.minX + lz;
+                        wz = bb.minZ + lx;
+                        break;
+                    default:
+                        return out; // coordBaseMode -1: orientation not decided, position undefined
+                }
+                out.add(cls + ":prof" + profs[i] + "@" + wx + "," + wz);
+            }
+        } catch (Exception ignored) {}
+        return out;
+    }
+
+    private static net.minecraft.world.gen.structure.StructureBoundingBox bboxField(Object comp) throws Exception {
+        for (Class<?> sc = comp.getClass(); sc != null; sc = sc.getSuperclass()) {
+            for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
+                if (net.minecraft.world.gen.structure.StructureBoundingBox.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    return (net.minecraft.world.gen.structure.StructureBoundingBox) f.get(comp);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static int coordBaseMode(Object comp) throws Exception {
+        for (Class<?> sc = comp.getClass(); sc != null; sc = sc.getSuperclass()) {
+            for (java.lang.reflect.Field f : sc.getDeclaredFields()) {
+                if (f.getType() == int.class
+                    && ("coordBaseMode".equals(f.getName()) || "field_74885_f".equals(f.getName()))) {
+                    f.setAccessible(true);
+                    return f.getInt(comp);
+                }
+            }
+        }
+        return -1;
+    }
+
     private static List<String> villageStarts(Object gen, World world, List<int[]> cells) throws Exception {
         final Map<?, ?> structureMap = (Map<?, ?>) STRUCTURE_MAP.get(gen);
         structureMap.clear();
@@ -418,6 +543,9 @@ public final class Prefilter {
                             + WorldgenProbe.bboxOf(comp));
                 }
                 java.util.Collections.sort(parts); // same canonical order as the full-gen villages dump
+                final List<String> villagers = new ArrayList<>();
+                for (final Object comp : comps) villagers.addAll(predictVillagers(comp));
+                java.util.Collections.sort(villagers);
                 final StringBuilder sb = new StringBuilder(64 + 64 * parts.size());
                 sb.append("{\"c\": [")
                     .append(cx)
@@ -429,6 +557,8 @@ public final class Prefilter {
                     .append(parts.size())
                     .append(" pieces: ")
                     .append(String.join("; ", parts))
+                    .append("\", \"villagers\": \"")
+                    .append(String.join("; ", villagers))
                     .append("\"}");
                 out.add(sb.toString());
             } catch (Exception ex) {
