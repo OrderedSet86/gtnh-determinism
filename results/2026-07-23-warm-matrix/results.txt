@@ -1,0 +1,13 @@
+FAIL p1-slot1-sanity (see diff-p1-slot1-sanity.txt)
+FAIL p1-forward (see diff-p1-forward.txt)
+FAIL p1-reverse (see diff-p1-reverse.txt)
+FAIL p1r-slot1-sanity (see diff-p1r-slot1-sanity.txt)
+FAIL p2-slot1-sanity (see diff-p2-slot1-sanity.txt)
+FAIL p2-forward (see diff-p2-forward.txt)
+FAIL p2-reverse (see diff-p2-reverse.txt)
+FAIL p2r-slot1-sanity (see diff-p2r-slot1-sanity.txt)
+FAIL p3-slot1-sanity (see diff-p3-slot1-sanity.txt)
+FAIL p3-forward (see diff-p3-forward.txt)
+FAIL p3-reverse (see diff-p3-reverse.txt)
+FAIL p3r-slot1-sanity (see diff-p3r-slot1-sanity.txt)
+PASS self-88888888

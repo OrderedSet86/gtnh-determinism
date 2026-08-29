@@ -1,0 +1,5 @@
+ 546:            62          16368  net.minecraft.world.WorldServerMulti
+1094:           136           3264  net.minecraft.world.WorldServer$ServerBlockEventList
+1496:            68           1632  [Lnet.minecraft.world.WorldServer$ServerBlockEventList;
+1526:             6           1584  net.minecraft.world.WorldServer
+4109:             1            240  [Lnet.minecraft.world.WorldServer;

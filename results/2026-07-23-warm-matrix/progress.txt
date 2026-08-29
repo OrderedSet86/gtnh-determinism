@@ -1,0 +1,45 @@
+00:35:23 COLD 88888888 start
+00:37:02 COLD 88888888 done
+00:37:02 COLD 1234567890 start
+00:38:38 COLD 1234567890 done
+00:38:38 COLD 42 start
+00:40:15 COLD 42 done
+00:40:15 COLD -777 start
+00:41:43 COLD -777 done
+00:41:43 COLD 314159265358979 start
+00:43:12 COLD 314159265358979 done
+00:43:12 COLD -987654321012345678 start
+00:44:41 COLD -987654321012345678 done
+00:44:41 WARM w1 (88888888,1234567890) start
+00:46:21 WARM w1 done
+00:46:21 WARM w1r (1234567890,88888888) start
+00:48:01 WARM w1r done
+00:48:01 WARM w2 (42,-777) start
+00:49:31 WARM w2 done
+00:49:31 WARM w2r (-777,42) start
+00:51:10 WARM w2r done
+00:51:10 WARM w3 (314159265358979,-987654321012345678) start
+00:52:47 WARM w3 done
+00:52:47 WARM w3r (-987654321012345678,314159265358979) start
+00:54:17 WARM w3r done
+00:54:17 WARM wself (88888888,88888888) start
+00:55:49 WARM wself done
+00:55:49 RUNS COMPLETE, diffing
+00:55:49 MATRIX COMPLETE
+FAIL p1-slot1-sanity (see diff-p1-slot1-sanity.txt)
+FAIL p1-forward (see diff-p1-forward.txt)
+FAIL p1-reverse (see diff-p1-reverse.txt)
+FAIL p1r-slot1-sanity (see diff-p1r-slot1-sanity.txt)
+FAIL p2-slot1-sanity (see diff-p2-slot1-sanity.txt)
+FAIL p2-forward (see diff-p2-forward.txt)
+FAIL p2-reverse (see diff-p2-reverse.txt)
+FAIL p2r-slot1-sanity (see diff-p2r-slot1-sanity.txt)
+FAIL p3-slot1-sanity (see diff-p3-slot1-sanity.txt)
+FAIL p3-forward (see diff-p3-forward.txt)
+FAIL p3-reverse (see diff-p3-reverse.txt)
+FAIL p3r-slot1-sanity (see diff-p3r-slot1-sanity.txt)
+PASS self-88888888
+TEDETAIL_RUNS_DONE
+done-cold
+TERAW_DONE
+V2_RUNS_DONE

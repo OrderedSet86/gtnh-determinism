@@ -1,0 +1,9 @@
+killed: pieces=11, require:furnace=6, require:furnace+sand=15, require:paper=18, require:paper+furnace=15, require:paper+furnace+sand=30, require:paper+sand=31, require:paper+tic=3, require:paper+tic+furnace=6, require:paper+tic+furnace+sand=23, require:paper+tic+sand=8, require:sand=18, require:tic=1, require:tic+furnace=2, require:tic+furnace+sand=14, require:tic+sand=3, village=152674, village>maxdist=349, water=709
+
+5 ranked seeds -> finalists.txt
+  score                  seed      spawn x,z    village x,z   paper    tic      furn  water   sand   clay  gravl
+    380   1425196592856258245      82,-28         34,18          61     96     68 x1     65     25     65    512
+    415  -8559317874875454079     -57,-31         50,18         115    142    112 x2     32      7     32    512
+    423  -1232783017558032110     -56,37           2,18          82     97     52 x1     65     61     65    512
+    447  -3503061262205596636     265,-120       146,-222       125    149    124 x2     37      1     37     37
+    513  -2318268816295824430      31,-63          2,50         131    145    137 x1     34     40     26    512

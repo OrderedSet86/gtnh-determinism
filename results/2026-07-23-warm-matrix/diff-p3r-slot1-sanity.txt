@@ -1,0 +1,8 @@
+seed -987654321012345678  |  rows vs rows  |  289 chunks compared
+DIFFERENT — 47/289 chunks differ (16.3%)
+  blocks-only: 0   te-only: 46   both: 1
+  block noise by Y-section (section i = y in [16i, 16i+15]):
+    y  80-95   # 1
+    y  96-111  # 1
+differing region bounds: x [-8..3], z [-8..2] (chunk coords)
+differing chunks: -8,-4 -8,-3 -8,-2 -8,-1 -8,0 -8,1 -7,-3 -7,-2 -7,-1 -7,0 -7,1 -6,-6 -6,-5 -6,-2 -6,-1 -6,0 -6,1 -5,-6 -5,-5 -4,-5 -4,-4 -3,-8 -3,-5 -2,-8 -2,-7 -2,-2 -2,-1 -1,-3 -1,-2 -1,-1 -1,0 -1,1 0,-5 0,-2 0,-1 0,0 0,1 1,-2 1,-1 1,0 …

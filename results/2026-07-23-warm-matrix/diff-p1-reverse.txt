@@ -1,0 +1,5 @@
+seed 88888888  |  rows vs rows  |  289 chunks compared
+DIFFERENT — 152/289 chunks differ (52.6%)
+  blocks-only: 0   te-only: 152   both: 0
+differing region bounds: x [-8..8], z [-8..8] (chunk coords)
+differing chunks: -8,-6 -8,-5 -8,-4 -8,5 -8,7 -8,8 -7,-8 -7,-7 -7,-3 -7,-2 -7,-1 -7,1 -7,2 -7,7 -7,8 -6,-6 -6,-4 -6,-3 -6,-2 -6,1 -6,2 -6,3 -5,-8 -5,-7 -5,-4 -5,-3 -5,-2 -5,-1 -5,0 -5,2 -5,4 -4,-5 -4,-4 -4,-1 -4,0 -4,5 -3,-4 -3,-2 -3,-1 -3,0 …

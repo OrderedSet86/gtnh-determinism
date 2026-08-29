@@ -1,0 +1,20 @@
+Persisted tile-entity diff, COLD rows vs COLD spiral
+seed -1501259159663517643, GTNH 2.8.4, radius 15, fix jar v0.5-main.16+9379a10ded-dirty
+
+type                                only-rows  only-spiral  changed
+GT_TileEntity_Ores                       4351         7593     1026
+etfuturum.cave_vines                        4            6      102
+etfuturum.glow_lichen                      32           22        1
+TileExtendedNode                            4            3        1
+tile.projectred.exploration.lily|0          1            1        0
+Chest                                       0            2        0
+MobSpawner                                  0            1        0
+
+totals: only-rows=4392 only-spiral=7628 changed=1130
+
+chests+spawners: rows=326 spiral=329
+  only-spiral (-337, 30, -258) MobSpawner
+  only-spiral (-337, 30, -256) Chest
+  only-spiral (-334, 30, -259) Chest
+
+regenerate: two cold scripts/run-probe.sh runs (rows, spiral), copying <server-dir>/World after each

@@ -1,0 +1,2 @@
+seed 88888888  |  rows vs rows  |  289 chunks compared
+IDENTICAL — worldgen was deterministic

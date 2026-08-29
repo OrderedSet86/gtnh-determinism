@@ -1,0 +1,330 @@
+[slicetrace] dungeon BEGIN at -287,-226
+[slicetrace] dungeon-window OPEN depth=1
+[slicetrace] chest-generate pos=-290,50,-194 level=0 placed=true detached=true
+[slicetrace] chest-generate pos=-325,50,-224 level=0 placed=true detached=true
+[slicetrace] chest-generate pos=-289,50,-208 level=0 placed=true detached=true
+[slicetrace] chest-generate pos=-284,50,-256 level=0 placed=true detached=false
+[slicetrace] chest-generate pos=-272,40,-209 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-316,40,-181 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-303,40,-271 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-344,40,-228 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-297,40,-186 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-310,40,-228 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-303,41,-243 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-297,41,-219 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-316,41,-237 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-297,41,-267 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-285,41,-200 level=1 placed=true detached=false
+[slicetrace] apply DEFERRED chunk=-19,-13 depth=1
+[slicetrace] apply DEFERRED chunk=-19,-14 depth=1
+[slicetrace] chest-generate pos=-322,31,-252 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-310,31,-250 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-312,31,-238 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-303,30,-162 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-302,30,-159 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-314,29,-178 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-314,31,-175 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-263,30,-260 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-283,33,-234 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-288,31,-221 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-357,31,-211 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-357,33,-209 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-244,31,-205 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-254,31,-205 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-255,33,-211 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-277,33,-158 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-289,31,-158 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-289,33,-162 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-344,31,-257 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-346,31,-255 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-357,31,-262 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-357,33,-260 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-269,30,-192 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-249,31,-268 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-249,33,-268 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-247,33,-268 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-256,31,-257 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-317,33,-217 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-315,31,-217 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-311,31,-211 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-312,31,-205 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-323,31,-213 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-298,30,-248 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-254,31,-187 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-320,30,-192 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-336,31,-183 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-329,31,-171 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-249,31,-234 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-249,33,-234 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-263,30,-226 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-281,30,-265 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-334,31,-251 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-336,33,-251 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-334,33,-239 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-332,33,-239 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-336,31,-239 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-340,31,-243 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-340,33,-243 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-340,33,-247 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-251,30,-248 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-298,31,-183 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-298,33,-183 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-294,31,-182 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-334,31,-268 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-319,30,-225 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-285,30,-242 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-320,31,-255 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-354,31,-183 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-255,31,-163 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-256,21,-200 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-256,23,-200 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-317,20,-161 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-302,20,-208 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-334,20,-212 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-241,20,-194 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-242,20,-192 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-279,20,-197 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-281,19,-196 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-355,20,-196 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-281,20,-242 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-284,20,-240 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-262,20,-168 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-264,20,-166 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-260,20,-169 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-303,21,-201 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-309,21,-213 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-322,21,-183 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-322,21,-171 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-275,21,-189 level=3 placed=true detached=false
+[slicetrace] chest-generate pos=-303,7,-182 level=4 placed=true detached=false
+[slicetrace] chest-generate pos=-299,7,-182 level=4 placed=true detached=false
+[slicetrace] chest-generate pos=-297,7,-180 level=4 placed=true detached=false
+[slicetrace] chest-generate pos=-297,7,-176 level=4 placed=true detached=false
+[slicetrace] chest-generate pos=-299,7,-174 level=4 placed=true detached=false
+[slicetrace] chest-generate pos=-303,7,-174 level=4 placed=true detached=false
+[slicetrace] apply DEFERRED chunk=-20,-12 depth=1
+[slicetrace] chest-generate pos=-305,7,-176 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-305,7,-180 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-308,10,-225 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-304,10,-235 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-317,10,-175 level=4 placed=true detached=true
+[slicetrace] loot-single listSize=4 pickKey=9889491158942398 live=true item=item.helmetCloth
+[slicetrace] loot-single listSize=4 pickKey=9889491184108160 live=true item=item.chestplateCloth
+[slicetrace] loot-single listSize=4 pickKey=9889491163136688 live=true item=item.pickaxeIron
+[slicetrace] loot-single listSize=4 pickKey=9889491158942398 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=4 pickKey=9889491184108160 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=4 pickKey=9889491158942398 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=4 pickKey=9889491158942398 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=4 pickKey=9889491158942398 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9731161430016653 live=true item=item.swordIron
+[slicetrace] loot-single listSize=11 pickKey=9713569214612124 live=true item=item.bootsChain
+[slicetrace] loot-single listSize=11 pickKey=9713569243972209 live=true item=item.helmetChain
+[slicetrace] loot-single listSize=11 pickKey=9713569072005788 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9713569373995695 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9713569072005788 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9731161375490707 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9731161455182453 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9731161455182453 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9731161505514168 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9555239796064918 live=true item=item.hatchetIron
+[slicetrace] loot-single listSize=59 pickKey=9555239531823795 live=true item=item.pickaxeIron
+[slicetrace] loot-single listSize=59 pickKey=9590424168153750 live=true item=item.bootsIron
+[slicetrace] loot-single listSize=59 pickKey=9537647526134464 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9555239439549061 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9555239531823795 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9590424176542324 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9537647551300220 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9555239431160521 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9555239489880708 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9555239489880708 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=59 pickKey=9555239355663049 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9414502278349496 live=true item=item.leggingsIron
+[slicetrace] loot-single listSize=20 pickKey=9361725703439063 live=true item=item.pickaxeIron
+[slicetrace] loot-single listSize=20 pickKey=9361725686661850 live=true item=item.leggingsIron
+[slicetrace] loot-single listSize=20 pickKey=9361725602775696 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9361725783130814 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9379317683962539 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9379317683962539 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9361725703439063 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9414502278349496 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9379317629436617 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9379317826568899 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9361725778936512 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9414502278349496 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=20 pickKey=9379317629436629 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027129672396 live=true item=item.pickaxeDiamond
+[slicetrace] loot-single listSize=11 pickKey=9185803658445461 live=true item=item.bootsDiamond
+[slicetrace] loot-single listSize=11 pickKey=9133027121283786 live=true item=item.bow
+[slicetrace] loot-single listSize=11 pickKey=9133027096117964 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027104506570 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027121283786 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9185803641668255 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027121283786 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9185803641668255 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027129672396 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9185803603919569 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9185803603919569 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027129672396 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9185803603919569 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027121283786 live=true item=item.enchantedBook
+[slicetrace] loot-single listSize=11 pickKey=9133027129672396 live=true item=item.enchantedBook
+[slicetrace] dungeon-window FLUSH chunk=-20,-12
+[slicetrace] apply chunk=-20,-12 writes=6185
+[slicetrace] apply chunk=-20,-13 writes=6936
+[slicetrace] apply chunk=-19,-15 writes=10531
+[slicetrace] apply chunk=-20,-15 writes=6859
+[slicetrace] apply chunk=-19,-18 writes=486
+[slicetrace] apply chunk=-19,-17 writes=2166
+[slicetrace] apply chunk=-19,-16 writes=4856
+[slicetrace] apply chunk=-20,-16 writes=3981
+[slicetrace] apply chunk=-21,-16 writes=2935
+[slicetrace] apply chunk=-20,-17 writes=982
+[slicetrace] apply chunk=-21,-15 writes=4117
+[slicetrace] apply chunk=-22,-16 writes=2152
+[slicetrace] apply chunk=-20,-14 writes=6633
+[slicetrace] apply chunk=-21,-14 writes=6288
+[slicetrace] apply chunk=-22,-15 writes=2379
+[slicetrace] apply chunk=-21,-13 writes=3897
+[slicetrace] dungeon-window FLUSH chunk=-19,-14
+[slicetrace] apply chunk=-19,-14 writes=11122
+[slicetrace] dungeon-window FLUSH chunk=-19,-13
+[slicetrace] apply chunk=-19,-13 writes=9029
+[slicetrace] dungeon-window CLOSE depth=0
+[slicetrace] dungeon END at -287,-226
+[slicetrace] apply chunk=-21,-17 writes=2146
+[slicetrace] apply chunk=-22,-17 writes=3145
+[slicetrace] apply chunk=-22,-14 writes=3783
+[slicetrace] apply chunk=-22,-13 writes=3486
+[slicetrace] apply chunk=-21,-12 writes=2727
+[slicetrace] apply chunk=-22,-12 writes=2953
+[slicetrace] apply chunk=-22,-11 writes=3266
+[slicetrace] apply chunk=-20,-11 writes=5519
+[slicetrace] apply chunk=-21,-11 writes=4016
+[slicetrace] apply chunk=-22,-10 writes=323
+[slicetrace] apply chunk=-21,-10 writes=919
+[slicetrace] apply chunk=-19,-10 writes=1227
+[slicetrace] apply chunk=-20,-10 writes=1801
+[slicetrace] dungeon BEGIN at -344,108
+[slicetrace] dungeon-window OPEN depth=1
+[slicetrace] chest-generate pos=-365,50,131 level=0 placed=true detached=true
+[slicetrace] chest-generate pos=-296,50,110 level=0 placed=true detached=false
+[slicetrace] chest-generate pos=-347,50,137 level=0 placed=true detached=true
+[slicetrace] chest-generate pos=-360,50,72 level=0 placed=true detached=false
+[slicetrace] chest-generate pos=-324,50,97 level=0 placed=true detached=false
+[slicetrace] chest-generate pos=-343,51,84 level=0 placed=true detached=false
+[slicetrace] chest-generate pos=-350,50,84 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-350,52,82 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-350,53,83 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-348,50,84 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-348,52,82 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-348,53,83 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-402,41,112 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-409,40,126 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-344,41,139 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-358,41,133 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-366,40,141 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-325,40,106 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-315,40,110 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-357,41,105 level=1 placed=true detached=false
+[slicetrace] chest-generate pos=-366,41,123 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-360,41,129 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-379,41,81 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-385,41,123 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-360,41,153 level=1 placed=true detached=true
+[slicetrace] chest-generate pos=-342,33,129 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-342,33,131 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-354,31,129 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-432,30,113 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-436,30,114 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-332,30,130 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-333,30,127 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-328,30,114 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-363,30,75 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-413,30,182 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-341,31,90 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-350,31,101 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-350,33,101 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-354,33,93 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-336,31,157 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-331,33,169 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-333,33,169 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-337,31,165 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-414,31,123 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-421,31,136 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-411,31,101 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-410,33,148 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-430,30,127 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-360,31,135 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-372,31,124 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-411,31,106 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-410,31,112 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-414,31,118 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-418,31,118 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-402,30,178 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-384,30,149 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-433,31,169 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-433,33,169 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-435,33,169 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-439,31,165 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-439,33,165 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-348,31,106 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-350,33,106 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-346,31,106 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-354,33,112 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-354,31,114 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-354,33,110 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-428,31,140 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-433,33,152 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-431,31,152 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-439,31,146 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-370,31,105 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-328,30,182 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-328,30,80 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-365,31,89 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-367,33,89 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-363,33,89 level=2 placed=true detached=false
+[slicetrace] chest-generate pos=-382,33,118 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-388,31,117 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-379,30,76 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-370,31,174 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-371,33,180 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-371,33,182 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-396,30,93 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-382,31,89 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-376,33,95 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-376,33,97 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-429,31,75 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-430,31,123 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-423,31,160 level=2 placed=true detached=true
+[slicetrace] chest-generate pos=-388,21,112 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-389,21,106 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-370,21,144 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-366,20,159 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-369,21,156 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-393,21,142 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-422,21,159 level=3 placed=true detached=true
+[slicetrace] chest-generate pos=-401,7,153 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-397,7,153 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-395,7,155 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-395,7,159 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-397,7,161 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-401,7,161 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-403,7,159 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-403,7,155 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-369,10,138 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-358,10,141 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-372,10,142 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-384,10,157 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-436,9,143 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-434,9,144 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-431,9,147 level=4 placed=true detached=true
+[slicetrace] chest-generate pos=-336,89,108 level=0 placed=true detached=false
+[slicetrace] dungeon-window CLOSE depth=0
+[slicetrace] dungeon END at -344,108
+[slicetrace] apply chunk=-22,8 writes=8587
+[slicetrace] apply chunk=-21,8 writes=5104
+[slicetrace] apply chunk=-23,7 writes=7890
+[slicetrace] apply chunk=-22,9 writes=2444
+[slicetrace] apply chunk=-21,9 writes=3775
+[slicetrace] apply chunk=-22,10 writes=1622
+[slicetrace] apply chunk=-21,10 writes=1659
