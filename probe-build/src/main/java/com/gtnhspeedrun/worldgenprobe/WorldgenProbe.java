@@ -35,6 +35,7 @@ import org.apache.logging.log4j.Logger;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
+import cpw.mods.fml.common.event.FMLServerAboutToStartEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
 
 /**
@@ -228,8 +229,26 @@ public class WorldgenProbe {
         throw new IllegalStateException("no Properties field on PropertyManager");
     }
 
+    /**
+     * Last hook before {@code startServer()}, so this is the table the spawn preload will generate against. TooMuchLoot
+     * does not run until {@code FMLServerStartingEvent}, which is after the preload — see {@link ChestLootExport}.
+     */
+    @Mod.EventHandler
+    public void serverAboutToStart(FMLServerAboutToStartEvent event) {
+        ChestLootExport.captureChestGenHooks("pre");
+    }
+
     @Mod.EventHandler
     public void serverStarted(FMLServerStartedEvent event) {
+        if (ChestLootExport.dir() != null) {
+            final File cfg = new File("config");
+            ChestLootExport.captureChestGenHooks("post");
+            ChestLootExport.captureRoguelike(cfg);
+            // Witchery needs no capture of its own: its stone-circle refilling chests and its worldgen components
+            // read the dungeonChest and mineshaftCorridor categories rather than registering a table.
+            ChestLootExport.writeCombined(ChestLootExport.dir());
+            ChestLootExport.writeLootBags(cfg, ChestLootExport.dir());
+        }
         MinecraftForge.EVENT_BUS.register(POP_LISTENER);
         final String daemonDir = System.getProperty("probe.daemon");
         if (daemonDir != null) {
