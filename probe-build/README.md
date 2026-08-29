@@ -1,6 +1,7 @@
 # WorldgenProbe
 
-Source of the `worldgenprobe` jar. Minecraft 1.7.10, for GT: New Horizons 2.7.4+.
+Source of the `worldgenprobe` jar. Minecraft 1.7.10, for GT: New Horizons 2.7.4 through the current
+daily build.
 
 This is the measurement mod, not a gameplay mod. It generates a region on a dedicated server and dumps
 region-file blocks and full tile-entity NBT, so that two runs of the same seed can be compared byte for byte.

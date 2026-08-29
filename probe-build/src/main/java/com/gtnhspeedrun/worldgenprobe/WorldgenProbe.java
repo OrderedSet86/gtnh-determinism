@@ -716,7 +716,13 @@ public class WorldgenProbe {
     /**
      * Statics that outlive the world and fed worldgen historically. Reflection-based and hard-failing: if a listed
      * class/field vanishes (mod update), the warm run must die loudly rather than silently produce contaminated
-     * results. Verified against the shipped 2.7.4 jars (TC 4.2.3.5a, witchery 0.24.1, GT 5.09.50.119, RWG alpha-1.5.0).
+     * results.
+     *
+     * <p>
+     * Verified against the shipped 2.7.4 jars (TC 4.2.3.5a, witchery 0.24.1, GT 5.09.50.119, RWG alpha-1.5.0), the
+     * 2.8.4 jars (GT 5.09.51.482), and the 2.9/daily jars (GT 5.09.54.115, RWG alpha-1.5.2). Fields that GT deleted
+     * in the 5.09.54.x worldgen rework are handled by {@link #clearOptionalStaticCollection}: still hard-failing
+     * where the field exists, skipped with a log line where it does not. Everything else stays unconditional.
      */
     private static void resetStatics() throws Exception {
         // TC maze map (rings/obelisks): clearHashMap() clears the static `labyrinth`. The dimension/biome blacklists
@@ -739,14 +745,10 @@ public class WorldgenProbe {
         ((Map<?, ?>) veins.get(null)).clear();
         // Aggressive round-1 resets for the cross-seed ore-TE contamination bisect: GT's deferred worldgen queue,
         // its (vestigial) processed-chunk set, and the re-entrancy flag on the registered generator instance.
-        final java.lang.reflect.Field mListF = gt.getDeclaredField("mList");
-        mListF.setAccessible(true);
-        final java.util.Collection<?> mList = (java.util.Collection<?>) mListF.get(null);
-        if (!mList.isEmpty()) LOG.warn("[probe] GT mList had {} queued containers at teardown!", mList.size());
-        mList.clear();
-        final java.lang.reflect.Field procF = gt.getDeclaredField("ProcChunks");
-        procF.setAccessible(true);
-        ((java.util.Collection<?>) procF.get(null)).clear();
+        // GT 5.09.54.x deleted mList and ProcChunks along with the deferred-worldgen queue they served, so both are
+        // optional; on 2.7.4-2.8.4 they still exist and a non-empty mList at teardown is still a contamination signal.
+        clearOptionalStaticCollection(gt, "mList", "queued containers");
+        clearOptionalStaticCollection(gt, "ProcChunks", "processed chunks");
         final Object gtGen = findRegisteredGenerator("GTWorldgenerator");
         if (gtGen != null) {
             final java.lang.reflect.Field genF = findField(gtGen.getClass(), "mIsGenerating");
@@ -758,13 +760,17 @@ public class WorldgenProbe {
         // per-chunk dedup is a STATIC HashSet<ChunkCoordIntPair> — no world/seed in the key, add-only. Stale
         // positions from a previous world make the next world SKIP BartWorks small-ore gen there, which shifts GT
         // host-rock recording (te-only diffs, first-write-wins). Also leaks across dimensions on live servers —
-        // upstream-reportable. Cleared per seed:
-        final java.lang.reflect.Field bwGen = Class.forName("bartworks.system.oregen.BWWordGenerator$WorldGenContainer")
-            .getDeclaredField("mGenerated");
-        bwGen.setAccessible(true);
-        final java.util.Collection<?> bwSet = (java.util.Collection<?>) bwGen.get(null);
-        if (!bwSet.isEmpty()) LOG.info("[probe] clearing {} stale BartWorks mGenerated chunk entries", bwSet.size());
-        bwSet.clear();
+        // upstream-reportable. Cleared per seed.
+        //
+        // Optional by CLASS, not just by field: GregTech 5.09.54.x absorbed BartWorks, and the 2.9/daily packs ship
+        // no bartworks jar at all. An unguarded Class.forName here killed every warm batch on daily — the second
+        // 54.x casualty in this method after mList/ProcChunks. Where the class exists the reset stays mandatory.
+        // Non-empty is normal here rather than a contamination signal: the set is add-only across slots by design.
+        clearOptionalStaticCollection(
+            "bartworks.system.oregen.BWWordGenerator$WorldGenContainer",
+            "mGenerated",
+            "stale BartWorks mGenerated chunk entries",
+            false);
         // CoFH WorldHandler tracks in-flight populations in a STATIC LinkedHashList<ChunkReference> (dim+coords, no
         // world identity) — entries strand when a world is torn down mid-cascade (observed 93→209 growth across
         // slots), and stale same-coordinate refs flip its defer/retrogen decisions in the next world. GTNH runs its
@@ -879,19 +885,23 @@ public class WorldgenProbe {
         rwgInst.setAccessible(true);
         rwgInst.set(null, null);
         // Fix jar virgin-terrain cache: self-invalidates on world identity change, but pins the old world until then.
-        try {
-            final Class<?> oracle = Class.forName("com.gtnhspeedrun.tcworldgenfix.TerrainOracle");
+        // Two package names: the current one, and the pre-rename one that jars up to 0.4 shipped (commit 1340ae3).
+        final Class<?> oracle = findClass(
+            "com.gtnhspeedrun.determinism.worldgen.TerrainOracle",
+            "com.gtnhspeedrun.tcworldgenfix.TerrainOracle");
+        if (oracle == null) {
+            LOG.warn(
+                "[probe] gtnhdeterminism fix jar NOT installed — warm-mode results are only meaningful with the fixes");
+        } else {
             final java.lang.reflect.Field cache = oracle.getDeclaredField("CACHE");
             cache.setAccessible(true);
+            // TerrainOracle guards its cache with `static synchronized`, i.e. the Class monitor.
             synchronized (oracle) {
                 ((Map<?, ?>) cache.get(null)).clear();
                 final java.lang.reflect.Field cw = oracle.getDeclaredField("cacheWorld");
                 cw.setAccessible(true);
                 cw.set(null, null);
             }
-        } catch (ClassNotFoundException e) {
-            LOG.warn(
-                "[probe] gtnhdeterminism fix jar NOT installed — warm-mode results are only meaningful with the fixes");
         }
         LOG.info("[probe] static reset done (TC maze+nodes, witchery list, GT veins, RWG saveddata, oracle)");
     }
@@ -1026,6 +1036,65 @@ public class WorldgenProbe {
         final java.lang.reflect.Field f = findField(owner.getClass(), name);
         f.setAccessible(true);
         ((java.util.Collection<?>) f.get(owner)).clear();
+    }
+
+    private static final java.util.Set<String> ABSENT_STATICS_LOGGED = new java.util.HashSet<>();
+
+    /**
+     * Clears a static collection that only some supported mod versions declare. Present means the same hard-failing
+     * contract as the rest of {@link #resetStatics}: a non-empty collection at teardown is a contamination signal and
+     * is warned about, and any other reflective failure propagates. Absent means the mod version dropped the field,
+     * which is logged once so a warm run never quietly loses a reset it used to perform.
+     */
+    private static void clearOptionalStaticCollection(Class<?> owner, String name, String what) throws Exception {
+        clearOptionalStaticCollection(owner, name, what, true);
+    }
+
+    /**
+     * As above, but the owning CLASS is optional too — for statics belonging to a mod that some supported pack
+     * versions do not ship at all. Absence of the class is a skip; absence of the field on a class that IS present
+     * is still a skip, but anything else propagates.
+     */
+    private static void clearOptionalStaticCollection(String className, String name, String what,
+        boolean warnIfNonEmpty) throws Exception {
+        final Class<?> owner = findClass(className);
+        if (owner == null) {
+            if (ABSENT_STATICS_LOGGED.add(className)) {
+                LOG.info("[probe] {} not installed in this pack — reset skipped", className);
+            }
+            return;
+        }
+        clearOptionalStaticCollection(owner, name, what, warnIfNonEmpty);
+    }
+
+    private static void clearOptionalStaticCollection(Class<?> owner, String name, String what, boolean warnIfNonEmpty)
+        throws Exception {
+        final java.lang.reflect.Field f;
+        try {
+            f = owner.getDeclaredField(name);
+        } catch (NoSuchFieldException e) {
+            if (ABSENT_STATICS_LOGGED.add(owner.getName() + "." + name)) {
+                LOG.info("[probe] {}.{} absent in this version — reset skipped", owner.getSimpleName(), name);
+            }
+            return;
+        }
+        f.setAccessible(true);
+        final java.util.Collection<?> c = (java.util.Collection<?>) f.get(null);
+        if (!c.isEmpty()) {
+            if (warnIfNonEmpty) LOG.warn("[probe] {} had {} {} at teardown!", name, c.size(), what);
+            else LOG.info("[probe] clearing {} {}", c.size(), what);
+        }
+        c.clear();
+    }
+
+    /** First of {@code names} that is loadable, or null if none are. */
+    private static Class<?> findClass(String... names) {
+        for (String n : names) {
+            try {
+                return Class.forName(n);
+            } catch (ClassNotFoundException ignored) {}
+        }
+        return null;
     }
 
     private static java.lang.reflect.Field findField(Class<?> c, String name) throws NoSuchFieldException {
@@ -1384,6 +1453,7 @@ public class WorldgenProbe {
         // ores/chests yet) so "empty" is distinguishable from "not decorated". Sorted by (x,z): the report is
         // independent of loadedChunks iteration order.
         final List<String> eldritch = new ArrayList<>();
+        boolean oreTilesSeen = false;
         final List<Chunk> loadedChunks = new ArrayList<>();
         for (Object o : world.theChunkProviderServer.loadedChunks) loadedChunks.add((Chunk) o);
         loadedChunks.sort(
@@ -1555,6 +1625,7 @@ public class WorldgenProbe {
                     .append("\"");
                 if (!c.isTerrainPopulated) sb.append(", \"populated\": false");
                 if (!ores.isEmpty()) {
+                    oreTilesSeen = true;
                     sb.append(", \"ores\": {");
                     boolean f1 = true;
                     for (Map.Entry<Integer, Integer> e : ores.entrySet()) {
@@ -1574,6 +1645,16 @@ public class WorldgenProbe {
                 }
                 sb.append("}");
             }
+        }
+        // An empty ore census reads as "this seed has no ores", which is indistinguishable from "the census cannot
+        // see ores on this pack". GT 5.09.54.x placed worldgen ores as plain blocks — OreManager.setOreForWorldGen
+        // calls world.setBlock — so the TileEntityOres walk above finds nothing. Say which one happened. Block-level
+        // ore reporting for 54.x is not implemented; chunk hashes and region-block diffs still cover ores, so
+        // determinism testing is unaffected and only the human-readable per-seed ore census is missing.
+        if (!oreTilesSeen && cpw.mods.fml.common.Loader.isModLoaded("gregtech")) {
+            LOG.warn(
+                "[probe] no ore tile entities found — GT 5.09.54.x stores worldgen ores as blocks, so the per-chunk"
+                    + " ore census in this report is EMPTY, not zero. Use region-block diffs for ore comparisons.");
         }
         sb.append("\n    },\n    \"eldritch\": [")
             .append(String.join(", ", eldritch))

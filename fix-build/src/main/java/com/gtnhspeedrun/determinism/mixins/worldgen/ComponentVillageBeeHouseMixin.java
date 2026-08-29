@@ -30,7 +30,7 @@ public class ComponentVillageBeeHouseMixin {
     @Unique
     private static final ThreadLocal<Random> gtnhdet$beeRand = new ThreadLocal<>();
 
-    @Inject(method = "func_74875_a", at = @At("HEAD"), require = 0)
+    @Inject(method = "func_74875_a", at = @At("HEAD"), require = 1)
     private void gtnhdet$captureRand(World world, Random rand, StructureBoundingBox box,
         CallbackInfoReturnable<Boolean> cir) {
         gtnhdet$beeRand.set(new Random(rand.nextLong()));
@@ -39,7 +39,7 @@ public class ComponentVillageBeeHouseMixin {
     @Redirect(
         method = { "plantFlowerGarden", "populateApiary" },
         at = @At(value = "FIELD", target = "Lnet/minecraft/world/World;field_73012_v:Ljava/util/Random;", opcode = 180),
-        require = 0)
+        require = 1)
     private Random gtnhdet$seededRand(World world) {
         final Random r = gtnhdet$beeRand.get();
         return r != null ? r : world.rand;
@@ -48,7 +48,7 @@ public class ComponentVillageBeeHouseMixin {
     @Redirect(
         method = "getRandomVillageBee",
         at = @At(value = "FIELD", target = "Lnet/minecraft/world/World;field_73012_v:Ljava/util/Random;", opcode = 180),
-        require = 0)
+        require = 1)
     private static Random gtnhdet$seededRandStatic(World world) {
         final Random r = gtnhdet$beeRand.get();
         return r != null ? r : world.rand;

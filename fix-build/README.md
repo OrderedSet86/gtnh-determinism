@@ -1,9 +1,10 @@
 # GTNH Worldgen Determinism
 
-Source of the `gtnhdeterminism` jar. Minecraft 1.7.10, for GT: New Horizons 2.7.4+.
+Source of the `gtnhdeterminism` jar. Minecraft 1.7.10, for GT: New Horizons 2.7.4 through the
+current daily build.
 
 The jar makes world generation a pure function of the world seed: the same seed produces the same world on every
-launch, and by every approach route. The repo root README lists all 28 fixes, the evidence behind them, and the
+launch, and by every approach route. The repo root README lists all 32 fixes, the evidence behind them, and the
 known remaining variance. Read it first — this file covers only how the module is built and laid out.
 
 ## What lives here
@@ -12,7 +13,8 @@ known remaining variance. Read it first — this file covers only how the module
   patches: the FML village-handler ordering fix and the loot-table session-drift fix. Also `LateMixinLoader`.
 * `com.gtnhspeedrun.determinism.worldgen` — support classes shared by the mixins, including the virgin-terrain
   oracle and the per-chunk slice queue.
-* `com.gtnhspeedrun.determinism.mixins.worldgen` — the 29 worldgen mixins.
+* `com.gtnhspeedrun.determinism.mixins.worldgen` — the 31 worldgen mixins, plus 3 diagnostic trace
+  mixins that ship inert behind `-Dgtnhdet.traceseg`.
 
 The worldgen mixins target other mods, so they are `remap = false` and load late, through `LateMixinLoader`
 gated on the mods actually present. Their names in that class are relative to the `package` field of

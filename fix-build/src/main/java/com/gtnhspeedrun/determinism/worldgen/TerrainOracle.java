@@ -56,4 +56,15 @@ public final class TerrainOracle {
                                                                              // worldgen
         return virginChunk(world, x >> 4, z >> 4).getBlock(x & 15, y, z & 15);
     }
+
+    /**
+     * Virgin (pre-population) block metadata at world coords; 0 outside the build height. Callers that need to
+     * identify a block variant — GT's stone types, for one — must read this from the same virgin chunk as
+     * {@link #block}, or the pair can straddle a cache eviction and describe two different worlds.
+     */
+    public static int meta(World world, int x, int y, int z) {
+        if (y < 0 || y > 255) return 0;
+        if (!(world instanceof WorldServer)) return world.getBlockMetadata(x, y, z);
+        return virginChunk(world, x >> 4, z >> 4).getBlockMetadata(x & 15, y, z & 15);
+    }
 }

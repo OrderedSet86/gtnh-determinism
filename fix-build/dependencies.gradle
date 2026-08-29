@@ -1,26 +1,46 @@
 // Add your dependencies here
+//
+// These are compile-only: the jar declares no mod dependencies and gates every mixin on what is actually installed
+// (see LateMixinLoader). Pins therefore decide only what the mixins can be WRITTEN against, not what they bind to.
+//
+// Policy: pin to the newest supported pack line — GTNH daily, config 2.9.0-nightly. Older lines stay supported
+// because their mixin targets are unchanged. That was verified by disassembling each target class at the 2.7.4-era
+// version and the daily version and diffing: Forestry ComponentVillageBeeHouse, EFR deepslate + cave-vine classes,
+// TiC SlimeIslandGen and ProjectRed TileLily are bytecode-identical across the whole range, and all ten Roguelike
+// targets differ only by a credits string, ldc->ldc_w, and a newer javac's synthetic enum $values().
+//
+// The one target that did change is GregTech's, which is why two GT mixins exist. See WorldgenGTOreLayerMixin
+// (<= 5.09.51.482) and WorldgenGTOreLayerStoneTypeMixin (>= 5.09.54.x).
 
 dependencies {
     compileOnly('thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev')
-    compileOnly('com.github.GTNewHorizons:TinkersConstruct:1.14.96-GTNH:dev')
-    // MUST track the line the pack actually ships (2.8.4 = 5.09.51.482, the 5.09.50.119-era ore API).
-    // 5.09.54.x replaced that API wholesale — IOreMaterial instead of the mPrimaryMeta shorts,
-    // veinHeight instead of mMinY/mMaxY, and no TileEntityOres.setOreBlock at all — so an ore mixin
-    // written against 54.x compiles but cannot bind against what runs.
-    // transitive=false: 5.09.51.482 pulls CodeChickenLib 1.3.0, purged from the GTNH maven. Nothing we
-    // touch in GT exposes a CCL type, so the stubs are unnecessary.
-    compileOnly('com.github.GTNewHorizons:GT5-Unofficial:5.09.51.482:dev') { transitive = false }
+    // Not a mixin target: ItemAmuletVis implements baubles.api.IBauble, and javac needs that interface on the
+    // classpath to resolve any method call on the class (ChestAmuletVisMixin). Baubles-Expanded is what the pack
+    // ships the baubles.api package in; the standalone Baubles artifact is not on the GTNH maven.
+    compileOnly('com.github.GTNewHorizons:Baubles-Expanded:2.2.22-GTNH:dev') { transitive = false }
+    compileOnly('com.github.GTNewHorizons:TinkersConstruct:1.14.104-GTNH:dev')
+    // Pinned to the 5.09.54.x line because WorldgenGTOreLayerStoneTypeMixin needs gregtech.api.enums.StoneType,
+    // which does not exist before it. 54.x replaced the ore API wholesale — IOreMaterial instead of the mPrimaryMeta
+    // shorts, veinHeight instead of mMinY/mMaxY, no TileEntityOres.setOreBlock, and the vein-reroll probe moved from
+    // Block.isReplaceableOreGen to StoneType.findStoneType. The pre-54 mixin still compiles against this pin: it
+    // names only WorldgenGTOreLayer (present in both lines) and matches executeWorldgenChunkified by name, and its
+    // call-site target is a string the annotation processor does not resolve.
+    // transitive=false: GT pulls CodeChickenLib 1.3.0, purged from the GTNH maven. Nothing we touch in GT exposes a
+    // CCL type, so the stubs are unnecessary.
+    compileOnly('com.github.GTNewHorizons:GT5-Unofficial:5.09.54.115:dev') { transitive = false }
     compileOnly(rfg.deobf('curse.maven:biomes-o-plenty-220318:2499612'))
     compileOnly(rfg.deobf('curse.maven:witchery-69673:2234410'))
+    // alpha-1.5.2 is what 2.9/daily ship. 2.7.4-2.8.4 shipped alpha-1.5.0, whose dev artifact is purged from the
+    // maven; all 29 deco classes RwgDecoForkMixin targets exist in both.
     compileOnly('com.github.GTNewHorizons:Realistic-World-Gen:alpha-1.5.2:dev')
-    compileOnly('com.github.GTNewHorizons:ProjectRed:4.12.39-GTNH:dev')
+    compileOnly('com.github.GTNewHorizons:ProjectRed:4.12.43-GTNH:dev')
     compileOnly('com.github.GTNewHorizons:MrTJPCore:1.3.7:dev')
-    compileOnly('com.github.GTNewHorizons:ForestryMC:4.11.31:dev')
-    // 1.6.0-GTNH (shipped in 2.7.4) is purged from the maven; 1.6.2 has identical Dungeon/WorldEditor (verified)
-    compileOnly('com.github.GTNewHorizons:Roguelike-Dungeons:1.6.2-GTNH:dev')
-    // transitive=false: LootGames pulls Yamcl 0.6.0, purged from the GTNH maven
-    compileOnly('com.github.GTNewHorizons:LootGames:2.1.4:dev') { transitive = false }
+    compileOnly('com.github.GTNewHorizons:ForestryMC:4.11.37:dev')
+    compileOnly('com.github.GTNewHorizons:Roguelike-Dungeons:1.6.6-GTNH:dev')
+    // transitive=false: LootGames pulls Yamcl 0.6.0, purged from the GTNH maven.
+    // 2.1.4 (shipped in 2.7.4) is itself purged now, so this pin cannot go back to it — a clean CI build fails on it.
+    compileOnly('com.github.GTNewHorizons:LootGames:2.2.14:dev') { transitive = false }
     // Deepslate layer band RNG (EtFuturumDeepslateMixin). Mixin's AP resolves targets= at compile time,
     // so the class must be on the classpath even though the mixin references it only by name.
-    compileOnly('ganymedes01.etfuturum:Et-Futurum-Requiem:2.6.2.25-GTNH:dev') { transitive = false }
+    compileOnly('ganymedes01.etfuturum:Et-Futurum-Requiem:2.6.57-GTNH:dev') { transitive = false }
 }

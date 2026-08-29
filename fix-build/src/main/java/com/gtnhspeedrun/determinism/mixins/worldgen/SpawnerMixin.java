@@ -21,7 +21,7 @@ public class SpawnerMixin {
     @Redirect(
         method = { "setMeta", "setRoguelike" },
         at = @At(value = "INVOKE", target = "Lnet/minecraft/tileentity/MobSpawnerBaseLogic;func_98278_g()V"),
-        require = 0)
+        require = 1)
     private static void gtnhdet$safeUpdateSpawner(MobSpawnerBaseLogic logic) {
         if (logic.getSpawnerWorld() != null) logic.updateSpawner();
     }

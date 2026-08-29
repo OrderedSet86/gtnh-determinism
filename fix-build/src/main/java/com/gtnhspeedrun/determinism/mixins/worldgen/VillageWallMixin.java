@@ -30,7 +30,7 @@ public class VillageWallMixin {
     @Redirect(
         method = { "placeWalls", "setBlock" },
         at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;func_147439_a(III)Lnet/minecraft/block/Block;"),
-        require = 0)
+        require = 1)
     private static Block gtnhdet$virginRead(World world, int x, int y, int z) {
         return TerrainOracle.block(world, x, y, z);
     }
@@ -40,7 +40,7 @@ public class VillageWallMixin {
         at = @At(
             value = "INVOKE",
             target = "Lnet/minecraft/world/World;func_147465_d(IIILnet/minecraft/block/Block;II)Z"),
-        require = 0)
+        require = 1)
     private static boolean gtnhdet$routedWrite(World world, int x, int y, int z, Block block, int meta, int flag) {
         return PendingSlices.routeSetBlock(world, x, y, z, block, meta, flag);
     }
@@ -50,7 +50,7 @@ public class VillageWallMixin {
         at = @At(
             value = "INVOKE",
             target = "Lnet/minecraft/world/World;func_147449_b(IIILnet/minecraft/block/Block;)Z"),
-        require = 0)
+        require = 1)
     private static boolean gtnhdet$routedWriteDefault(World world, int x, int y, int z, Block block) {
         return PendingSlices.routeSetBlock(world, x, y, z, block, 0, 3);
     }

@@ -25,8 +25,13 @@ import com.gtnhspeedrun.determinism.worldgen.TerrainOracle;
  * designed, but the answer is a pure function of the seed — population-order noise can no longer flip vein
  * identity, and any chunk of the vein region computes the same cached result.
  *
- * Targets GT 5.09.50.x (pack 2.7.4). All isReplaceableOreGen calls inside executeWorldgenChunkified are the probe —
- * ore placement itself uses other paths. (GTNH speedrun determinism audit, finding F4.)
+ * Targets GT up to and including 5.09.51.482 (packs 2.7.4 through 2.8.4). All isReplaceableOreGen calls inside
+ * executeWorldgenChunkified are the probe — ore placement itself uses other paths. (GTNH speedrun determinism
+ * audit, finding F4.)
+ *
+ * <p>
+ * 5.09.54.x deleted isReplaceableOreGen and moved the probe to StoneType.findStoneType; see
+ * {@link WorldgenGTOreLayerStoneTypeMixin}, which LateMixinLoader selects instead on those versions.
  *
  * <p>
  * NOT covered: {@code setOreBlock}'s per-block live-world read still decides WHERE ore lands, and the

@@ -21,7 +21,7 @@ public class ComponentWickerManMixin {
     @Redirect(
         method = "addComponentParts",
         at = @At(value = "FIELD", target = "Lnet/minecraft/world/World;field_73012_v:Ljava/util/Random;", opcode = 180),
-        require = 0)
+        require = 1)
     private Random gtnhdet$seededSpawnerRoll(World world, World worldArg, Random random) {
         return random;
     }

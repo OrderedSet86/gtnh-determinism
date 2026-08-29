@@ -26,7 +26,7 @@ public class TileLilyMixin {
         at = @At(
             value = "INVOKE",
             target = "Lmrtjp/core/math/MathLib$;weightedRandom(Lscala/collection/Traversable;Ljava/util/Random;)Ljava/lang/Object;"),
-        require = 0)
+        require = 1)
     @SuppressWarnings({ "rawtypes", "unchecked" })
     private Object gtnhdet$seededColor(MathLib$ mathLib, Traversable weights, Random ignored) {
         final TileEntity self = (TileEntity) (Object) this;

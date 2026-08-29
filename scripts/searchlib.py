@@ -14,19 +14,27 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-# GT m-value encoding (GT5u 1.7.10): m % 1000 = material id; m // 1000:
-#   0 stone, 1 netherrack, 2 endstone, 3 black granite, 4 red granite, 5 marble, 6 basalt,
-#   16+v small-ore variant (16000 + v*1000 + material)
+# GT m-value encoding (GT5u 1.7.10). m % 1000 is the material id; the thousands digit is the stone type:
+#   0 stone, 1 netherrack, 2 endstone, 3 black granite, 4 red granite, 5 marble, 6 basalt.
+# Two flags sit above that, as offsets rather than bits:
+#   +16000 small-ore variant
+#   +8000  natural (worldgen-placed rather than player-placed) — added by GT 5.09.54.x
+# Decoding matches GTOreAdapter.getOreInfo. It reads pre-54 values correctly too: those never set the natural
+# offset, so the extra modulo is a no-op on them and one decoder covers every supported pack version.
+SMALL_ORE_META_OFFSET = 16000
+NATURAL_ORE_META_OFFSET = 8000
 STONE_NAMES = {0: "stone", 1: "netherrack", 2: "endstone", 3: "blackgranite",
                4: "redgranite", 5: "marble", 6: "basalt"}
 
 
 def decode_ore(m, mats=None):
-    small = m >= 16000
-    v = (m - 16000) // 1000 if small else m // 1000
+    small = m >= SMALL_ORE_META_OFFSET
+    base = m % SMALL_ORE_META_OFFSET
+    natural = base >= NATURAL_ORE_META_OFFSET
+    v = (base % NATURAL_ORE_META_OFFSET) // 1000
     mat = m % 1000
     name = (mats or {}).get(str(mat), f"mat{mat}")
-    return {"material": name, "materialId": mat, "small": small,
+    return {"material": name, "materialId": mat, "small": small, "natural": natural,
             "stone": STONE_NAMES.get(v, f"v{v}")}
 
 

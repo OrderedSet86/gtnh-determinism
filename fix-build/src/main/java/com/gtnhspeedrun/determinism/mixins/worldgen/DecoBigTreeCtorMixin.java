@@ -17,6 +17,13 @@ import rwg.deco.trees.DecoBigTree;
  * single `size` field read in generate() resolves the sentinel to 7 + rand.nextInt(7) — the same uniform 7..13 as
  * stock, drawn as the first draw from the per-tree seeded stream, byte-matching the forked-RWG source fix.
  * Explicit-size call sites (DecoBigTree(int, int)) pass size >= 0 and keep their value.
+ *
+ * <p>
+ * These are the only injectors left at {@code require = 0}. Every other soft injector was tightened to
+ * {@code require = 1} once its target was confirmed byte-identical from the 2.7.4-era version through the daily
+ * one, but RWG is the exception: packs up to 2.8.4 ship alpha-1.5.0 and 2.9 onwards ship alpha-1.5.2, and the
+ * alpha-1.5.0 artifact is purged from the GTNH maven, so the two cannot be diffed. Crashing every 2.7.4 user over
+ * an unverifiable assumption is worse than losing tree-size determinism, so this one stays soft.
  */
 @Mixin(value = DecoBigTree.class, remap = false)
 public class DecoBigTreeCtorMixin {
