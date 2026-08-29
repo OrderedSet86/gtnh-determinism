@@ -128,7 +128,12 @@ public class WorldgenProbe {
      * histograms cannot express single-column depth, so consumers were inferring it from the sandY span and
      * reading a thin blanket on a hillside as a deep pit; these measure it directly.
      */
-    public static final int REPORT_FORMAT = 3;
+    /**
+     * 4: adds per-chunk "o" (orphaned-tile-entity digest, omitted when the chunk has none) and makes the block
+     * digest self-delimiting via MSB/metadata presence markers. "b"/"s" therefore differ from format 3 — do not
+     * compare across the boundary.
+     */
+    public static final int REPORT_FORMAT = 4;
 
     public static final Object POP_LISTENER = new PopSeqHandler();
 
@@ -1843,12 +1848,19 @@ public class WorldgenProbe {
                 } else {
                     sec.update(ebs.getBlockLSBArray());
                     all.update(ebs.getBlockLSBArray());
+                    // Presence markers keep the digest stream SELF-DELIMITING. Without them a section carrying
+                    // metadata but no MSB and one carrying MSB but no metadata feed byte-identical streams, so two
+                    // genuinely different chunks can collide. Format 5 added these; digests differ from format 4.
                     final NibbleArray msb = ebs.getBlockMSBArray();
+                    sec.update((byte) (msb != null ? 1 : 0));
+                    all.update((byte) (msb != null ? 1 : 0));
                     if (msb != null) {
                         sec.update(msb.data);
                         all.update(msb.data);
                     }
                     final NibbleArray meta = ebs.getMetadataArray();
+                    sec.update((byte) (meta != null ? 1 : 0));
+                    all.update((byte) (meta != null ? 1 : 0));
                     if (meta != null) {
                         sec.update(meta.data);
                         all.update(meta.data);
@@ -1864,7 +1876,14 @@ public class WorldgenProbe {
             .append(hex(all.digest()))
             .append("\", \"t\": \"")
             .append(hashTileEntities(chunk))
-            .append("\"}");
+            .append("\"");
+        final String orphans = hashOrphanTileEntities(chunk);
+        if (orphans != null) {
+            out.append(", \"o\": \"")
+                .append(orphans)
+                .append("\"");
+        }
+        out.append("}");
         return out.toString();
     }
 
@@ -1893,14 +1912,36 @@ public class WorldgenProbe {
     }
 
     private static String hashTileEntities(Chunk chunk) throws Exception {
+        return digestTileEntities(chunk, false);
+    }
+
+    /**
+     * Digest of the chunk's ORPHANED tile entities — those whose block was overwritten later in worldgen while the
+     * TE lingered in the map — or null when the chunk has none.
+     *
+     * <p>
+     * These used to be dropped silently by {@link #teMatchesBlock} on the grounds that they only add launch-timing
+     * jitter. That was wrong in a way that matters: {@code Chunk.writeToNBT} persists the whole
+     * {@code chunkTileEntityMap}, so orphans are real state the player receives, and {@code diff-region-tes.py} —
+     * the persisted-world ground truth — does not filter them. The probe could therefore report IDENTICAL while
+     * the saved worlds differed. Roguelike chest carving is exactly this case, which is why
+     * {@code TreasureChestMixin.gtnhdet$isLive()} has to ask the block rather than the TE.
+     *
+     * <p>
+     * They stay OUT of {@code "t"} so that digest keeps its established meaning, and land in {@code "o"} instead:
+     * visible as a diff rather than silence, without conflating the two populations.
+     */
+    private static String hashOrphanTileEntities(Chunk chunk) throws Exception {
+        return digestTileEntities(chunk, true);
+    }
+
+    private static String digestTileEntities(Chunk chunk, boolean orphansOnly) throws Exception {
         final MessageDigest md = MessageDigest.getInstance("SHA-256");
         // Tile entities (chest loot etc.), canonicalized: sorted by position, NBT keys sorted recursively.
         final Map<String, TileEntity> tes = new TreeMap<>();
         for (Object o : chunk.chunkTileEntityMap.values()) {
             final TileEntity te = (TileEntity) o;
-            // Skip orphaned/mismatched TEs (block overwritten later in worldgen but the TE lingered in the map);
-            // they don't affect the persisted block/ore state and only add launch-timing jitter.
-            if (!teMatchesBlock(chunk, te)) continue;
+            if (teMatchesBlock(chunk, te) == orphansOnly) continue;
             tes.put(
                 te.xCoord + ","
                     + te.yCoord
@@ -1923,6 +1964,7 @@ public class WorldgenProbe {
             }
             md.update(canonicalNbt(tag).getBytes(StandardCharsets.UTF_8));
         }
+        if (orphansOnly && tes.isEmpty()) return null;
         return hex(md.digest());
     }
 
