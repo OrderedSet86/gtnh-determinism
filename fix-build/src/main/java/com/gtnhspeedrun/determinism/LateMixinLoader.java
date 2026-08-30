@@ -53,6 +53,11 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (loadedMods.contains("TConstruct")) {
             mixins.add("worldgen.SlimeIslandGenMixin");
         }
+        if (loadedMods.contains("TML")) {
+            // F9's second half. The first half is MinecraftServerLootMixin, which is unconditional because
+            // MinecraftServer loads long before late mixins run; it no-ops when TooMuchLoot is absent.
+            mixins.add("worldgen.TooMuchLootServerStartingMixin");
+        }
         if (loadedMods.contains("gregtech")) {
             mixins.add(gtOreMixin());
         }

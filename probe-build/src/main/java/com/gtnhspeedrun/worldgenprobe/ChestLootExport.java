@@ -31,7 +31,8 @@ import cpw.mods.fml.common.registry.GameRegistry;
  * <p>
  * Writes two files:
  * <ul>
- * <li>{@code chestloot.csv} — Forge {@code ChestGenHooks} plus Roguelike Dungeons, tagged by a {@code source} column.
+ * <li>{@code chestloot.csv} — Forge {@code ChestGenHooks}, Roguelike Dungeons and the Twilight Forest, tagged by a
+ * {@code source} column.
  * <li>{@code lootbags.csv} — EnhancedLootBags, which uses per-item percentages instead of weights and so cannot share
  * the other schema without making both misleading.
  * </ul>
@@ -45,6 +46,11 @@ import cpw.mods.fml.common.registry.GameRegistry;
  * <p>
  * Roguelike Dungeons does not use ChestGenHooks at all. It reads its own rules from
  * {@code config/roguelike_dungeons/settings}, which is why its loot is absent from the ChestGenHooks tables.
+ *
+ * <p>
+ * The Twilight Forest does not use it either. {@code TFTreasure.generate} places a vanilla chest and fills it from
+ * five static pools of its own, so TF loot is invisible to both the ChestGenHooks capture and the determinism jar's
+ * {@code WeightedRandomChestContent} chest fix. See {@link #captureTfTreasure()}.
  */
 public final class ChestLootExport {
 
@@ -53,10 +59,18 @@ public final class ChestLootExport {
     /** Rows accumulate here because "pre" and "post" are captured at different events but share one file. */
     private static final List<String> ROWS = new ArrayList<>();
 
-    /** Reading order: what the chest is, then what drops and how often, then the ids needed to look an item up. */
+    /**
+     * Reading order: what the chest is, then what drops and how often, then the ids needed to look an item up.
+     *
+     * <p>
+     * {@code enchant_level} is blank for every source but {@code tftreasure}. It cannot fold into {@code nbt},
+     * because TF applies it at draw time via {@code EnchantmentHelper.addRandomEnchantment} and so it is
+     * genuinely absent from the stored stack's tag. Appending a column rather than overloading one is safe here:
+     * the only consumer, {@code scripts/tc-chest-materials.py}, reads with {@code csv.DictReader}.
+     */
     private static final String HEADER = "source,phase,table,category,level,rolls_min,rolls_max,to_each,"
         + "display_name,weight,stack_min,stack_max,pool_total_weight,pick_chance_per_roll,"
-        + "registry_name,meta,entry_class,nbt";
+        + "registry_name,meta,entry_class,nbt,enchant_level";
 
     private ChestLootExport() {}
 
@@ -67,7 +81,30 @@ public final class ChestLootExport {
 
     // ---------------------------------------------------------------- ChestGenHooks
 
-    /** @param phase "pre" before TooMuchLoot has run, "post" after. */
+    private static boolean firstPopulateCaptured;
+
+    /**
+     * Capture the table as it stands when the world's FIRST chunk is populated — the only phase that answers "what
+     * did the spawn preload actually roll", independent of where in the server lifecycle a mod moves the rewrite.
+     *
+     * <p>
+     * {@code pre} is a lifecycle snapshot taken at {@code FMLServerAboutToStartEvent}. On a stock instance that is
+     * also what the preload rolls, so the two coincide and {@code pre} was a usable proxy. The determinism jar's F9
+     * applies TooMuchLoot at {@code MinecraftServer.loadAllWorlds} — later than {@code AboutToStart}, earlier than
+     * the first chunk — at which point {@code pre} still reports the old table while no chest ever uses it. Compare
+     * {@code firstpopulate} against {@code post}: equal means one table for the whole world.
+     */
+    public static synchronized void captureFirstPopulate() {
+        if (firstPopulateCaptured || dir() == null) return;
+        firstPopulateCaptured = true;
+        captureChestGenHooks("firstpopulate");
+    }
+
+    /**
+     * @param phase {@code pre} at FMLServerAboutToStart, {@code firstpopulate} at the world's first populated chunk,
+     *              {@code post} after server start. See {@link #captureFirstPopulate()} for why the middle one
+     *              exists.
+     */
     public static void captureChestGenHooks(String phase) {
         if (dir() == null) return;
         try {
@@ -238,6 +275,138 @@ public final class ChestLootExport {
         return n;
     }
 
+    // ---------------------------------------------------------------- Twilight Forest
+
+    /**
+     * Exports the static {@code TFTreasure} tables. Like Roguelike, the Twilight Forest never touches
+     * {@code ChestGenHooks}: {@code TFTreasure.generate} places a vanilla chest and fills it directly from its own
+     * five pools, which is also why the determinism jar's structure-chest fix — a mixin on
+     * {@code WeightedRandomChestContent} — does not reach a TF chest. It does not need to. TF's fill RNG is
+     * already position-derived and seed-pure: {@code treasureRNG.setSeed(world.getSeed() * x + y ^ z)}.
+     *
+     * <p>
+     * These tables are seed-independent, so one capture describes every world the pack generates. There is no
+     * {@code pre} phase for the same reason there is none for Roguelike: TooMuchLoot rewrites ChestGenHooks
+     * categories, not TFTreasure.
+     *
+     * <p>
+     * Roll counts and pool-selection odds are read out of {@code TFTreasure.generate}, {@code getCommonItem} and
+     * {@code getRareItem} rather than guessed. Each chest draws 4 common, 2 uncommon and 1 rare item, and the two
+     * paired pools are chosen by {@code !other.isEmpty() && rand.nextInt(4) == 0} — so {@code useless} and
+     * {@code ultrarare} take a quarter of their group's draws when they are populated, and {@code common} and
+     * {@code rare} take the rest.
+     */
+    public static void captureTfTreasure() {
+        if (dir() == null) return;
+        try {
+            final Map<String, Map<String, Object>> tables = TwilightForestProbe.treasureTables();
+            if (tables == null) {
+                LOG.info("[probe][lootcsv] Twilight Forest not loaded, skipping tftreasure");
+                return;
+            }
+            int rows = 0;
+            for (Map.Entry<String, Map<String, Object>> table : tables.entrySet()) {
+                final Map<String, Object> pools = table.getValue();
+                final boolean uselessFilled = !isEmptyPool(pools.get("useless"));
+                final boolean ultrarareFilled = !isEmptyPool(pools.get("ultrarare"));
+                for (String cat : TwilightForestProbe.TREASURE_CATEGORIES) {
+                    final Object pool = pools.get(cat);
+                    if (pool == null) continue;
+                    final List<?> items = TwilightForestProbe.treasureItems(pool);
+                    int total = 0;
+                    for (Object it : items) total += (Integer) TwilightForestProbe.treasureItem(it)[1];
+                    final String rolls = String.valueOf(rollsFor(cat));
+                    final String each = String.format("%.6f", toEachFor(cat, uselessFilled, ultrarareFilled));
+                    for (Object it : items) {
+                        final Object[] parts = TwilightForestProbe.treasureItem(it);
+                        final ItemStack stack = (ItemStack) parts[0];
+                        final int weight = (Integer) parts[1];
+                        final int ench = (Integer) parts[2];
+                        String reg = "", disp = "", nbt = "";
+                        int meta = 0, stackMax = 1;
+                        try {
+                            final Object name = Item.itemRegistry.getNameForObject(stack.getItem());
+                            reg = name != null ? name.toString() : stack.getUnlocalizedName();
+                            meta = stack.getItemDamage();
+                            disp = stack.getDisplayName();
+                            // getItemStack rolls nextInt(stackSize)+1 into a copy, so the stored size is the
+                            // maximum of a uniform 1..max draw, not a fixed count.
+                            stackMax = stack.stackSize;
+                            if (stack.getTagCompound() != null) nbt = stack.getTagCompound()
+                                .toString();
+                        } catch (Throwable t) {
+                            disp = "<item id does not resolve in this build>";
+                        }
+                        ROWS.add(
+                            rowRaw(
+                                "tftreasure",
+                                "",
+                                table.getKey(),
+                                cat,
+                                "",
+                                rolls,
+                                rolls,
+                                each,
+                                reg,
+                                meta,
+                                disp,
+                                String.valueOf(weight),
+                                "1",
+                                String.valueOf(stackMax),
+                                String.valueOf(total),
+                                total > 0 ? String.format("%.6f", (double) weight / total) : "0",
+                                "",
+                                nbt,
+                                ench > 0 ? String.valueOf(ench) : ""));
+                        rows++;
+                    }
+                }
+            }
+            LOG.info("[probe][lootcsv] tftreasure: {} tables, {} rows", tables.size(), rows);
+        } catch (Throwable t) {
+            LOG.error("[probe][lootcsv] tftreasure capture failed", t);
+        }
+    }
+
+    /** Draws per chest for a pool's slot group — the hardcoded loop bounds in {@code TFTreasure.generate}. */
+    private static int rollsFor(String category) {
+        switch (category) {
+            case "useless":
+            case "common":
+                return 4;
+            case "uncommon":
+                return 2;
+            case "rare":
+            case "ultrarare":
+                return 1;
+            default:
+                throw new IllegalArgumentException("unknown TFTreasure pool: " + category);
+        }
+    }
+
+    /** Probability this pool wins a draw of its slot group. See {@code getCommonItem}/{@code getRareItem}. */
+    private static double toEachFor(String category, boolean uselessFilled, boolean ultrarareFilled) {
+        switch (category) {
+            case "useless":
+                return uselessFilled ? 0.25 : 0;
+            case "common":
+                return uselessFilled ? 0.75 : 1;
+            case "uncommon":
+                return 1;
+            case "rare":
+                return ultrarareFilled ? 0.75 : 1;
+            case "ultrarare":
+                return ultrarareFilled ? 0.25 : 0;
+            default:
+                throw new IllegalArgumentException("unknown TFTreasure pool: " + category);
+        }
+    }
+
+    private static boolean isEmptyPool(Object pool) {
+        return pool == null || TwilightForestProbe.treasureItems(pool)
+            .isEmpty();
+    }
+
     // ---------------------------------------------------------------- EnhancedLootBags
 
     /**
@@ -389,6 +558,31 @@ public final class ChestLootExport {
     private static String rowRaw(String source, String phase, String table, String cat, String level, String rmin,
         String rmax, String each, String reg, int meta, String disp, String weight, String smin, String smax,
         String total, String chance, String cls, String nbt) {
+        return rowRaw(
+            source,
+            phase,
+            table,
+            cat,
+            level,
+            rmin,
+            rmax,
+            each,
+            reg,
+            meta,
+            disp,
+            weight,
+            smin,
+            smax,
+            total,
+            chance,
+            cls,
+            nbt,
+            "");
+    }
+
+    private static String rowRaw(String source, String phase, String table, String cat, String level, String rmin,
+        String rmax, String each, String reg, int meta, String disp, String weight, String smin, String smax,
+        String total, String chance, String cls, String nbt, String enchLevel) {
         return String.join(
             ",",
             q(source),
@@ -408,7 +602,8 @@ public final class ChestLootExport {
             q(reg),
             String.valueOf(meta),
             q(cls),
-            q(nbt));
+            q(nbt),
+            q(enchLevel));
     }
 
     @SuppressWarnings("unchecked")

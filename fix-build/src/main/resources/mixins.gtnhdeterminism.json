@@ -6,6 +6,12 @@
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
+    "worldgen.MinecraftServerLootMixin",
+    "worldgen.ChestGenHooksCaptureMixin",
+    "worldgen.StructureComponentChestMixin",
+    "worldgen.StructureStartPartsMixin",
+    "worldgen.ChunkPopulateBarrierMixin",
+    "worldgen.StructureChestFillMixin",
     "worldgen.SpawnVillagersMixin",
     "worldgen.SpawnerAnimalsMixin",
     "worldgen.EntitySheepMixin",

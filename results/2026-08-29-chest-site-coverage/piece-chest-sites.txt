@@ -1,0 +1,47 @@
+# Piece-to-chest-site table for the F10 fork.
+# Measured with -Dgtnhdet.chesttrace=true on GTNH daily-707, 4 seeds, radius 12.
+#
+# format: piece | loot category | site source | local (x,y,z) mixed into the fork
+#
+# box-relative entries always carry y=0. A mod piece's box.minY is a nominal value, not a ground
+# anchor, so y-minY would re-encode terrain height; it is excluded deliberately. See ChestFillContext.
+# Several pieces list more than one local XZ. That is the piece's orientation (coordBaseMode), which
+# Prefilter.predictVillagers already computes, not an instability.
+
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsBigHouse1 | vn_plains_house | box-relative | [(2, 0, 8), (8, 0, 4)]
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsCartographer1 | vn_cartographer | box-relative | [(4, 0, 3), (4, 0, 6)]
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsFisherCottage1 | vn_fisher | box-relative | [(4, 0, 6), (6, 0, 4), (6, 0, 6)]
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMediumHouse2 | vn_plains_house | box-relative | [(2, 0, 10), (10, 0, 2)]
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse7 | vn_plains_house | box-relative | [(4, 0, 5)]
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStable2 | dungeonChest | box-relative | [(-5, 0, 15), (-4, 0, 12)]
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTannery1 | vn_tannery | box-relative | [(5, 0, 7), (7, 0, 5)]
+astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsWeaponsmith1 | villageBlacksmith | box-relative | [(2, 0, 4), (6, 0, 4)]
+astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaButchersShop2 | vn_butcher | box-relative | [(6, 0, 5)]
+astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaCartographer1 | vn_cartographer | box-relative | [(6, 0, 4)]
+astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaMediumHouse1 | vn_savanna_house | box-relative | [(2, 0, 2)]
+astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaSmallHouse2 | vn_savanna_house | box-relative | [(2, 0, 4)]
+astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaTannery1 | vn_tannery | box-relative | [(2, 0, 4)]
+astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaWeaponsmith2 | villageBlacksmith | box-relative | [(9, 0, 2)]
+com.emoniph.witchery.worldgen.ComponentShack | dungeonChest | caller-local | [(1, 1, 2)]
+com.emoniph.witchery.worldgen.ComponentVillageApothecary | WG:PHOTOWORKSHOP | caller-local | [(7, 0, 1)]
+com.emoniph.witchery.worldgen.ComponentVillageApothecary | mineshaftCorridor | caller-local | [(7, 0, 1)]
+com.emoniph.witchery.worldgen.ComponentVillageApothecary | naturalistChest | caller-local | [(7, 0, 1)]
+com.emoniph.witchery.worldgen.ComponentVillageBookShop | TinkerHouse | box-relative | [(2, 0, 4)]
+com.emoniph.witchery.worldgen.ComponentVillageBookShop | dungeonChest | box-relative | [(2, 0, 4)]
+com.emoniph.witchery.worldgen.ComponentVillageBookShop | naturalistChest | box-relative | [(2, 0, 4)]
+com.emoniph.witchery.worldgen.ComponentVillageKeep | TinkerHouse | caller-local | [(13, 20, 12)]
+com.emoniph.witchery.worldgen.ComponentVillageKeep | dungeonChest | caller-local | [(13, 20, 12)]
+com.emoniph.witchery.worldgen.ComponentVillageWatchTower | TinkerHouse | caller-local | [(5, 13, 5)]
+com.emoniph.witchery.worldgen.ComponentVillageWatchTower | WG:PHOTOWORKSHOP | caller-local | [(5, 13, 5)]
+forestry.apiculture.worldgen.ComponentVillageBeeHouse | naturalistChest | caller-local | [(7, 1, 4)]
+mods.railcraft.common.worldgen.ComponentWorkshop | railcraft:workshop | box-relative | [(9, 0, 4), (9, 0, 6)]
+tconstruct.world.village.ComponentToolWorkshop | TinkerHouse | box-relative | [(1, 0, 2), (1, 0, 4), (2, 0, 1), (4, 0, 1)]
+tconstruct.world.village.ComponentToolWorkshop | TinkerHouse | caller-local | [(4, 1, 5)]
+tconstruct.world.village.ComponentToolWorkshop | TinkerPatterns | box-relative | [(1, 0, 2), (1, 0, 4), (2, 0, 1), (4, 0, 1)]
+thaumcraft.common.lib.world.ComponentWizardTower | towerChestContents | caller-local | [(2, 6, 2)]
+witchinggadgets.common.world.VillageComponentPhotoshop | WG:PHOTOWORKSHOP | caller-local | [(1, 1, 5)]
+
+# Chests with no structure component at all, still using the absolute-position fork (correctly):
+#    191  rwg.world.ChunkGeneratorRealistic.func_73153_a:524
+#      4  com.emoniph.witchery.worldgen.WitcheryComponent.setDispenser:100
+#      1  thaumcraft.common.lib.world.WorldGenGreatwoodTrees.generate:584

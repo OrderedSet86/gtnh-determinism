@@ -23,6 +23,12 @@
 #   PREFILTER_GATE_WATER        require >= N water columns in the terrain digest
 #   PROBE_JAVA         JVM to use; auto-detects a 17-21 JDK under ~/.gradle/jdks if unset
 #   PROBE_PORT         server port (default 25597 — off the probe/farm default to avoid collisions)
+#   PROBE_JVMFLAGS     extra -D flags, appended LAST so they override the ones set above. Until
+#                      2026-08-29 this variable was accepted by every other probe script and silently
+#                      ignored here, which makes an A/B look like it ran and report no difference.
+#                      (warm-probe.sh has the mirror-image trap: it places PROBE_JVMFLAGS BEFORE its
+#                      own -Dprobe.search, so PROBE_JVMFLAGS="-Dprobe.search=true" is overridden —
+#                      use PROBE_SEARCH=true there.)
 #
 # The probe jar must already be deployed: scripts/build-probe.sh --deploy <server-dir>.
 set -euo pipefail
@@ -117,4 +123,5 @@ GATES=""
   -Dprobe.prefilter.terrain="${PREFILTER_TERRAIN:-4}" \
   $GATES \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
+  ${PROBE_JVMFLAGS:-} \
   -jar "$LAUNCH_JAR" nogui < /dev/null

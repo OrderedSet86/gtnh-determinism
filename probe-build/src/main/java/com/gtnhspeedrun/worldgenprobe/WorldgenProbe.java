@@ -48,7 +48,9 @@ import cpw.mods.fml.common.event.FMLServerStartedEvent;
  *
  * Properties: -Dprobe.order=rows|cols|rows-reverse|spiral (required to activate) -Dprobe.radius=N (chunk radius to
  * hash, default 12; walks radius N+1 so the border can populate) -Dprobe.out=path (output file, default
- * ./probe-<order>.json)
+ * ./probe-<order>.json) -Dprobe.dim=N (dimension to walk, default 0 = overworld; 7 is the Twilight Forest in
+ * GTNH 2.8.4) -Dprobe.tffeatures=N (Twilight Forest feature map, region radius in 16-chunk regions; -1 or absent
+ * disables — independent of probe.dim, because the map reads biomes only and generates no chunks)
  */
 @Mod(
     modid = WorldgenProbe.MODID,
@@ -73,7 +75,14 @@ public class WorldgenProbe {
      * the live PropertyManager and the probe params into system properties, then lets startServer continue: seed
      * parse -> loadAllWorlds -> FMLServerStartedEvent -> normal probe run.
      */
-    /** Population-order trace: records the exact sequence chunks get populated, for cascade forensics. */
+    /**
+     * Population-order trace: records the exact sequence chunks get populated, for cascade forensics.
+     *
+     * Scoped to {@link #probeDim()}, so the trace always describes the dimension under test. At the default
+     * probe.dim=0 both the guard and the emitted "P:x,z"/"G:x,z" strings are unchanged, and every stored corpus
+     * stays comparable. With probe.dim=7 the overworld spawn preload drops out of the trace, which is the
+     * desired reading — the report's "dim" field says which dimension the sequence belongs to.
+     */
     public static final List<String> POP_SEQ = new ArrayList<>();
 
     /** FML's ASMEventHandler needs a public named class — anonymous listeners throw during event dispatch. */
@@ -81,7 +90,7 @@ public class WorldgenProbe {
 
         @cpw.mods.fml.common.eventhandler.SubscribeEvent
         public void onPopulate(net.minecraftforge.event.terraingen.PopulateChunkEvent.Pre e) {
-            if (e.world == null || e.world.provider.dimensionId != 0) return;
+            if (e.world == null || e.world.provider.dimensionId != probeDim()) return;
             synchronized (POP_SEQ) {
                 POP_SEQ.add("P:" + e.chunkX + "," + e.chunkZ);
             }
@@ -90,7 +99,7 @@ public class WorldgenProbe {
         /** Fires when a chunk enters the provider — for fresh chunks this is generation order (incl. cascades). */
         @cpw.mods.fml.common.eventhandler.SubscribeEvent
         public void onChunkLoad(net.minecraftforge.event.world.ChunkEvent.Load e) {
-            if (e.world == null || e.world.provider.dimensionId != 0) return;
+            if (e.world == null || e.world.provider.dimensionId != probeDim()) return;
             String entry = "G:" + e.getChunk().xPosition + "," + e.getChunk().zPosition;
             if (Boolean.getBoolean("probe.tracestacks")) {
                 // name the code that triggered this cascade: first non-vanilla, non-probe frames
@@ -142,7 +151,33 @@ public class WorldgenProbe {
      * species off world.rand while every other draw uses the populate-seeded Random), so a per-chunk entity key
      * would differ between any two runs and swamp the villager signal it was added to measure.
      */
-    public static final int REPORT_FORMAT = 5;
+    /**
+     * 6: adds top-level "dim" (0 = overworld; absent in every earlier corpus), "center"/"centerSource" (walk-centre
+     * provenance, never recorded before), and the opt-in "tffeatures" section (-Dprobe.tffeatures=N). "dim" is
+     * load-bearing rather than informational: with -Dprobe.dim != 0 the "chunks" and "search" sections describe
+     * that dimension, so a format-5 reader pooling a directory would blend dimensions silently. "spawnextra" is
+     * empty for dim != 0 — recreateWorlds replicates initialWorldChunkLoad for the overworld only, so there is no
+     * preload region elsewhere to hash. At probe.dim=0 every other section is byte-identical to format 5.
+     */
+    /**
+     * 7: adds per-chunk "biomeCounts" to the "search" section — the full 256-column biome census from
+     * Chunk.getBiomeArray(), raw ids including the 255 "unset" sentinel. The existing "biome"/"biomeId" fields
+     * sample one column (the chunk centre) and are unchanged, so a format-6 reader is unaffected; what is new is
+     * that "is every column here a no-rain biome" becomes answerable at all, which the centre sample cannot do
+     * under RWG's per-column biome draw and river painting. Also emits the biomes.json sidecar next to the
+     * report. Every other section is byte-identical to format 6.
+     */
+    public static final int REPORT_FORMAT = 7;
+
+    /**
+     * Dimension the probe walks and reports. 0 = overworld, which is what every pre-format-6 corpus contains.
+     *
+     * Read live rather than cached: the daemon rewrites probe.dim between jobs, long after PopSeqHandler was
+     * registered, so a cached static would answer for the wrong job.
+     */
+    static int probeDim() {
+        return Integer.getInteger("probe.dim", 0);
+    }
 
     public static final Object POP_LISTENER = new PopSeqHandler();
 
@@ -190,6 +225,7 @@ public class WorldgenProbe {
             if (jRadius != null) System.setProperty("probe.radius", jRadius);
             if (jOut != null) System.setProperty("probe.out", jOut);
             setOrClear("probe.search", jsonField(json, "search"));
+            setOrClear("probe.dim", jsonField(json, "dim"));
             setOrClear("probe.dim0only", jsonField(json, "dim0only"));
             setOrClear("probe.nohash", jsonField(json, "nohash"));
             injectLevelSeed(seed);
@@ -238,12 +274,35 @@ public class WorldgenProbe {
     }
 
     /**
-     * Last hook before {@code startServer()}, so this is the table the spawn preload will generate against. TooMuchLoot
-     * does not run until {@code FMLServerStartingEvent}, which is after the preload — see {@link ChestLootExport}.
+     * Fires on the world's first populated chunk and captures the loot table exactly once. Registered here rather
+     * than folded into {@link PopSeqHandler}, which is only registered at server-started and so would miss the
+     * whole spawn preload — and kept separate so POP_SEQ's contents stay comparable with existing corpora.
+     */
+    public static final class FirstPopulateLootHandler {
+
+        @cpw.mods.fml.common.eventhandler.SubscribeEvent
+        public void onPopulate(net.minecraftforge.event.terraingen.PopulateChunkEvent.Pre e) {
+            // Deliberately dim 0, NOT probeDim(): the question this answers is "what table did the spawn preload
+            // roll", and the preload is a loadAllWorlds step that only ever touches the overworld. It also
+            // captures once per JVM, so retargeting it would replace a correct answer with a worse one and
+            // silently change chestloot.csv for every -Dprobe.lootcsv run. Twilight Forest gains nothing from a
+            // change here anyway: TFTreasure fills its chests directly and never touches ChestGenHooks.
+            if (e.world == null || e.world.provider.dimensionId != 0) return;
+            ChestLootExport.captureFirstPopulate();
+        }
+    }
+
+    /**
+     * Last hook before {@code startServer()}. On a stock instance this is also the table the spawn preload rolls,
+     * because TooMuchLoot does not run until {@code FMLServerStartingEvent}, which is after the preload. That
+     * equality does NOT hold once a mod moves the rewrite earlier — the determinism jar's F9 applies it at
+     * {@code MinecraftServer.loadAllWorlds} — so the phase that actually answers "what did the preload roll" is
+     * {@code firstpopulate}, captured by the handler above. See {@link ChestLootExport#captureFirstPopulate()}.
      */
     @Mod.EventHandler
     public void serverAboutToStart(FMLServerAboutToStartEvent event) {
         ChestLootExport.captureChestGenHooks("pre");
+        if (ChestLootExport.dir() != null) MinecraftForge.EVENT_BUS.register(new FirstPopulateLootHandler());
     }
 
     @Mod.EventHandler
@@ -252,6 +311,7 @@ public class WorldgenProbe {
             final File cfg = new File("config");
             ChestLootExport.captureChestGenHooks("post");
             ChestLootExport.captureRoguelike(cfg);
+            ChestLootExport.captureTfTreasure();
             // Witchery needs no capture of its own: its stone-circle refilling chests and its worldgen components
             // read the dungeonChest and mineshaftCorridor categories rather than registering a table.
             ChestLootExport.writeCombined(ChestLootExport.dir());
@@ -294,8 +354,9 @@ public class WorldgenProbe {
                 runWarmBatch(parseSeeds(seedsSpec), order, radius, out);
             } else {
                 runProbe(
-                    FMLCommonHandler.instance()
-                        .getMinecraftServerInstance().worldServers[0],
+                    probeTargetWorld(
+                        FMLCommonHandler.instance()
+                            .getMinecraftServerInstance().worldServers[0]),
                     order,
                     radius,
                     out);
@@ -313,7 +374,9 @@ public class WorldgenProbe {
      * Warm job-queue daemon (-Dprobe.daemon=<control-dir>): boot once, then park on the server thread polling
      * <control-dir>/queue/ for job files. Each job is a one-line JSON:
      * {"seed": N, "order": "rows", "radius": 8, "out": "/abs/path.json", "search": false, "tedetail": false,
-     * "teraw": "cx,cz", "cx": N, "cz": N} — only seed and out are required. Jobs run in filename sort order, each as
+     * "teraw": "cx,cz", "cx": N, "cz": N, "dim": N} — only seed and out are required. "dim" selects the dimension
+     * to walk (0 = overworld, 7 = Twilight Forest); it must not name a dimension that "dim0only" excluded. Jobs
+     * run in filename sort order, each as
      * a full warm cycle (teardown, static reset, recreate, probe). Job files move to done/ (or failed/) with a
      * .status file (millis + error). Touch <control-dir>/stop to shut the daemon down. Worldgen must run on the
      * server thread, so this loop intentionally never returns to the tick loop.
@@ -408,6 +471,7 @@ public class WorldgenProbe {
                 setOrClear("probe.search", jsonField(json, "search"));
                 setOrClear("probe.tedetail", jsonField(json, "tedetail"));
                 setOrClear("probe.tracestacks", jsonField(json, "tracestacks"));
+                setOrClear("probe.dim", jsonField(json, "dim"));
                 setOrClear("probe.dim0only", jsonField(json, "dim0only"));
                 setOrClear("probe.teraw", jsonField(json, "teraw"));
                 setOrClear("probe.tefiltered", jsonField(json, "tefiltered"));
@@ -418,13 +482,13 @@ public class WorldgenProbe {
                 ensurePostBootLootSnapshot();
                 teardownAllWorlds(server);
                 resetStatics();
-                restoreLootTables(lootSnapPre, "pre-server");
+                restoreLootTables(lootSnapForPreload(), "preload");
                 recreateWorlds(server, seed, worldType, genOpts);
                 restoreLootTables(lootSnapPost, "post-boot");
                 final WorldServer over = DimensionManager.getWorld(0);
                 if (over == null || over.getSeed() != seed)
                     throw new IllegalStateException("recreated overworld missing or wrong seed");
-                runProbe(over, order, radius, outS);
+                runProbe(probeTargetWorld(over), order, radius, outS);
             } catch (Exception e) {
                 error = e.toString();
                 LOG.error("[probe] job {} failed", job.getName(), e);
@@ -649,7 +713,7 @@ public class WorldgenProbe {
                     }
                 }
             } else {
-                restoreLootTables(lootSnapPre, "pre-server"); // spawn preload must see cold-boot table state
+                restoreLootTables(lootSnapForPreload(), "preload"); // must match what a cold boot's preload used
             }
             recreateWorlds(server, seeds[i], worldType, genOpts);
             restoreLootTables(lootSnapPost, "post-boot"); // the walk generates with fully-loaded tables
@@ -665,7 +729,7 @@ public class WorldgenProbe {
             String slotOut = outFor(outTemplate, seeds[i]);
             // repeated seed in one batch (self-contamination tests): don't clobber the earlier slot's JSON
             if (new File(slotOut).exists()) slotOut = slotOut + ".slot" + (i + 1);
-            runProbe(over, order, radius, slotOut);
+            runProbe(probeTargetWorld(over), order, radius, slotOut);
         }
     }
 
@@ -690,13 +754,18 @@ public class WorldgenProbe {
     }
 
     /** Mirrors MinecraftServer.stopServer() minus saving: Unload events, flush, deregister, drain IO, delete save. */
-    /** leakcheck: weakly track torn-down dim0 worlds so surviving ones can be path-hunted. */
+    /**
+     * leakcheck: weakly track torn-down dim0 worlds so surviving ones can be path-hunted. The probe dimension is
+     * tracked too when it is not dim 0: a probe.dim=7 warm batch builds one extra full WorldServer and chunk map
+     * per slot, which is exactly the population this hunter exists to find.
+     */
     private static final List<java.lang.ref.WeakReference<Object>> LEAK_TRACK = new ArrayList<>();
 
     private static void teardownAllWorlds(MinecraftServer server) throws Exception {
         final File worldDir = new File(server.getFolderName());
         for (WorldServer ws : DimensionManager.getWorlds()) {
-            if (Boolean.getBoolean("probe.leakcheck") && ws.provider.dimensionId == 0) {
+            if (Boolean.getBoolean("probe.leakcheck")
+                && (ws.provider.dimensionId == 0 || ws.provider.dimensionId == probeDim())) {
                 LEAK_TRACK.add(new java.lang.ref.WeakReference<Object>(ws));
             }
             MinecraftForge.EVENT_BUS.post(new WorldEvent.Unload(ws));
@@ -707,6 +776,10 @@ public class WorldgenProbe {
         warnIfChunkIOPending();
         deleteRecursively(worldDir);
         if (worldDir.exists()) throw new IllegalStateException("could not delete " + worldDir.getAbsolutePath());
+        // The stale-level.dat guard in recreateWorlds proves the save directory is gone; this proves the probe
+        // dimension is actually deregistered, so the next slot cannot walk the previous seed's world.
+        if (DimensionManager.getWorld(probeDim()) != null)
+            throw new IllegalStateException("dimension " + probeDim() + " survived teardown");
     }
 
     /** Probe loads chunks synchronously so Forge's async ChunkIOExecutor queue should be empty; verify. */
@@ -941,8 +1014,27 @@ public class WorldgenProbe {
      * every category's contents list at the FIRST between-seed reset (post-boot state = what a cold run's walk
      * starts from) and restore before each slot, logging any drift so the mutating mod is named in the log.
      */
-    private static java.util.Map<String, java.util.List<Object>> lootSnapPre; // at FMLLoadComplete (pre-TML)
-    private static java.util.Map<String, java.util.List<Object>> lootSnapPost; // post-boot (post-TML)
+    private static java.util.Map<String, LootSnap> lootSnapPre; // at FMLLoadComplete (pre-TML)
+    private static java.util.Map<String, LootSnap> lootSnapPost; // post-boot (post-TML)
+
+    /**
+     * One category's full restorable state. Restoring only {@code contents} rebuilds a table that never existed:
+     * TooMuchLoot moves {@code countMin}/{@code countMax} as well as the item pool ({@code villageBlacksmith} is
+     * 3-9 pre and 4-11 post), so a contents-only restore pairs the pristine pool with the mutated roll count, and
+     * the extra {@code generateChestContents} iterations then shift every later draw in that chunk.
+     */
+    private static final class LootSnap {
+
+        final java.util.List<Object> contents;
+        final int min;
+        final int max;
+
+        LootSnap(java.util.List<Object> contents, int min, int max) {
+            this.contents = contents;
+            this.min = min;
+            this.max = max;
+        }
+    }
 
     @SuppressWarnings("unchecked")
     private static Map<String, net.minecraftforge.common.ChestGenHooks> chestInfo() throws Exception {
@@ -958,12 +1050,71 @@ public class WorldgenProbe {
         return f;
     }
 
+    /**
+     * Report the determinism jar's F10 counters, so a run says how many structure chests were re-derived from
+     * position and how many fell back to stock's roll. A fix that silently does nothing looks exactly like a fix
+     * that works, and the fallback path is the one that would hide.
+     */
+    private static void logChestFillStats() {
+        try {
+            LOG.info(
+                "[probe][loot] F10 structure chests: {}",
+                Class.forName("com.gtnhspeedrun.determinism.worldgen.ChestFillContext")
+                    .getMethod("stats")
+                    .invoke(null));
+        } catch (ClassNotFoundException | NoSuchMethodException absent) {
+            // determinism jar not installed, or older than F10
+        } catch (Exception e) {
+            LOG.warn("[probe][loot] could not read F10 counters: {}", e.toString());
+        }
+    }
+
+    /**
+     * Which snapshot a replicated spawn preload must generate against, i.e. what a real cold boot would have used.
+     *
+     * <p>
+     * On a stock instance that is the pre-TooMuchLoot table: a cold boot preloads inside {@code loadAllWorlds},
+     * before {@code FMLServerStartingEvent}. Restoring the post table there was the 2.8.4 warm-slot contamination —
+     * 17 wrong chests per seed, all inside the preload radius, deterministic and therefore invisible to
+     * warm[A-&gt;A] self-tests.
+     *
+     * <p>
+     * With the determinism jar's F9 the split no longer exists: TooMuchLoot is applied at {@code loadAllWorlds}
+     * before any chunk, so a cold boot's preload rolls the post table and the warm path must match. Restoring
+     * {@code pre} under F9 would be the same contamination with the sign flipped.
+     */
+    private static java.util.Map<String, LootSnap> lootSnapForPreload() {
+        if (f9Active()) return lootSnapPost;
+        return lootSnapPre;
+    }
+
+    private static Boolean f9Cache;
+
+    private static boolean f9Active() {
+        if (f9Cache == null) {
+            try {
+                Class.forName("com.gtnhspeedrun.determinism.worldgen.EarlyLootTables");
+                f9Cache = Boolean.TRUE;
+                LOG.info("[probe][loot] determinism jar F9 present — replicated preloads use the post-TML table");
+            } catch (ClassNotFoundException absent) {
+                f9Cache = Boolean.FALSE;
+            }
+        }
+        return f9Cache;
+    }
+
     @SuppressWarnings("unchecked")
-    private static java.util.Map<String, java.util.List<Object>> captureLootTables() throws Exception {
+    private static java.util.Map<String, LootSnap> captureLootTables() throws Exception {
         final java.lang.reflect.Field contentsF = lootContentsField();
-        final java.util.Map<String, java.util.List<Object>> snap = new java.util.HashMap<>();
+        final java.util.Map<String, LootSnap> snap = new java.util.HashMap<>();
         for (Map.Entry<String, net.minecraftforge.common.ChestGenHooks> e : chestInfo().entrySet()) {
-            snap.put(e.getKey(), new ArrayList<>((java.util.List<Object>) contentsF.get(e.getValue())));
+            final net.minecraftforge.common.ChestGenHooks hooks = e.getValue();
+            snap.put(
+                e.getKey(),
+                new LootSnap(
+                    new ArrayList<>((java.util.List<Object>) contentsF.get(hooks)),
+                    hooks.getMin(),
+                    hooks.getMax()));
         }
         return snap;
     }
@@ -974,36 +1125,50 @@ public class WorldgenProbe {
         lootSnapPost = captureLootTables();
         LOG.info("[probe] post-boot loot snapshot: {} categories", lootSnapPost.size());
         if (lootSnapPre != null) {
-            for (Map.Entry<String, java.util.List<Object>> e : lootSnapPost.entrySet()) {
-                final java.util.List<Object> pre = lootSnapPre.get(e.getKey());
-                if (pre != null && !lootDigest(pre).equals(lootDigest(e.getValue()))) {
+            for (Map.Entry<String, LootSnap> e : lootSnapPost.entrySet()) {
+                final LootSnap pre = lootSnapPre.get(e.getKey());
+                final LootSnap post = e.getValue();
+                if (pre == null) continue;
+                final boolean rolls = pre.min != post.min || pre.max != post.max;
+                if (!lootDigest(pre.contents).equals(lootDigest(post.contents)) || rolls) {
                     LOG.info(
                         "[probe][loot] category {} is mutated between load-complete and server-started "
-                            + "({} -> {} entries) — spawn-preload chests roll the FORMER in cold boots:",
+                            + "({} -> {} entries, rolls {}-{} -> {}-{}) — spawn-preload chests roll the FORMER "
+                            + "in cold boots:",
                         e.getKey(),
-                        pre.size(),
-                        e.getValue()
-                            .size());
-                    logLootDiff(e.getKey(), pre, e.getValue());
+                        pre.contents.size(),
+                        post.contents.size(),
+                        pre.min,
+                        pre.max,
+                        post.min,
+                        post.max);
+                    logLootDiff(e.getKey(), pre.contents, post.contents);
                 }
             }
         }
     }
 
     @SuppressWarnings("unchecked")
-    private static void restoreLootTables(java.util.Map<String, java.util.List<Object>> snap, String label)
-        throws Exception {
+    private static void restoreLootTables(java.util.Map<String, LootSnap> snap, String label) throws Exception {
         if (snap == null) {
             LOG.warn("[probe][loot] {} snapshot missing — cannot restore", label);
             return;
         }
         final java.lang.reflect.Field contentsF = lootContentsField();
         for (Map.Entry<String, net.minecraftforge.common.ChestGenHooks> e : chestInfo().entrySet()) {
-            final java.util.List<Object> live = (java.util.List<Object>) contentsF.get(e.getValue());
-            final java.util.List<Object> want = snap.get(e.getKey());
+            final LootSnap want = snap.get(e.getKey());
             if (want == null) continue; // category appeared later; leave as-is
+            final net.minecraftforge.common.ChestGenHooks hooks = e.getValue();
+            final java.util.List<Object> live = (java.util.List<Object>) contentsF.get(hooks);
             live.clear();
-            live.addAll(want);
+            live.addAll(want.contents);
+            // Roll counts are part of the table. villageBlacksmith is the category this actually moves.
+            hooks.setMin(want.min);
+            hooks.setMax(want.max);
+        }
+        final net.minecraftforge.common.ChestGenHooks bs = chestInfo().get("villageBlacksmith");
+        if (bs != null) {
+            LOG.info("[probe][loot] restored {} — villageBlacksmith rolls {}-{}", label, bs.getMin(), bs.getMax());
         }
     }
 
@@ -1135,6 +1300,12 @@ public class WorldgenProbe {
 
     /** Replicates the loadAllWorlds body (it is protected) minus demo/bonus-chest/initialWorldChunkLoad. */
     private static void recreateWorlds(MinecraftServer server, long seed, WorldType worldType, String genOpts) {
+        // Scope the fix jar's worldgen traces to the world we are about to generate. A warm run also generates
+        // the server's own boot world, and instrumentation cannot otherwise tell the two apart — a trace corpus
+        // that mixed them produced two wrong findings before it was caught. A system property keeps this
+        // dependency-free in both directions; the fix jar treats "unset" as "trace everything", so cold runs and
+        // standalone use are unaffected.
+        System.setProperty("gtnhdet.tracescope", Long.toString(seed));
         final ISaveHandler sh = server.getActiveAnvilConverter()
             .getSaveLoader(server.getFolderName(), true);
         if (sh.loadWorldInfo() != null)
@@ -1150,9 +1321,14 @@ public class WorldgenProbe {
         // probe.dim0only: skip recreating the ~12 non-overworld static dims per slot. Overworld probing never
         // touches them, and each recreated WorldServerMulti set stays pinned by mod dim-bookkeeping (measured
         // ~12 leaked worlds/slot in the 20-cycle jmap check) — dim0-only keeps long daemon batches flat.
+        //
+        // The probe dimension is always exempt, so the flag now reads "dim 0 plus the dimension under test". The
+        // name is kept because renaming it would touch warm-probe.sh, seed-search.sh, probe-queue.sh, the daemon
+        // job parser and the CRIU handler at once. At probe.dim=0 the loop is bit-identical to before.
         final boolean dim0Only = Boolean.getBoolean("probe.dim0only");
+        final int probeDim = probeDim();
         for (int dim : DimensionManager.getStaticDimensionIDs()) {
-            if (dim0Only && dim != 0) continue;
+            if (dim0Only && dim != 0 && dim != probeDim) continue;
             final WorldServer w = dim == 0 ? over
                 : new WorldServerMulti(server, sh, server.getFolderName(), dim, settings, over, server.theProfiler);
             w.addWorldAccess(new WorldManager(server, w));
@@ -1189,14 +1365,96 @@ public class WorldgenProbe {
         }
     }
 
+    /**
+     * Resolves the world the walk runs in from -Dprobe.dim, defaulting to the overworld it is handed.
+     *
+     * The seed equality check is the generic form of the Twilight Forest seed hazard: Forge's
+     * {@code World.getSeed()} delegates to {@code provider.getSeed()}, so any provider that overrides it can
+     * decouple its dimension from the world seed and make every seed in a batch generate the same world.
+     * {@link #assertTwilightForestPreconditions} names the TF case specifically so the error is actionable; this
+     * catches every other one structurally.
+     */
+    private static WorldServer probeTargetWorld(WorldServer over) {
+        final int dim = probeDim();
+        if (dim == 0) return over;
+        final WorldServer target = DimensionManager.getWorld(dim);
+        if (target == null) throw new IllegalStateException(
+            "-Dprobe.dim=" + dim
+                + " but that dimension does not exist. Either the id is wrong, or -Dprobe.dim0only skipped it "
+                + "(it exempts the probe dimension, so this means the flag was read before probe.dim was set).");
+        if (target.getSeed() != over.getSeed()) {
+            // Give the dimension-specific check the first word: it names the config key responsible,
+            // which this generic message cannot. It throws when it recognises the cause; if it
+            // returns, fall through and report what we do know.
+            assertTwilightForestPreconditions();
+            throw new IllegalStateException(
+                "dimension " + dim
+                    + " reports seed "
+                    + target.getSeed()
+                    + " but the overworld is "
+                    + over.getSeed()
+                    + " — its WorldProvider overrides getSeed(), so this dimension does not follow the world seed");
+        }
+        return target;
+    }
+
+    /**
+     * Hard-fails the run when the Twilight Forest is configured in a way that silently invalidates the report.
+     *
+     * Runs before the walk so a misconfiguration costs milliseconds rather than minutes of generation. Reads the
+     * live statics rather than parsing config/TwilightForest.cfg: {@code registerWorldChunkManager} copies
+     * {@code TwilightForestMod.dimensionID} into {@code provider.dimensionId}, so the static is the runtime truth.
+     */
+    private static void assertTwilightForestPreconditions() {
+        final Class<?> mod = TwilightForestProbe.modClass();
+        if (mod == null) {
+            if (TwilightForestProbe.regionRadius() >= 0)
+                throw new IllegalStateException("-Dprobe.tffeatures is set but Twilight Forest is not loaded");
+            return; // probe.dim names some non-TF dimension in a pack without TF: nothing to check.
+        }
+        // Only when TF data is actually being produced. Probing some other dimension (say the Nether) with TF
+        // merely installed must not fail here.
+        if (probeDim() != TwilightForestProbe.dimensionId() && TwilightForestProbe.regionRadius() < 0) return;
+        try {
+            final Object seedOverride = mod.getField("twilightForestSeed")
+                .get(null);
+            if (seedOverride != null && !seedOverride.toString()
+                .isEmpty())
+                throw new IllegalStateException(
+                    "config/TwilightForest.cfg S:TwilightForestSeed is set to \"" + seedOverride
+                        + "\". WorldProviderTwilightForest.getSeed() then returns that string's hashCode instead of "
+                        + "the world seed, and Forge's World.getSeed() delegates to the provider — so TF terrain, "
+                        + "TF features and every GT ore-vein seed in TF become independent of the world seed. "
+                        + "Every seed in this batch would produce an identical Twilight Forest.");
+            if (mod.getField("oldMapGen")
+                .getBoolean(null))
+                throw new IllegalStateException(
+                    "config/TwilightForest.cfg B:OldMapGen=true selects the pre-1.7 feature grid "
+                        + "(generateFeatureForOldMapGen / getNearestCenterXYZOld). The emitted feature map would "
+                        + "describe geometry this world does not have.");
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not read TwilightForestMod configuration statics", e);
+        }
+    }
+
     private void runProbe(WorldServer world, String order, int radius, String out) throws Exception {
         final long seed = world.getSeed();
+        final int dim = probeDim();
         final int walkR = radius + 1;
-        LOG.info("[probe] seed={} order={} radius={} (walking r={})", seed, order, radius, walkR);
+        LOG.info("[probe] seed={} dim={} order={} radius={} (walking r={})", seed, dim, order, radius, walkR);
+        if (dim != 0 || TwilightForestProbe.regionRadius() >= 0) assertTwilightForestPreconditions();
 
         // In search mode the region of interest is the spawn neighborhood (chest sweep is spawn-relative), so
         // default the walk center to the spawn chunk; explicit probe.cx/cz still override.
+        //
+        // This is also the right centre for a Twilight Forest walk and needs no special case: WorldServerMulti
+        // gives dim 7 a DerivedWorldInfo, and TF adds no getSpawnPoint override, so getSpawnPoint() there IS the
+        // overworld spawn. TF is 1:1 with the overworld in X/Z (WorldProviderTwilightForest does not override
+        // getMovementFactor, unlike the Nether's 8.0), so a portal built at the overworld spawn arrives here.
         final boolean searchMode = Boolean.getBoolean("probe.search");
+        final String centerSource = System.getProperty("probe.cx") != null || System.getProperty("probe.cz") != null
+            ? "explicit"
+            : searchMode ? "spawn" : "origin";
         final int cx = Integer.getInteger("probe.cx", searchMode ? world.getSpawnPoint().posX >> 4 : 0);
         final int cz = Integer.getInteger("probe.cz", searchMode ? world.getSpawnPoint().posZ >> 4 : 0);
         final List<int[]> walk = buildWalk(order, walkR);
@@ -1247,8 +1505,12 @@ public class WorldgenProbe {
         // The spawn preload region (spawn chunk ±12) is always generated — hash whatever part of it falls outside
         // the main window too, as a separate section so existing corpus comparisons stay valid. Generated-but-
         // unmeasured chunks are how the dungeon divergence hid from earlier runs.
+        //
+        // Dim 0 only: recreateWorlds replicates initialWorldChunkLoad for the overworld alone, so in any other
+        // dimension there is no preload region and this loop would GENERATE up to 625 fresh chunks and hash them
+        // into a section named for a preload that never ran.
         final Map<String, String> spawnExtra = new TreeMap<>();
-        {
+        if (dim == 0) {
             final int scx = world.getSpawnPoint().posX >> 4;
             final int scz = world.getSpawnPoint().posZ >> 4;
             for (int x = scx - 12; x <= scx + 12; x++) {
@@ -1262,7 +1524,10 @@ public class WorldgenProbe {
                 }
             }
         }
-        final String structures = dumpVillages(world);
+        // Villages are an overworld generator. In any other dimension villageStructureMap finds no MapGenVillage
+        // and returns its "not found" string, which reads as a failure rather than a not-applicable. Emit an
+        // empty array instead so the key keeps its type for every consumer.
+        final String structures = dim == 0 ? dumpVillages(world) : "[]";
         final String witchery = dumpWitcheryStructures();
         // Opt-in: entity sections are absent from format-4 corpora, and the worldgen animal-species defect makes
         // the census differ between any two runs until that is fixed.
@@ -1275,7 +1540,15 @@ public class WorldgenProbe {
             LOG.info("[probe] entities: {} in window, villager lines follow in report", ents.size());
         }
         final String search = Boolean.getBoolean("probe.search") ? buildSearchReport(world, radius, cx, cz) : null;
-        if (search != null) dumpGtMaterialsOnce(new File(out).getParentFile());
+        // Independent of probe.dim: the map reads biomes only, and World.getBiomeGenForCoords falls through to
+        // the chunk manager for unloaded chunks, so an ordinary dim-0 run emits it without generating anything.
+        final String tfFeatures = TwilightForestProbe.buildFeatureMap(radius, cx, cz);
+        if (search != null) {
+            dumpGtMaterialsOnce(new File(out).getParentFile());
+            // Same sidecar contract as gtmats.json: seed-independent, written once, read back by the Python
+            // side. Corpora need it so a biome id resolves to rain/humidity without hardcoding a pack's table.
+            BiomeTable.dumpOnce(new File(out).getParentFile(), world.getWorldChunkManager());
+        }
         final StringBuilder tedetail = new StringBuilder();
         if (Boolean.getBoolean("probe.tedetail")) {
             tedetail.append(",\n  \"tedetail\": {\n");
@@ -1335,11 +1608,19 @@ public class WorldgenProbe {
             .append(REPORT_FORMAT)
             .append(",\n  \"seed\": ")
             .append(seed)
+            .append(",\n  \"dim\": ")
+            .append(dim)
             .append(",\n  \"order\": \"")
             .append(order)
             .append("\",\n  \"radius\": ")
             .append(radius)
-            .append(",\n  \"chunks\": {\n");
+            .append(",\n  \"center\": [")
+            .append(cx)
+            .append(", ")
+            .append(cz)
+            .append("],\n  \"centerSource\": \"")
+            .append(centerSource)
+            .append("\",\n  \"chunks\": {\n");
         boolean first = true;
         for (Map.Entry<String, String> e : hashes.entrySet()) {
             if (!first) sb.append(",\n");
@@ -1382,6 +1663,7 @@ public class WorldgenProbe {
             .append(villagePieces == null ? "" : ",\n  \"villagepieces\": " + villagePieces)
             .append(entityCensus == null ? "" : ",\n  \"entities\": " + entityCensus)
             .append(search == null ? "" : ",\n  \"search\": " + search)
+            .append(tfFeatures == null ? "" : ",\n  \"tffeatures\": " + tfFeatures)
             .append(tedetail)
             .append("\n}\n");
         final File f = new File(out);
@@ -1389,6 +1671,7 @@ public class WorldgenProbe {
             w.write(sb.toString());
         }
         LOG.info("[probe] wrote {} chunk hashes to {}", hashes.size(), f.getAbsolutePath());
+        logChestFillStats();
 
         final String tefiltered = System.getProperty("probe.tefiltered");
         if (tefiltered != null) {
@@ -1505,6 +1788,25 @@ public class WorldgenProbe {
                 final int ccx = c.xPosition, ccz = c.zPosition;
                 final net.minecraft.world.biome.BiomeGenBase biome = world
                     .getBiomeGenForCoords((ccx << 4) + 8, (ccz << 4) + 8);
+                // Full per-column biome census, because "biome" above is ONE column of 256 (the chunk centre).
+                // A chunk is rarely uniform under RWG: the generator draws each column from a blended
+                // distribution and then paints river biomes over it, so a predicate like "every column here is a
+                // no-rain biome" is unanswerable from the centre sample alone.
+                //
+                // Read column by column, NOT through Chunk.getBiomeArray(): EndlessIDs replaces the vanilla
+                // byte array and throws from that accessor ("Crashing in fear of potential world corruption"),
+                // which takes the whole run down on a 2.9/daily pack. Same constraint hashChunk already works
+                // around for the section arrays. getBiomeGenForWorldCoords takes chunk-LOCAL coordinates and
+                // resolves the 255 "unset" sentinel itself, so no sentinel reaches the report.
+                final Map<Integer, Integer> biomeCounts = new TreeMap<>();
+                for (int lx = 0; lx < 16; lx++) {
+                    for (int lz = 0; lz < 16; lz++) {
+                        biomeCounts.merge(
+                            c.getBiomeGenForWorldCoords(lx, lz, world.getWorldChunkManager()).biomeID,
+                            1,
+                            Integer::sum);
+                    }
+                }
                 int water = 0, clay = 0, sand = 0, gravel = 0, hclay = 0;
                 final Map<Integer, Integer> waterY = new TreeMap<>();
                 final Map<Integer, Integer> clayY = new TreeMap<>();
@@ -1618,6 +1920,10 @@ public class WorldgenProbe {
                 }
                 if (!firstChunk) sb.append(",\n");
                 firstChunk = false;
+                // Attribution goes on the chunk, not on the chest: every chest in a chunk belongs to the same
+                // feature, and dumpInventory's output must stay byte-stable because the stage-0 prefilter emits
+                // chests through that same serializer. Empty string when the chunk is outside any feature.
+                final String tfFeature = TwilightForestProbe.chunkFeatureJson(world, ccx, ccz);
                 sb.append("      \"")
                     .append(ccx)
                     .append(",")
@@ -1626,6 +1932,9 @@ public class WorldgenProbe {
                     .append(jsonEscape(biome.biomeName))
                     .append("\", \"biomeId\": ")
                     .append(biome.biomeID)
+                    .append(", \"biomeCounts\": ")
+                    .append(jsonIntMap(biomeCounts))
+                    .append(tfFeature)
                     .append(", \"water\": ")
                     .append(water)
                     .append(", \"clay\": ")
@@ -1766,16 +2075,36 @@ public class WorldgenProbe {
         return 0;
     }
 
-    private static String dumpInventory(net.minecraft.inventory.IInventory inv, TileEntity te) {
-        final StringBuilder sb = new StringBuilder("{\"pos\": [").append(te.xCoord)
+    /**
+     * Package-visible so the stage-0 prefilter's Roguelike module emits chests through the SAME serializer as a
+     * full-gen run. Anything else makes a prefilter-vs-corpus diff report formatting noise as a finding.
+     */
+    static String dumpInventory(net.minecraft.inventory.IInventory inv, TileEntity te) {
+        return dumpInventory(
+            inv,
+            te.xCoord,
+            te.yCoord,
+            te.zCoord,
+            te.getClass()
+                .getSimpleName());
+    }
+
+    /**
+     * Position and type given explicitly, for an inventory that is not a tile entity.
+     *
+     * <p>
+     * The stage-0 village chest module rolls into a bare {@link SizedInventory} rather than a
+     * {@code TileEntityChest}, because the slot count has to match the real container. It still emits through
+     * this serializer so a prefilter-vs-corpus diff cannot report formatting as a finding.
+     */
+    static String dumpInventory(net.minecraft.inventory.IInventory inv, int x, int y, int z, String type) {
+        final StringBuilder sb = new StringBuilder("{\"pos\": [").append(x)
             .append(", ")
-            .append(te.yCoord)
+            .append(y)
             .append(", ")
-            .append(te.zCoord)
+            .append(z)
             .append("], \"type\": \"")
-            .append(
-                te.getClass()
-                    .getSimpleName())
+            .append(type)
             .append("\", \"items\": [");
         boolean first = true;
         int size;
@@ -1819,7 +2148,8 @@ public class WorldgenProbe {
             .toString();
     }
 
-    private static String jsonEscape(String s) {
+    /** Package-visible so sibling emitters (TwilightForestProbe) escape identically — see dumpInventory. */
+    static String jsonEscape(String s) {
         return s == null ? "null"
             : s.replace("\\", "\\\\")
                 .replace("\"", "\\\"")
@@ -1864,6 +2194,60 @@ public class WorldgenProbe {
             LOG.info("[probe] wrote {} GT material names to {}", byId.size(), outF);
         } catch (Exception e) {
             LOG.warn("[probe] could not dump GT materials: {}", e.toString());
+        }
+        dumpGtDims(dir);
+    }
+
+    /**
+     * Runtime dimension id -> GT ore-mix dimension token, written beside gtmats.json so the vein predictor can
+     * resolve a report's "dim" without a hardcoded table. A pack may move the Twilight Forest off id 7.
+     *
+     * <p>
+     * Restricted to the four names GT accepts. {@code GTWorldgen.isGenerationAllowed} reads
+     * {@code provider.getDimensionName()} and hard-rejects anything outside {Overworld, Nether, The End, Twilight
+     * Forest}, so those are the only dimensions a GT ore vein can ever occupy. The End is spelled "The End" at
+     * runtime but "TheEnd" in {@code OreMixBuilder}, so it is normalised here rather than at every reader.
+     */
+    private static void dumpGtDims(File dir) {
+        try {
+            final Map<String, String> byId = new TreeMap<>();
+            for (int dim : DimensionManager.getStaticDimensionIDs()) {
+                String name;
+                try {
+                    // Prefer the live provider; fall back to a throwaway one for dimensions dim0only skipped.
+                    final WorldServer live = DimensionManager.getWorld(dim);
+                    name = live != null ? live.provider.getDimensionName()
+                        : DimensionManager.createProviderFor(dim)
+                            .getDimensionName();
+                } catch (Throwable t) {
+                    continue; // a provider that cannot be built standalone is not one GT generates into
+                }
+                if ("The End".equals(name)) name = "TheEnd";
+                if ("Overworld".equals(name) || "Nether".equals(name)
+                    || "TheEnd".equals(name)
+                    || "Twilight Forest".equals(name)) {
+                    byId.put(Integer.toString(dim), name);
+                }
+            }
+            final File outF = new File(dir == null ? new File(".") : dir, "gtdims.json");
+            final StringBuilder sb = new StringBuilder("{\n");
+            boolean first = true;
+            for (Map.Entry<String, String> e : byId.entrySet()) {
+                if (!first) sb.append(",\n");
+                first = false;
+                sb.append("  \"")
+                    .append(e.getKey())
+                    .append("\": \"")
+                    .append(jsonEscape(e.getValue()))
+                    .append("\"");
+            }
+            sb.append("\n}\n");
+            try (FileWriter w = new FileWriter(outF)) {
+                w.write(sb.toString());
+            }
+            LOG.info("[probe] wrote {} GT-eligible dimension names to {}", byId.size(), outF);
+        } catch (Exception e) {
+            LOG.warn("[probe] could not dump GT dimensions: {}", e.toString());
         }
     }
 

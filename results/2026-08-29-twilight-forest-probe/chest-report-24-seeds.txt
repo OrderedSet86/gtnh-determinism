@@ -1,0 +1,185 @@
+24 Twilight Forest report(s), 13175 chunks walked, 574 chests
+  312 chest(s) outside any major feature — reported under "(outside any major feature)" below.
+  Mostly hollow-tree leaf caches: MapGenTFHollowTree is not a TFFeature, so those
+  chests are correctly outside the feature grid rather than mis-attributed.
+
+how often  (a region holds at most one major feature, so regions are the denominator)
+  Small Hollow Hill         609 of 2575 regions (23.7%)   walked instances 7   chests/instance min 1 median 2 max 4
+  Medium Hollow Hill        298 of 2575 regions (11.6%)   walked instances 3   chests/instance min 1 median 4 max 5
+  Naga Courtyard            259 of 2575 regions (10.1%)   walked instances 3   chests/instance min 1 median 2 max 2
+  Lich Tower                248 of 2575 regions ( 9.6%)   walked instances 4   chests/instance min 4 median 5.5 max 10
+  Hedge Maze                207 of 2575 regions ( 8.0%)   walked instances 5   chests/instance min 2 median 5 max 8
+  Knight Stronghold         161 of 2575 regions ( 6.3%)   walked instances 2   chests/instance min 2 median 7.5 max 13
+  Troll Lairs               154 of 2575 regions ( 6.0%)   walked instances 3   chests/instance min 5 median 6 max 8
+  Yeti Lairs                153 of 2575 regions ( 5.9%)   walked instances 0
+  Labyrinth                 152 of 2575 regions ( 5.9%)   walked instances 2   chests/instance min 54 median 55.5 max 57
+  Large Hollow Hill          97 of 2575 regions ( 3.8%)   walked instances 2   chests/instance min 4 median 7.5 max 11
+  Final Castle               41 of 2575 regions ( 1.6%)   walked instances 0
+  Dark Tower                 39 of 2575 regions ( 1.5%)   walked instances 1   chests/instance min 19 median 19 max 19
+  Ice Tower                  37 of 2575 regions ( 1.4%)   walked instances 0
+  Hydra Lair                 36 of 2575 regions ( 1.4%)   walked instances 0
+  Quest Grove                33 of 2575 regions ( 1.3%)   walked instances 1   chests/instance min 1 median 1 max 1
+  Quest Island               26 of 2575 regions ( 1.0%)   walked instances 0
+  Mushroom Tower             25 of 2575 regions ( 1.0%)   walked instances 0
+
+what spawns, per feature
+  (outside any major feature)  (269 instance(s), 6586 items)
+    Firefly                              464     1.72/instance   stack median 6 max 12
+    Purple Drink                         336     1.25/instance   stack median 11 max 16
+    Potato                               244     0.91/instance   stack median 3 max 6
+    Melon Seeds                          230     0.86/instance   stack median 3 max 5
+    Pumpkin Pie                          222     0.83/instance   stack median 7.5 max 12
+    Carrot                               218     0.81/instance   stack median 4 max 6
+    Melon                                215     0.80/instance   stack median 4 max 6
+    Wheat                                212     0.79/instance   stack median 3 max 6
+    Tin Ingot                            209     0.78/instance   stack median 12 max 16
+    Apple                                187     0.70/instance   stack median 7 max 11
+    Canopy Tree Sapling                  168     0.62/instance   stack median 2 max 4
+    Twilight Mangrove Sapling            136     0.51/instance   stack median 3 max 4
+
+  Labyrinth  (2 instance(s), 1362 items)
+    Maze Wafer                           187    93.50/instance   stack median 6 max 12
+    Paper                                153    76.50/instance   stack median 5 max 12
+    Stick                                124    62.00/instance   stack median 7 max 12
+    Steeleaf                             104    52.00/instance   stack median 5 max 10
+    Firefly                              103    51.50/instance   stack median 3 max 5
+    Coal                                  85    42.50/instance   stack median 8 max 12
+    Ironwood Ingot                        84    42.00/instance   stack median 3 max 9
+    Iron Ingot                            78    39.00/instance   stack median 3 max 6
+    Arrow                                 69    34.50/instance   stack median 7 max 11
+    Gunpowder                             58    29.00/instance   stack median 3 max 4
+    Leather                               46    23.00/instance   stack median 3 max 4
+    Milk                                  28    14.00/instance   stack median 1 max 1
+
+  Hedge Maze  (5 instance(s), 498 items)
+    Arrow                                 90    18.00/instance   stack median 7 max 12
+    Mushroom                              74    14.80/instance   stack median 3 max 4
+    Stick                                 50    10.00/instance   stack median 3 max 6
+    Wheat                                 48     9.60/instance   stack median 3 max 4
+    Pumpkin Seeds                         32     6.40/instance   stack median 3 max 4
+    Melon                                 29     5.80/instance   stack median 2.5 max 4
+    Firefly                               25     5.00/instance   stack median 3 max 4
+    String                                23     4.60/instance   stack median 2 max 4
+    Melon Seeds                           22     4.40/instance   stack median 2 max 4
+    Oak Wood Planks                       20     4.00/instance   stack median 2.5 max 4
+    Cobweb                                16     3.20/instance   stack median 2 max 3
+    Feather                                9     1.80/instance   stack median 2 max 3
+
+  Troll Lairs  (3 instance(s), 396 items)
+    Uberous Soil                          84    28.00/instance   stack median 5 max 6
+    Coal                                  58    19.33/instance   stack median 10 max 31
+    Bone Meal                             55    18.33/instance   stack median 6.5 max 12
+    Torchberries                          55    18.33/instance   stack median 8.5 max 16
+    Seeds                                 43    14.33/instance   stack median 4 max 6
+    Mushroom                              25     8.33/instance   stack median 3 max 4
+    Trollsteinn                           22     7.33/instance   stack median 5 max 6
+    Carrot                                19     6.33/instance   stack median 3 max 5
+    Magic Beans                           10     3.33/instance   stack median 1 max 1
+    Potato                                10     3.33/instance   stack median 4 max 5
+    Melon Seeds                           10     3.33/instance   stack median 4 max 5
+    Lamp of Cinders                        3     1.00/instance   stack median 1 max 1
+
+  Dark Tower  (1 instance(s), 323 items)
+    Stick                                 62    62.00/instance   stack median 10 max 12
+    Arrow                                 34    34.00/instance   stack median 6 max 8
+    Glowstone Dust                        26    26.00/instance   stack median 9 max 10
+    Ironwood Ingot                        21    21.00/instance   stack median 3 max 5
+    Steeleaf                              20    20.00/instance   stack median 5.5 max 7
+    Firefly                               18    18.00/instance   stack median 3 max 5
+    Iron Ingot                            16    16.00/instance   stack median 4.5 max 6
+    Charcoal                              15    15.00/instance   stack median 5 max 7
+    Stainless Steel Ingot                 13    13.00/instance   stack median 13 max 13
+    Experiment 115                         8     8.00/instance   stack median 3 max 3
+    Potato                                 7     7.00/instance   stack median 3.5 max 4
+    Baked Potato                           7     7.00/instance   stack median 3.5 max 6
+
+  Lich Tower  (4 instance(s), 317 items)
+    Transformation Powder                 20     5.00/instance   stack median 7 max 12
+    Clay                                  17     4.25/instance   stack median 8.5 max 11
+    Gold Nugget                           15     3.75/instance   stack median 5 max 6
+    Glass Bottle                          14     3.50/instance   stack median 3.5 max 6
+    Dandelion                             11     2.75/instance   stack median 3 max 4
+    Ladder                                11     2.75/instance   stack median 2 max 6
+    Sand                                   9     2.25/instance   stack median 1 max 4
+    Fire Charge                            9     2.25/instance   stack median 1 max 2
+    Feather                                9     2.25/instance   stack median 1 max 3
+    Orange Tallow Candle                   8     2.00/instance   stack median 1.5 max 4
+    Ender Pearl                            8     2.00/instance   stack median 4 max 7
+    Lime Tallow Candle                     7     1.75/instance   stack median 2 max 2
+
+  Large Hollow Hill  (2 instance(s), 292 items)
+    Gold Nugget                           23    11.50/instance   stack median 4 max 7
+    Torchberries                          23    11.50/instance   stack median 3 max 5
+    Tiny Pile of Thaumium Dust            19     9.50/instance   stack median 2 max 5
+    Copper Ingot                          18     9.00/instance   stack median 5 max 6
+    Air Shard                             15     7.50/instance   stack median 4 max 4
+    Mica Dust                             14     7.00/instance   stack median 7 max 10
+    Firefly                               12     6.00/instance   stack median 12 max 12
+    Raw Fish                              10     5.00/instance   stack median 2.5 max 4
+    Molybdenum Ingot                      10     5.00/instance   stack median 3 max 4
+    Transformation Powder                  9     4.50/instance   stack median 4.5 max 5
+    Pumpkin Pie                            8     4.00/instance   stack median 8 max 8
+    Water Shard                            8     4.00/instance   stack median 3 max 4
+
+  Knight Stronghold  (2 instance(s), 292 items)
+    Maze Wafer                            59    29.50/instance   stack median 6 max 9
+    Arrow                                 47    23.50/instance   stack median 8 max 11
+    Stick                                 47    23.50/instance   stack median 11 max 12
+    Firefly                               23    11.50/instance   stack median 3 max 5
+    Iron Ingot                            21    10.50/instance   stack median 2 max 5
+    Coal                                  15     7.50/instance   stack median 4 max 10
+    Ironwood Ingot                         7     3.50/instance   stack median 1 max 2
+    Blue Wool                              7     3.50/instance   stack median 1 max 1
+    Charm of Keeping I                     6     3.00/instance   stack median 1 max 1
+    Steeleaf                               5     2.50/instance   stack median 5 max 5
+    Milk                                   5     2.50/instance   stack median 1 max 1
+    Enchanted Book                         5     2.50/instance   stack median 1 max 1
+
+  Small Hollow Hill  (7 instance(s), 285 items)
+    Torch                                 53     7.57/instance   stack median 11 max 12
+    Nickel Ingot                          24     3.43/instance   stack median 2 max 4
+    Arrow                                 22     3.14/instance   stack median 10 max 10
+    Wheat                                 21     3.00/instance   stack median 4 max 5
+    String                                16     2.29/instance   stack median 2 max 4
+    Small Pile of Thaumium Dust           14     2.00/instance   stack median 2 max 2
+    Manganese Ingot                       13     1.86/instance   stack median 2.5 max 3
+    Antimony Ingot                        10     1.43/instance   stack median 3 max 4
+    Pumpkin Pie                           10     1.43/instance   stack median 10 max 10
+    Gunpowder                              9     1.29/instance   stack median 3 max 4
+    Iron Ingot                             8     1.14/instance   stack median 1 max 3
+    Firefly                                8     1.14/instance   stack median 8 max 8
+
+  Medium Hollow Hill  (3 instance(s), 176 items)
+    Mica Dust                             16     5.33/instance   stack median 8 max 14
+    Carrot                                15     5.00/instance   stack median 3.5 max 6
+    Bronze Ingot                          13     4.33/instance   stack median 3 max 3
+    Copper Ingot                          11     3.67/instance   stack median 4 max 6
+    Transformation Powder                 10     3.33/instance   stack median 10 max 10
+    Firefly                               10     3.33/instance   stack median 10 max 10
+    Cobalt Ingot                           9     3.00/instance   stack median 2 max 4
+    Tiny Pile of Thaumium Dust             8     2.67/instance   stack median 3 max 3
+    Iron Ingot                             7     2.33/instance   stack median 3.5 max 4
+    Sugar Canes                            6     2.00/instance   stack median 3 max 4
+    Molybdenum Ingot                       6     2.00/instance   stack median 3 max 3
+    Wrought Iron Ingot                     6     2.00/instance   stack median 3 max 3
+
+  Naga Courtyard  (3 instance(s), 127 items)
+    Purple Drink                          24     8.00/instance   stack median 12 max 16
+    Tin Ingot                             18     6.00/instance   stack median 9 max 10
+    Nickel Ingot                          12     4.00/instance   stack median 6 max 6
+    Magnesium Ingot                       12     4.00/instance   stack median 3 max 4
+    Zinc Ingot                             8     2.67/instance   stack median 8 max 8
+    Carrot                                 6     2.00/instance   stack median 6 max 6
+    Neodymium Dust                         5     1.67/instance   stack median 2.5 max 3
+    Bronze Ingot                           5     1.67/instance   stack median 5 max 5
+    Magnetic Iron Ingot                    4     1.33/instance   stack median 4 max 4
+    Steel Ingot                            4     1.33/instance   stack median 2 max 2
+    Darkwood Sapling                       3     1.00/instance   stack median 3 max 3
+    Standard Binding Agent                 3     1.00/instance   stack median 3 max 3
+
+  Quest Grove  (1 instance(s), 4 items)
+    Brown Wool                             1     1.00/instance   stack median 1 max 1
+    Red Wool                               1     1.00/instance   stack median 1 max 1
+    Magenta Wool                           1     1.00/instance   stack median 1 max 1
+    Purple Wool                            1     1.00/instance   stack median 1 max 1
+

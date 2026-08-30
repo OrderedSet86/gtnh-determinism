@@ -20,7 +20,9 @@ version is installed, and every other fix targets code that is unchanged across 
 | Target | What was wrong | What the jar fixes |
 |---|---|---|
 | Forge/FML | Village building handlers iterate in per-launch HashMap order | Village layouts (smeltery/blacksmith presence) identical per seed |
-| Forge/FML (chest loot) | Loot tables are static and get rewritten once the first world starts — only the **first world created per client session** rolled spawn-region loot from pristine tables; every later world rolled different chests from the same seed | Tables reset before every world start: each world rolls like the first of a session, matching dedicated servers and the seed library |
+| Forge/FML (chest loot) | Loot tables are static and get rewritten once the first world starts — only the **first world created per client session** rolled spawn-region loot from pristine tables; every later world rolled different chests from the same seed. The reset itself restored only a category's item list and left its roll COUNT at the mutated value, so `villageBlacksmith` drew 4-11 stacks from the 3-9 table — a table that never existed anywhere | Tables reset before every world start, all three fields (items, min, max), so each world rolls like the first of a session |
+| Forge/FML (spawn-preload split) | A cold boot generates its spawn region inside `loadAllWorlds`, before `FMLServerStartingEvent` where TooMuchLoot replaces whole categories. A chest is filled when it is placed, so the 25×25-chunk preload kept the pre-rewrite table forever and everything outside it used the post-rewrite one. Ten categories differed; `villageBlacksmith` went 60 entries rolling 3-9 to 118 rolling 4-11 | TooMuchLoot applied before the first chunk exists and its own later run suppressed — one table for the whole world. **Balance note: HungerOverhaul's food injection only ever reached chests through the pre table, so the 1-32 marshmallow stacks are gone; the post table gives 1-2.** Kept as a fix rather than preserved for routing, so a future upstream fix cannot break routing silently |
+| Minecraft (structure chests) | Village, mineshaft, stronghold, pyramid, vanilla-dungeon and Witchery chests draw every item from the chunk's shared populate `Random`, so contents depend on everything that consumed draws earlier in that chunk — mod `PopulateChunkEvent.Pre` handlers, an intersecting mineshaft, whichever village pieces were built first — and each of those is only as stable as the terrain reads behind it | Contents derived from the structure piece and the chest's position within it. The stock body still runs first, so every draw it would have made is still made and **zero blocks move** — measured: the block-differing chunk set is identical to the two-run noise floor. Pool, weights and roll range unchanged; only the RNG source moves |
 | Witchery | Clock-seeded `world.rand`; structure *type* picked by shuffling a shared list in place per chunk; wicker-man spawner rolled off `world.rand` | Covens, wicker men, shacks, goblin huts — position, type, and spawner seed-stable |
 | Witchery (village walls) | Walls were built by a hidden tile entity 40+ ticks after generation, probing whatever terrain existed at that moment — shape depended on route and timing, and idle worlds could skip walls entirely | Walls build during generation from virgin-terrain heights, sliced per chunk: shape, gates, and guard posts seed-stable |
 | Thaumcraft | Terrain-gated draw skew, `world.rand` barrow loot, first-chunk-wins bonus nodes, maze gen on a racing thread | Nodes, totems, barrows + loot seed-stable |
@@ -39,16 +41,19 @@ version is installed, and every other fix targets code that is unchanged across 
 | Minecraft (passive mobs) | `SpawnerAnimals.performWorldGenSpawning` picks the *species* off `world.rand` while every other draw in the method uses the populate-seeded `Random` — the same shadowing shape as the TiC slime bug. Which animals a seed starts with, and therefore the first leather, wool and food on the route, was clock-random | Species drawn from the populate Random. Sheep fleece colour and ocelot kittens, which are rolled later off `worldObj.rand`, derive from world seed + spawn position |
 | Minecraft (horses) | `EntityHorse` rolls type, coat variant, max health, jump strength and movement speed off the clock-seeded `Entity.rand`. Speed spans 0.1125–0.3375, so the same seed gave a horse up to **three times faster** depending on the launch, and donkey-versus-horse — portable storage or not — was a coin flip | All five derived from world seed + spawn position. Variation is preserved, not flattened: 87 distinct speeds and 87 distinct jump strengths across 95 horses on one seed. Horse *breeding* keeps the stock RNG — the fork is armed only while `onSpawnWithEgg` runs |
 
-Running tally: **35 fixes** — 33 mixin-based plus 2 reflection patches — carried by **37 mixin
-classes** across **11 mods, Forge/FML and vanilla Minecraft**, rewiring **65 worldgen classes**.
-Three fixes take more than one mixin: the GregTech pair are alternatives, exactly one binding per GT
-version; the Vis Amulet needs both an init-time pin and a per-chest derivation; and the passive-mob
-spawn fix carries one mixin each for the shared spawner, sheep, ocelots and horses. Three further
+Running tally: **37 fixes** — 35 mixin-based plus 2 reflection patches — carried by **44 mixin
+classes** across **12 mods, Forge/FML and vanilla Minecraft**, rewiring **71 worldgen classes**.
+Five fixes take more than one mixin: the GregTech pair are alternatives, exactly one binding per GT
+version; the Vis Amulet needs both an init-time pin and a per-chest derivation; the passive-mob spawn
+fix carries one mixin each for the shared spawner, sheep, ocelots and horses; the spawn-preload split
+needs one mixin to apply TooMuchLoot early and one to suppress its own later run; and structure chest
+contents need five — capture the table, capture the piece two ways, fence off chunk population, refill
+the chest. Three further
 diagnostic mixins ship inert behind `-Dgtnhdet.traceseg` and are not counted here.
 
-The five vanilla-targeting mixins are the first in this jar to patch Minecraft itself rather than a
-mod, so they use default `remap` and are registered in the early mixin config rather than through the
-late loader.
+Nine mixins patch Minecraft or Forge itself rather than a mod — eight vanilla classes plus Forge's
+`ChestGenHooks`. They use default `remap` and are registered in the early mixin config rather than
+through the late loader, because their targets load before the late loader runs.
 
 ## Verification
 
@@ -93,12 +98,43 @@ across 169 chunks:
 | GT / mod ore placement | 3,741 | vein *identity* is 99.0% stable; this is per-block placement |
 
 Chest loot is fully launch-deterministic, measured two ways: 131/131 chests identical across two cold
-launches of one seed with **zero tile-entity differences of any kind**, and 548 chests across
-**10 seeds** identical between two separate JVMs — existence, item lists and NBT all counted
-separately. That needed one more fix: `Thaumcraft.Config.initLoot()` seeds a `Random` from
+launches of one seed with **zero tile-entity differences of any kind**, and 536 chests / 3,929 item
+stacks across **10 seeds** identical between two separate JVMs — existence, item lists and NBT all
+counted separately. That multi-seed check was re-run after the structure-chest fix changed three times
+on 2026-08-29, so it reflects the jar as it stands rather than an earlier build
+([results/2026-08-29-chest-reverification](results/2026-08-29-chest-reverification/README.md)). That needed one more fix: `Thaumcraft.Config.initLoot()` seeds a `Random` from
 `System.currentTimeMillis()` and bakes the roll into the loot Vis Amulet's NBT, so the charge changed
 every launch. It runs before the load-complete loot snapshot, so the existing table-restore fix
 preserved it rather than catching it.
+
+Structure chest contents are also route-independent as of the position-derived fix: on seed `-777` at
+radius 8, 124 chests are identical across `rows`, `cols` and `spiral` and across two separate JVMs —
+existence, contents and NBT all zero. That fix demonstrably acts rather than merely agreeing with
+itself: against a control jar with only those three mixins removed, 27 of the 124 chests carry
+different items, no chest appears or disappears, and the set of chunks whose **blocks** differ is
+identical to the two-run noise floor, so nothing but chest contents moved. Evidence:
+[results/2026-08-29-position-derived-chests](results/2026-08-29-position-derived-chests/README.md)
+and [results/2026-08-29-post-only-loot](results/2026-08-29-post-only-loot/README.md).
+
+That fix derives a chest's contents from the structure piece it sits in rather than from the chest's
+absolute position, which is what keeps contents stable when a pack update shifts terrain under a
+village. Instrumenting a real run showed the piece was being identified for only 10 of 71 chests on
+one seed: most village pieces in this pack — VillageNames' biome structures, TinkerConstruct,
+Railcraft, Witchery — fill their chests without calling the vanilla method the hook watched, and were
+falling back to absolute position. Deterministic, but not terrain-stable. Wrapping
+`StructureStart.generateStructure`, the single call site that builds every structure piece, raises
+that to 24 of 71; the rest are `WorldGenDungeons` rooms, which genuinely have no piece. Measured, and
+including the correction to a first version of the fix that did not actually work:
+[results/2026-08-29-chest-site-coverage](results/2026-08-29-chest-site-coverage/README.md).
+
+Naming the piece exposed a second defect. A village piece that writes into an unpopulated chunk
+cascades into that chunk's population *inside* its own call, so vanilla dungeon chests generated
+there were inheriting the village piece as their component and deriving their loot from its bounding
+box — deterministic, so no route or launch test could catch it, but wrong enough that a dungeon's
+contents would move if the village moved. A barrier around `ChunkProviderServer.populate` scopes the
+piece correctly. The tempting cheaper rule, "only trust a piece if the chest is inside its bounding
+box", is false: 11 of 17 out-of-box chests are legitimate, because several pieces really do place
+chests outside their own box.
 
 **Entities** are measured from format 5 onward and are not covered by the block table above, since
 entities are not blocks. With the jar installed, villager count, position and profession are stable

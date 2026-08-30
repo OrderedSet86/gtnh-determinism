@@ -20,6 +20,14 @@ def main() -> int:
     if a["seed"] != b["seed"]:
         print(f"WARNING: seeds differ ({a['seed']} vs {b['seed']}) — comparison is meaningless")
 
+    # "dim" arrived in format 6; absent means the report is an overworld walk. Without this check, diffing a
+    # Twilight Forest report against an overworld one of the same seed prints "100% of chunks differ" and gives
+    # no hint why.
+    if a.get("dim", 0) != b.get("dim", 0):
+        print(
+            f"WARNING: dimensions differ ({a.get('dim', 0)} vs {b.get('dim', 0)}) — comparison is meaningless"
+        )
+
     # merge the always-generated spawn-region extra hashes when both runs carry them
     if a.get("spawnextra") and b.get("spawnextra"):
         a["chunks"] = {**a["chunks"], **a["spawnextra"]}

@@ -1,0 +1,55 @@
+registry_name,meta,display_name,source,category,level,reason
+IguanaTweaksTConstruct:clayBucketFired,0,Fired Clay Bucket,roguelike,TOOLS,0,not a tool part
+IguanaTweaksTConstruct:clayBucketFired,0,Fired Clay Bucket,roguelike,TOOLS,1,not a tool part
+IguanaTweaksTConstruct:clayBucketFired,0,Fired Clay Bucket,roguelike,TOOLS,2,not a tool part
+IguanaTweaksTConstruct:clayBucketFired,0,Fired Clay Bucket,roguelike,TOOLS,3,not a tool part
+IguanaTweaksTConstruct:clayBucketFired,0,Fired Clay Bucket,roguelike,TOOLS,4,not a tool part
+IguanaTweaksTConstruct:clayBucketMilk,0,Milk Clay Bucket,roguelike,STARTER,0,not a tool part
+IguanaTweaksTConstruct:clayBucketMilk,0,Milk Clay Bucket,roguelike,STARTER,1,not a tool part
+IguanaTweaksTConstruct:clayBucketMilk,0,Milk Clay Bucket,roguelike,STARTER,2,not a tool part
+IguanaTweaksTConstruct:clayBucketMilk,0,Milk Clay Bucket,roguelike,STARTER,3,not a tool part
+IguanaTweaksTConstruct:clayBucketMilk,0,Milk Clay Bucket,roguelike,STARTER,4,not a tool part
+TConstruct:blankPattern,0,Blank Pattern,roguelike,loot_junk,2,no material
+TConstruct:blankPattern,0,Blank Pattern,roguelike,loot_junk,3,no material
+TConstruct:blankPattern,0,Blank Pattern,roguelike,loot_junk,4,no material
+TConstruct:bootsWood,0,Wooden Boots,roguelike,ARMOUR,0,"armour, no tool material"
+TConstruct:chestplateWood,0,Wooden Chestplate,roguelike,ARMOUR,0,"armour, no tool material"
+TConstruct:creativeModifier,0,Creative Tool Modifier,roguelike,REWARD,4,no material
+TConstruct:fletching,0,Feather Fletching,roguelike,WEAPONS,1,"damage value indexes FletchingMaterial, a separate registry"
+TConstruct:fletching,1,Leaf Fletching,roguelike,WEAPONS,2,"damage value indexes FletchingMaterial, a separate registry"
+TConstruct:fletching,2,Slime Fletching,roguelike,WEAPONS,3,"damage value indexes FletchingMaterial, a separate registry"
+TConstruct:fletching,4,Slimeleaf Fletching,roguelike,WEAPONS,4,"damage value indexes FletchingMaterial, a separate registry"
+TConstruct:heartCanister,1,Miniature Red Heart,chestgenhooks,TinkerHouse,,no material
+TConstruct:heartCanister,1,Miniature Red Heart,chestgenhooks,dungeonChest,,no material
+TConstruct:heartCanister,1,Miniature Red Heart,chestgenhooks,pyramidDesertyChest,,no material
+TConstruct:heartCanister,1,Miniature Red Heart,chestgenhooks,pyramidJungleChest,,no material
+TConstruct:helmetWood,0,Wooden Helmet,roguelike,ARMOUR,0,"armour, no tool material"
+TConstruct:leggingsWood,0,Wooden Leggings,roguelike,ARMOUR,0,"armour, no tool material"
+TConstruct:materials,6,Ball of Moss,chestgenhooks,chest4,,"crafting items, damage value is an item index"
+TConstruct:materials,6,Ball of Moss,roguelike,REWARD,3,"crafting items, damage value is an item index"
+TConstruct:materials,7,Lava Crystal,roguelike,REWARD,0,"crafting items, damage value is an item index"
+TConstruct:materials,8,Necrotic Bone,chestgenhooks,chest3,,"crafting items, damage value is an item index"
+TConstruct:materials,8,Necrotic Bone,roguelike,REWARD,2,"crafting items, damage value is an item index"
+TConstruct:materials,19,Iron Nugget,chestgenhooks,vn_jungle_house,,"crafting items, damage value is an item index"
+TConstruct:materials,19,Iron Nugget,chestgenhooks,vn_taiga_house,,"crafting items, damage value is an item index"
+TConstruct:materials,26,Silky Jewel,chestgenhooks,chest3,,"crafting items, damage value is an item index"
+TConstruct:materials,26,Silky Jewel,roguelike,REWARD,1,"crafting items, damage value is an item index"
+TConstruct:materials,43,Reinforcement,chestgenhooks,chest2,,"crafting items, damage value is an item index"
+TConstruct:slime.sapling,0,Slimy Sapling,chestgenhooks,chest2,,no material
+TConstruct:slime_boots,0,Slime Boots,roguelike,ARMOUR,0,no material
+TConstruct:slimesling,0,Slimesling,roguelike,REWARD,0,no material
+TConstruct:woodPattern,1,Tool Rod Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,2,Pickaxe Head Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,3,Shovel Head Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,4,Axe Head Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,5,Sword Blade Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,6,Wide Guard Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,7,Hand Guard Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,8,Crossbar Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,9,Tool Binding Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,10,Pan Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,11,Wide Board Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,12,Knife Blade Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,13,Chisel Head Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+TConstruct:woodPattern,22,Full Guard Pattern,chestgenhooks,TinkerPatterns,,"pattern shape, damage value is a part index"
+tinkersdefense:Heater,0,"<not a plain item, or id not in this build>",roguelike,ARMOUR,3,not a tool part

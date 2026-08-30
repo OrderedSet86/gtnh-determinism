@@ -43,4 +43,8 @@ dependencies {
     // Deepslate layer band RNG (EtFuturumDeepslateMixin). Mixin's AP resolves targets= at compile time,
     // so the class must be on the classpath even though the mixin references it only by name.
     compileOnly('ganymedes01.etfuturum:Et-Futurum-Requiem:2.6.57-GTNH:dev') { transitive = false }
+    // F9 (TooMuchLootServerStartingMixin). Same reason as Et Futurum: the mixin names its target as a string, but
+    // Mixin's annotation processor resolves it at compile time. EarlyLootTables itself uses only reflection, so the
+    // jar still runs on a pack without TooMuchLoot.
+    compileOnly('com.github.GTNewHorizons:TooMuchLoot:4.3.0-GTNH:dev') { transitive = false }
 }

@@ -7,6 +7,13 @@
 #   order:        rows | cols | rows-reverse | spiral
 #   out-template: /path/foo.json -> /path/foo-<seed>.json per seed ({seed} placeholder also works)
 #
+# PROBE_DIM=N walks a dimension other than the overworld (7 = Twilight Forest in GTNH 2.8.4). The walk centre is
+# unchanged: dim 7 shares the overworld's spawn point through DerivedWorldInfo, and the Twilight Forest is 1:1
+# with the overworld in X/Z, so a portal built at spawn arrives at the centre of the window.
+# PROBE_TFFEATURES=N emits the Twilight Forest feature map (region radius, in 16-chunk regions). It is
+# independent of PROBE_DIM and generates no chunks, but it does need dim 7 to exist — so with
+# PROBE_DIM0ONLY=true, also set PROBE_DIM=7.
+#
 # ONLY valid with the gtnhdeterminism fix jar installed: identity-hash state is constant
 # within a JVM, so warm runs cannot stand in for cold-launch variance tests on stock jars.
 # Requires Java 17-21 as $PROBE_JAVA (or java), worldgenprobe >= 0.3 in <server-dir>/mods.
@@ -51,7 +58,8 @@ if [ -f java9args.txt ]; then JAVA_ARGS="@java9args.txt"; fi
 "$JAVA_BIN" $JAVA_ARGS \
   -Xmx"${PROBE_XMX:-6G}" -Xms"${PROBE_XMX:-6G}" ${PROBE_JVMFLAGS:-} \
   -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.seeds="$SEEDS" \
-  -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" -Dprobe.dim0only="${PROBE_DIM0ONLY:-false}" -Dprobe.nohash="${PROBE_NOHASH:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_STATICSWEEP:+-Dprobe.staticsweep=$PROBE_STATICSWEEP} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
+  -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" -Dprobe.dim0only="${PROBE_DIM0ONLY:-false}" -Dprobe.nohash="${PROBE_NOHASH:-false}" ${PROBE_DIM:+-Dprobe.dim=$PROBE_DIM} ${PROBE_TFFEATURES:+-Dprobe.tffeatures=$PROBE_TFFEATURES} ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_STATICSWEEP:+-Dprobe.staticsweep=$PROBE_STATICSWEEP} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
+  -Dgtnhdet.tracescope=none \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
   -jar "$LAUNCH_JAR" nogui < /dev/null
 

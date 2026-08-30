@@ -57,9 +57,14 @@ to work but benchmark {4, 4.5, 5, 6} G with `-Xlog:gc` before fixing N. Per-inst
 Xmx + ~1.2-1.5 G (metaspace for 209 mods, code cache, GC/JIT/native, Netty). Starting
 point: 5 instances × `-Xmx4G -Xms4G -XX:MaxMetaspaceSize=768M`, N configurable; per
 instance `-XX:ActiveProcessorCount=4 -XX:ParallelGCThreads=4 -XX:ConcGCThreads=1` on 16
-cores. Optional boot shave: mixin no-oping `MinecraftServer.initialWorldChunkLoad`
+cores. ~~Optional boot shave: mixin no-oping `MinecraftServer.initialWorldChunkLoad`
 (MCSRC `MinecraftServer.java:282-314`) when probing (~10 s/run; probe re-walks its own
-square regardless).
+square regardless).~~ **Measured 2026-08-29: this is NOT free.** Skipping the boot world's
+preload in warm mode changes the measured world by **314 of 625 chunks**, against a 2-4
+chunk same-setting noise floor. Generating the boot world is load-bearing for what the
+requested seed's world comes out as; the mechanism is unidentified. Available as
+`-Dprobe.skipbootpreload=true`, off by default. See
+results/2026-08-29-trace-scope.
 
 ### A.4 Driver
 Jobs file (`seed<TAB>order[<TAB>radius]`), `flock`-cursor dispatch for resume support.
@@ -118,6 +123,15 @@ the exact vanilla path; AmidstGTNH does live dim-0 teardown the same way
    `createSpawnPosition` — required for parity and for spawn-pos search.
 4. Probe + JSON per seed; `initiateShutdown()` after the last.
 
+### B.2a Trace scoping (a warm run generates two worlds)
+A warm run generates the server's boot world at startup and then one world per requested seed.
+Worldgen instrumentation fires in both, and trace lines from the two are otherwise
+indistinguishable — a corpus that mixed them produced two wrong findings before it was caught.
+`warm-probe.sh` therefore launches with `-Dgtnhdet.tracescope=none` and `recreateWorlds` sets the
+property to each seed as it starts generating it; the fix jar's `TraceScope` honours it. Unset means
+"emit everything", so cold runs are unaffected. Deny-by-default is deliberate: a new instrument gets
+the protection without its author knowing the trap exists.
+
 ### B.3 Static reset registry
 Reflection-based, class-presence-gated, logs every action, hard-fails if a listed field is
 missing (schema drift must be loud).
@@ -172,8 +186,8 @@ minimal ISaveHandler (null worldInfo → fresh `WorldInfo(settings, name)`), a
   `new XSTR(seed).nextInt(100) < chance`; attempt i layer via
   `WorldgenQuery.veins().findRandom(rng seeded Fnv1a64(oreveinSeed, i))`
   (`GTWorldgenerator.java:309-402`). Gate-less this gives "attempt-1 vein (probable) +
-  fallback order"; the reroll gate IS evaluable with modest work — see HANDOFF
-  "Worldless GT vein prediction: REASSESSED as feasible (2026-08-03)". NOTE the
+  fallback order"; the reroll gate IS evaluable with modest work, reassessed as feasible
+  on 2026-08-03. NOTE the
   `Fnv1a64` form above is GT 54.x; the 2.7.4/2.8.4 line draws attempts sequentially off
   one `oreveinRNG` (`forks/...:343-346`).
 - Roguelike trigger grid: `Dungeon.canSpawnInChunk` (`Dungeon.java:112-144`), same
@@ -189,12 +203,46 @@ thread-safe — one per worker thread. Estimate 50-200 seeds/s/thread ⇒ **10�
 seeds/hour** in one warm JVM vs ~40/hour full-gen.
 
 ### C.4 Cannot prefilter (finalists get full runs)
-Chest contents, ring winners (virgin 5-column test), Roguelike validLocation/loot, TC
-nodes/trees, decoration-level anything.
-SUPERSEDED entries: village piece layout (done — coke%-floor modules, golden 8/8 piece-exact);
-vein terrain rerolls + Y (reassessed feasible 2026-08-03, see HANDOFF — `veinMinY` was always
+Ring winners (virgin 5-column test), TC nodes/trees, decoration-level anything.
+**Witchery: SUPERSEDED 2026-08-29.** Measured route-stable with `-Dgtnhdet.witchtrace=true` (identical
+gate-cell decisions and placements across rows/spiral, 3 seeds), so no TerrainOracle redirect is
+needed. The stage-0 module ships as `-Dprobe.prefilter.witchery=N`: candidate cells 9/9, biome ids 8/8,
+gate verdicts 8/8, handler try-order 6/6, and all 6 real placements covered. It stops short of the
+winner, which needs the placing call and therefore world writes. See
+results/2026-08-29-witchery-prefilter and results/2026-08-29-witchery-placement-trace.
+**Block reads are no longer the obstacle for any of these (2026-08-29).**
+`Prefilter.VirginChunkProvider` backs `SeedProbeWorld`, so `world.getBlock`/`getBlockMetadata` answer
+virgin terrain and `TerrainOracle` — which falls through to `world.getBlock` for a non-WorldServer —
+works here unchanged.
+**Roguelike validLocation/loot: SUPERSEDED 2026-08-29.** `RoguelikePrefilter` builds the real
+`WorldEditor` and `Dungeon` and calls `spawnInChunk`, then reads `Dungeon.getChests()`. On seed -777
+that is 108/108 chests matched against a full-gen radius-15 run — position, items, slot indices and
+NBT all exact — at 193 ms per dungeon, +5.5% on a gated sweep. The trigger Random needs no registry
+introspection: `GameRegistry.generateWorld` reseeds before *each* generator, so Roguelike always
+receives `new Random(chunkSeed)`. See results/2026-08-29-roguelike-prefilter.
+SUPERSEDED entries: village piece layout (done — coke%-floor modules, now golden 79/79 piece-exact
+over 99 corpus seeds, 79/80 village recall, 99/99 exact spawns);
+village chest CONTENTS (2026-08-29, `-Dprobe.prefilter.villagechests=true`): **95/95 exact** across
+eleven loot categories including villageBlacksmith and both TinkerConstruct chests — item, damage,
+count, slot and NBT, from the structure layout alone, no chunk generated. All 95 predicted positions
+exist; zero over-prediction. Sites are refused rather than guessed when the roll count is not
+table-drawn (genuinely stream-derived), the container size was never measured, or the loot table reads
+0..0 in the prefilter process. See results/2026-08-29-village-chest-prefilter;
+vein terrain rerolls + Y (reassessed feasible 2026-08-03 — `veinMinY` was always
 pure RNG, and the gate's virgin-terrain input is already computed then discarded at
 `Prefilter.java:300`).
+**Chest contents: SUPERSEDED for structure chests as of fix jar F10 (2026-08-29) — not because the
+prefilter got smarter, but because the game changed.** Village, mineshaft, stronghold, pyramid,
+vanilla-dungeon and Witchery chest contents are now a pure function of
+`(seed, component minX/minZ, piece class, chest local x/y/z)` plus the loot table, with no dependence
+on the populate stream. The prefilter already emits exact piece class and `minX`/`minZ` without
+generating a chunk, and it runs post-TooMuchLoot, so after F9 its live tables are the only tables.
+Village chest contents are therefore computable with **zero terrain generation** — a free stage that
+can gate on actual paper / TiC heads / GT ingots instead of on piece presence.
+Two residuals, both already carried by the piece module: chest **Y** is not predicted (emit exact XZ,
+flag Y approximate; XZ distance is what ranking uses), and a piece can still be pruned at build time
+when `getAverageGroundLevel` fails. Roguelike loot is a separate path and stays in the list above — it
+needs the dungeon replayed, which needs the virgin-terrain chunk provider.
 Golden test: for 3 seeds assert predictions appear in full-gen probe JSON.
 
 ---

@@ -17,7 +17,7 @@ nothing to do with each other:
 
 NBT-only differences are reported as a failure, not a footnote. Chest gameplay state lives in tags —
 enchantments, charge levels, aspect fills, bee genomes — and treating an NBT-only diff as cosmetic
-has hidden real defects in this project before. See docs/HANDOFF.md rule 6.
+has hidden real defects in this project before.
 """
 import json
 import sys
@@ -25,10 +25,23 @@ from collections import Counter
 from pathlib import Path
 
 
+# Sidecars the probe writes beside the reports. Skipped by name rather than by "has no seed key", so a
+# future sidecar that happens to carry one cannot be mistaken for a report.
+SIDECARS = {"gtmats.json", "gtdims.json", "biomes.json"}
+
+
 def load(d):
-    """seed -> {(x,y,z) -> chest dict} across every report in the directory."""
+    """"seed@dim" -> {(x,y,z) -> chest dict} across every report in the directory.
+
+    Keyed by dimension as well as seed since report format 6. One seed can now have both an overworld
+    and a Twilight Forest report in a directory; keying on the seed alone let the second silently
+    overwrite the first, so the tool compared OW-against-OW or TF-against-TF depending on glob order
+    and printed ALL SEEDS IDENTICAL either way.
+    """
     out = {}
     for p in sorted(Path(d).glob("*.json")):
+        if p.name in SIDECARS:
+            continue
         try:
             r = json.loads(p.read_text())
         except Exception as e:
@@ -37,6 +50,9 @@ def load(d):
         seed = r.get("seed")
         if seed is None:
             continue
+        key = f"{seed}@{r.get('dim', 0)}"
+        if key in out:
+            print(f"  ! {p.name}: duplicate seed/dim {key} — earlier report ignored", file=sys.stderr)
         chunks = (r.get("search") or {}).get("chunks") or {}
         chests = {}
         for cv in chunks.values():
@@ -44,7 +60,7 @@ def load(d):
                 continue
             for c in cv.get("chests") or []:
                 chests[tuple(c.get("pos", []))] = c
-        out[str(seed)] = chests
+        out[key] = chests
     return out
 
 
@@ -60,7 +76,12 @@ def main():
     verbose = "--verbose" in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     A, B = load(args[0]), load(args[1])
-    seeds = sorted(set(A) & set(B), key=lambda s: int(s))
+
+    def sort_key(k):
+        seed, _, dim = k.partition("@")
+        return (int(dim or 0), int(seed))
+
+    seeds = sorted(set(A) & set(B), key=sort_key)
     print(f"batch A: {len(A)} seeds   batch B: {len(B)} seeds   compared: {len(seeds)}")
     for s in sorted(set(A) ^ set(B)):
         print(f"  ! seed {s} present in only one batch")

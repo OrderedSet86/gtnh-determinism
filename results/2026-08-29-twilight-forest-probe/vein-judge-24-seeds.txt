@@ -1,0 +1,47 @@
+corpus: /tmp/claude-1000/-home-order-Dropbox-OrderedSetCode-cloned-gtnh-gtnh-determinism/e2e8c8e8-fc90-4c8f-811a-dc92fef9de6f/scratchpad/tfcorpus   dim 7 (Twilight Forest)
+  seeds 24   corpus cells 1485   with a prediction 1485
+
+identity
+  matched                 482
+  identity_flip           753
+    lost_to_reroll        1   (predicted a shard mix, corpus has another)
+    reroll_beneficiary    95   (corpus GAINED a shard mix)
+    ^ these two count different things and must never be summed
+  unidentified_ambiguous  29
+  unidentified_below-floor 14
+  unidentified_no-matching-mix 207
+  shard_unknown           0   (only the shared Amber/Cinnabar materials)
+  ambiguous_boundary      0 blocks in chunks spanning two cells
+  no_eligible_draw        0
+
+by predicted Y band  (TF ground level is 30, so high-band veins probe air and reroll)
+  tMinY <= ground   462/514   89.9%
+  tMinY >  ground   20/721   2.8%
+
+the three shard mixes
+  ore.mix.aquaignis        predicted   20  correct   20  in corpus   54   precision 100.0%  recall  37.0%
+  ore.mix.terraaer         predicted   16  correct   16  in corpus   47   precision 100.0%  recall  34.0%
+  ore.mix.perditioordo     predicted   16  correct   15  in corpus   45   precision  93.8%  recall  33.3%
+  ALL THREE                predicted   52  correct   51  in corpus  146   precision  98.1%  recall  34.9%
+
+full Twilight Forest pool, by predicted mix (first measurement outside the overworld)
+  ore.mix.gold             minY  30  predicted  185  correct   10  precision   5.4%
+  ore.mix.magnetite        minY  60  predicted  168  correct    0  precision   0.0%
+  ore.mix.iron             minY  10  predicted  163  correct  130  precision  79.8%
+  ore.mix.coal             minY  30  predicted   97  correct    0  precision   0.0%
+  ore.mix.sapphire         minY  10  predicted   69  correct   59  precision  85.5%
+  ore.mix.apatite          minY  40  predicted   68  correct    1  precision   1.5%
+  ore.mix.olivine          minY  10  predicted   64  correct   61  precision  95.3%
+  ore.mix.cassiterite      minY  60  predicted   63  correct    0  precision   0.0%
+  ore.mix.salts            minY  50  predicted   62  correct    2  precision   3.2%
+  ore.mix.nickel           minY  10  predicted   53  correct   43  precision  81.1%
+  ore.mix.lapis            minY  20  predicted   50  correct   18  precision  36.0%
+  ore.mix.tfgalena         minY   5  predicted   47  correct   47  precision 100.0%
+  ore.mix.diamond          minY   5  predicted   46  correct   43  precision  93.5%
+  ore.mix.soapstone        minY  20  predicted   46  correct   16  precision  34.8%
+  ore.mix.aquaignis        minY   5  predicted   20  correct   20  precision 100.0%
+  ore.mix.perditioordo     minY   5  predicted   16  correct   15  precision  93.8%
+  ore.mix.terraaer         minY   5  predicted   16  correct   16  precision 100.0%
+  ore.mix.molybdenum       minY  20  predicted    2  correct    1  precision  50.0%
+
+shard-mix precision criterion (>= 85%): PASS

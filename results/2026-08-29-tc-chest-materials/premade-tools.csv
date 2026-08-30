@@ -1,0 +1,7 @@
+registry_name,tool,source,category,display_name,weight,pick_chance_per_roll,exp_per_chest,head_meta,head_material,handle_meta,handle_material,accessory_meta,accessory_material,nbt_durability,nbt_mining_speed,nbt_attack,nbt_harvest_level,nbt_unbreaking,calc_durability,calc_mining_speed,calc_attack,calc_harvest_level,calc_unbreaking,matches_nbt
+TConstruct:broadsword,Broadsword,chestgenhooks,bonusChest,Bronze Broadsword,5,0.064935,0.6494,14,Bronze,14,Bronze,14,Bronze,427,650,7,4,1,427,650,7,4,1,yes
+TConstruct:hatchet,Hatchet,chestgenhooks,bonusChest,Starter Hatchet,5,0.064935,0.6494,0,Wood,0,Wood,,,38,150,4,0,0,38,150,4,0,0,yes
+TConstruct:pickaxe,Pickaxe,chestgenhooks,bonusChest,Starter Pickaxe,5,0.064935,0.6494,0,Wood,0,Wood,0,Wood,38,150,2,0,0,38,150,2,0,0,yes
+TConstruct:broadsword,Broadsword,chestgenhooks,villageBlacksmith,Bronze Broadsword,10,0.014577,0.1093,14,Bronze,14,Bronze,14,Bronze,427,650,7,4,1,427,650,7,4,1,yes
+TConstruct:pickaxe,Pickaxe,chestgenhooks,villageBlacksmith,Bronze Pickaxe,10,0.014577,0.1093,14,Bronze,14,Bronze,14,Bronze,356,650,4,3,1,356,650,4,3,1,yes
+TConstruct:shovel,Shovel,chestgenhooks,villageBlacksmith,Bronze Shovel,1,0.001458,0.0109,14,Bronze,14,Bronze,,,356,650,5,4,1,356,650,5,4,1,yes

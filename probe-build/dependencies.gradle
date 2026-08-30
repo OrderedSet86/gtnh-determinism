@@ -1,4 +1,8 @@
 dependencies {
     // Mixin target for the opt-in parallel-noise fast path (-Dprobe.parallelnoise=true)
     compileOnly('com.github.GTNewHorizons:Realistic-World-Gen:alpha-1.5.2:dev')
+    // The stage-0 prefilter's Roguelike module constructs the real WorldEditor and Dungeon instead of
+    // reimplementing them, so those types must be on the compile classpath. Same pin as fix-build.
+    // compileOnly: the probe declares no dependency on Roguelike and the module no-ops when it is absent.
+    compileOnly('com.github.GTNewHorizons:Roguelike-Dungeons:1.6.6-GTNH:dev')
 }

@@ -1,0 +1,23 @@
+cell           predicted                 minY  actual                    blocks  verdict
+(-17, 7)       ore.mix.salts               50  ore.mix.diamond              460  rerolled
+(-17, 10)      ore.mix.iron                10  ore.mix.iron                2119  exact
+(-17, 13)      ore.mix.sapphire            10  ore.mix.sapphire            1297  exact
+(-17, 16)      ore.mix.magnetite           60  ore.mix.coal                 817  rerolled
+(-14, 7)       ore.mix.salts               50  ore.mix.magnetite            154  rerolled
+(-14, 10)      ore.mix.apatite             40  ore.mix.olivine             1369  rerolled
+(-14, 13)      ore.mix.soapstone           20  ore.mix.soapstone             41  exact
+(-14, 16)      ore.mix.sapphire            10  ore.mix.sapphire            1641  exact
+(-14, 19)      ore.mix.sapphire            10  ore.mix.sapphire            1442  exact
+(-11, 7)       ore.mix.perditioordo         5  ore.mix.perditioordo         958  exact
+(-11, 13)      ore.mix.cassiterite         60  ore.mix.olivine             1677  rerolled
+(-11, 16)      ore.mix.salts               50  ore.mix.iron                1209  rerolled
+(-11, 19)      ore.mix.apatite             40  None                         916  unidentified
+(-8, 7)        ore.mix.terraaer             5  ore.mix.terraaer            1008  exact
+(-8, 10)       ore.mix.diamond              5  None                         917  unidentified
+(-8, 13)       ore.mix.iron                10  ore.mix.iron                1998  exact
+(-8, 19)       ore.mix.diamond              5  ore.mix.diamond              611  exact
+(-5, 7)        ore.mix.tfgalena             5  ore.mix.tfgalena            2541  exact
+(-5, 10)       ore.mix.apatite             40  ore.mix.olivine             1474  rerolled
+(-5, 13)       ore.mix.diamond              5  None                         786  unidentified
+(-5, 16)       ore.mix.nickel              10  ore.mix.nickel              1332  exact
+(-5, 19)       ore.mix.magnetite           60  ore.mix.nickel               445  rerolled

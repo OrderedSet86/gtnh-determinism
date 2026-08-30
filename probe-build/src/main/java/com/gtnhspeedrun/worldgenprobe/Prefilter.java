@@ -17,6 +17,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldProviderSurface;
 import net.minecraft.world.WorldSettings;
 import net.minecraft.world.WorldType;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.gen.structure.MapGenVillage;
 import net.minecraft.world.storage.ISaveHandler;
@@ -54,11 +55,26 @@ import net.minecraft.world.storage.ISaveHandler;
  * [-Dprobe.prefilter.radius=64 (chunks around origin for village cells)]
  * [-Dprobe.prefilter.pieces=true (full village piece layouts)]
  * [-Dprobe.prefilter.terrain=4 (digest radius in chunks around predicted spawn; -1 disables terrain+spawn)]
+ * [-Dprobe.prefilter.chunkcache=256 (LRU size of the virgin-terrain chunk cache)]
+ * [-Dprobe.prefilter.strictworld=true (throw on a live world write instead of logging)]
+ * [-Dprobe.prefilter.digestviaprovider=true (terrain digest source; false = the old hand-rolled path)]
+ * [-Dprobe.prefilter.selftest=false (cross-check world.getBlock against the digest)]
+ * [-Dprobe.prefilter.dungeon=N (Roguelike trigger scan radius in chunks around predicted spawn; -1 off)]
+ * [-Dprobe.prefilter.gate.dungeon=false (kill seeds with no dungeon trigger in range)]
+ * [-Dprobe.prefilter.witchery=N (Witchery candidate-cell scan radius in chunks around predicted spawn; -1 off)]
+ *
+ * Block reads (2026-08-29): {@link VirginChunkProvider} backs the world, so {@code world.getBlock} and
+ * {@code getBlockMetadata} answer virgin terrain. That is what {@code TerrainOracle} falls through to for a
+ * non-WorldServer, so the fix jar's virgin-terrain consumers — Roguelike validLocation, the GT vein reroll gate —
+ * become evaluable here. Verified 64800 columns / 200 seeds with zero mismatches against the independently
+ * computed digest; see results/2026-08-29-virgin-chunk-provider.
  */
 public final class Prefilter {
 
     /** Minimal seed-bearing World: enough construction to satisfy RWG's chunk manager and world type wiring. */
     static final class SeedProbeWorld extends World {
+
+        private VirginChunkProvider virgin;
 
         SeedProbeWorld(long seed, WorldType type) {
             super(
@@ -69,9 +85,20 @@ public final class Prefilter {
                 new Profiler());
         }
 
+        /**
+         * Virgin terrain on demand, so {@code world.getBlock} and {@code getBlockMetadata} answer worldlessly.
+         * Called from {@code World}'s constructor, after {@code worldInfo} and {@code provider.registerWorld},
+         * so the seed and the chunk manager are both available — but the generator is still built lazily, since
+         * nothing needs it until the first read.
+         */
         @Override
         protected IChunkProvider createChunkProvider() {
-            return null;
+            virgin = new VirginChunkProvider(this);
+            return virgin;
+        }
+
+        VirginChunkProvider virginProvider() {
+            return virgin;
         }
 
         @Override
@@ -86,12 +113,224 @@ public final class Prefilter {
 
         /**
          * MapGenCaves' Forge-patched digBlock asks the world for the biome; the vanilla path first checks
-         * blockExists → NPE on our null chunk provider. Answer straight from the chunk manager — for
+         * blockExists, which is false for every chunk here. Answer straight from the chunk manager — for
          * never-generated chunks that is exactly what the vanilla fallback does anyway.
          */
         @Override
         public net.minecraft.world.biome.BiomeGenBase getBiomeGenForCoords(int x, int z) {
             return getWorldChunkManager().getBiomeGenAt(x, z);
+        }
+
+        // --- Write guards. Cached chunks ARE the virgin terrain; a live write would edit the oracle in place
+        // and every later read would answer from a world that no longer matches the seed — deterministically,
+        // and therefore invisibly. Nothing in the intended call graph writes, so these should never fire.
+
+        @Override
+        public boolean setBlock(int x, int y, int z, net.minecraft.block.Block block, int meta, int flags) {
+            return refuseWrite("setBlock", x, y, z);
+        }
+
+        @Override
+        public boolean setBlockMetadataWithNotify(int x, int y, int z, int meta, int flags) {
+            return refuseWrite("setBlockMetadataWithNotify", x, y, z);
+        }
+
+        @Override
+        public void setTileEntity(int x, int y, int z, net.minecraft.tileentity.TileEntity te) {
+            refuseWrite("setTileEntity", x, y, z);
+        }
+
+        private boolean refuseWrite(String what, int x, int y, int z) {
+            final String msg = "prefilter: live world write " + what
+                + " at "
+                + x
+                + ","
+                + y
+                + ","
+                + z
+                + " — the chunk cache is the virgin-terrain oracle and must stay read-only";
+            if (Boolean.parseBoolean(System.getProperty("probe.prefilter.strictworld", "true"))) {
+                throw new IllegalStateException(msg);
+            }
+            WorldgenProbe.LOG.error("[prefilter] {}", msg);
+            return false;
+        }
+
+        // Lighting and render notifications walk neighbouring chunks, which would pull the whole window into
+        // the cache for no benefit. Nothing here has a renderer or a light-sensitive consumer.
+
+        @Override
+        public void markBlockForUpdate(int x, int y, int z) {}
+
+        @Override
+        public void notifyBlockChange(int x, int y, int z, net.minecraft.block.Block block) {}
+
+        @Override
+        public void func_147479_m(int x, int y, int z) {}
+
+        @Override
+        public boolean updateLightByType(net.minecraft.world.EnumSkyBlock type, int x, int y, int z) {
+            return false;
+        }
+    }
+
+    /**
+     * Virgin-terrain chunk provider: real {@link Chunk} objects from the pack's real chunk generator, cached.
+     *
+     * <p>
+     * This is what turns {@code SeedProbeWorld} from "a seed carrier" into "a world you can read". Everything
+     * downstream of it — the GT vein reroll gate, Roguelike's {@code validLocation}, the fix jar's
+     * {@code TerrainOracle}, which falls through to {@code world.getBlock} for a non-{@code WorldServer} — needs
+     * exactly one thing: block and metadata reads that are a pure function of the seed.
+     *
+     * <p>
+     * It dispatches to {@code ChunkGeneratorRealistic.provideChunk} rather than replicating the terrain steps.
+     * That is the same method {@code TerrainOracle} calls in a full run, and it is what
+     * {@code WorldTypeRealistic.getChunkGenerator} builds, so parity is structural instead of tested-in. It also
+     * closes an omission in the hand-rolled path: {@code RwgTerrain} ran only
+     * {@code generateTerrain → replaceBlocksForBiome → caves} and skipped the per-biome {@code generateMapGen},
+     * which writes blocks.
+     *
+     * <p>
+     * {@link #chunkExists} always answers false, which is the truth — nothing here is a loaded, populated chunk —
+     * and is load-bearing for the fix jar: {@code PendingSlices.shouldBuffer} short-circuits on it, so a dungeon
+     * generated against this world buffers every write instead of reaching {@code world.setBlock}.
+     */
+    static final class VirginChunkProvider implements IChunkProvider {
+
+        private static final int DEFAULT_CACHE = 256;
+
+        private final World world;
+        private IChunkProvider gen;
+        private final Map<Long, Chunk> cache;
+        /** Coords currently inside provideChunk: re-entry would recurse forever, so it fails loudly instead. */
+        private final java.util.Set<Long> generating = new java.util.HashSet<>();
+        /** Coords generated at least once, so an eviction followed by a re-request is visible as thrash. */
+        private final java.util.Set<Long> seen = new java.util.HashSet<>();
+
+        private int generated;
+        private int regenerated;
+
+        VirginChunkProvider(World world) {
+            this.world = world;
+            final int max = Integer.getInteger("probe.prefilter.chunkcache", DEFAULT_CACHE);
+            this.cache = new LinkedHashMap<Long, Chunk>(64, 0.75f, true) {
+
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, Chunk> eldest) {
+                    return size() > max;
+                }
+            };
+        }
+
+        private static long key(int cx, int cz) {
+            return ((long) cx << 32) ^ (cz & 0xffffffffL);
+        }
+
+        private IChunkProvider generator() {
+            if (gen == null) {
+                try {
+                    gen = (IChunkProvider) Class.forName("rwg.world.ChunkGeneratorRealistic")
+                        .getConstructor(World.class, long.class)
+                        .newInstance(world, world.getSeed());
+                } catch (Exception e) {
+                    throw new IllegalStateException("prefilter: cannot build RWG chunk generator", e);
+                }
+            }
+            return gen;
+        }
+
+        @Override
+        public Chunk provideChunk(int cx, int cz) {
+            final long k = key(cx, cz);
+            final Chunk hit = cache.get(k);
+            if (hit != null) return hit;
+            if (!generating.add(k)) {
+                throw new IllegalStateException(
+                    "prefilter: re-entrant chunk generation at " + cx
+                        + ","
+                        + cz
+                        + " — a generator read the world "
+                        + "for the chunk it is building");
+            }
+            try {
+                final Chunk c = generator().provideChunk(cx, cz);
+                cache.put(k, c);
+                generated++;
+                if (!seen.add(k)) regenerated++;
+                return c;
+            } finally {
+                generating.remove(k);
+            }
+        }
+
+        @Override
+        public Chunk loadChunk(int cx, int cz) {
+            return provideChunk(cx, cz);
+        }
+
+        /** Always false: these are generated-on-demand terrain snapshots, never loaded populated chunks. */
+        @Override
+        public boolean chunkExists(int cx, int cz) {
+            return false;
+        }
+
+        @Override
+        public void populate(IChunkProvider p, int cx, int cz) {}
+
+        @Override
+        public boolean saveChunks(boolean all, net.minecraft.util.IProgressUpdate progress) {
+            return true;
+        }
+
+        @Override
+        public boolean unloadQueuedChunks() {
+            return false;
+        }
+
+        @Override
+        public boolean canSave() {
+            return false;
+        }
+
+        @Override
+        public String makeString() {
+            return "prefilter-virgin " + cache.size() + "/" + generated + " gen, " + regenerated + " regen";
+        }
+
+        @Override
+        public List<net.minecraft.world.biome.BiomeGenBase.SpawnListEntry> getPossibleCreatures(
+            net.minecraft.entity.EnumCreatureType type, int x, int y, int z) {
+            return java.util.Collections.emptyList();
+        }
+
+        @Override
+        public net.minecraft.world.ChunkPosition func_147416_a(World w, String name, int x, int y, int z) {
+            return null;
+        }
+
+        @Override
+        public int getLoadedChunkCount() {
+            return cache.size();
+        }
+
+        @Override
+        public void recreateStructures(int cx, int cz) {}
+
+        @Override
+        public void saveExtraData() {}
+
+        int generatedCount() {
+            return generated;
+        }
+
+        /**
+         * How many chunks had to be generated a second time because the LRU evicted them. Nonzero means the
+         * cache is too small for the access pattern and the run is paying full terrain cost repeatedly — a
+         * throughput bug that would otherwise be invisible.
+         */
+        int regeneratedCount() {
+            return regenerated;
         }
     }
 
@@ -202,6 +441,15 @@ public final class Prefilter {
      */
     static final class RwgTerrain {
 
+        /**
+         * Migration switch for the digest source. True dispatches to the world's own chunk provider (which runs
+         * the whole of provideChunk, including the generateMapGen pass the hand-rolled path skipped); false keeps
+         * the original subsequence. Exists so the change to an already-golden-tested surface can be A/B'd on one
+         * flag rather than one rebuild, and should be removed once that comparison is recorded.
+         */
+        private static final boolean VIA_PROVIDER = Boolean
+            .parseBoolean(System.getProperty("probe.prefilter.digestviaprovider", "true"));
+
         private final Object gen;
         private final Object cmr;
         private final java.lang.reflect.Method mGenTerrain;
@@ -274,6 +522,80 @@ public final class Prefilter {
             final long key = ((long) cx << 32) ^ (cz & 0xffffffffL);
             Cols c = cache.get(key);
             if (c != null) return c;
+            c = VIA_PROVIDER ? digestFromProvider(cx, cz) : digestHandRolled(cx, cz);
+            cache.put(key, c);
+            return c;
+        }
+
+        /**
+         * Digest a chunk the world's own provider generated. This is the same {@code provideChunk} the full run
+         * calls through {@code TerrainOracle}, so it needs no reflection and cannot drift from it — and unlike
+         * the hand-rolled path below it includes the per-biome {@code generateMapGen} pass, which writes blocks.
+         */
+        private Cols digestFromProvider(int cx, int cz) {
+            final Chunk chunk = world.getChunkFromChunkCoords(cx, cz);
+            final net.minecraft.world.chunk.storage.ExtendedBlockStorage[] sections = chunk.getBlockStorageArray();
+            final Cols c = new Cols();
+            int sandTotal = 0;
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    // Cols is indexed col = x*16+z, matching RWG's (j*16+i)*256+k layout.
+                    final int col = (x << 4) | z;
+                    int k = 63;
+                    while (k < 255 && !isAirLike(blockAt(sections, x, k + 1, z))) k++;
+                    c.top[col] = blockAt(sections, x, k, z);
+                    int ts = 255;
+                    while (ts > 0) {
+                        final net.minecraft.block.Block b = blockAt(sections, x, ts, z);
+                        if (!isAirLike(b) && b != net.minecraft.init.Blocks.water) break;
+                        ts--;
+                    }
+                    c.topSolid[col] = (short) ts;
+                    c.water[col] = blockAt(sections, x, 62, z) == net.minecraft.init.Blocks.water;
+                    int run = 0;
+                    while (run < ts && blockAt(sections, x, ts - run, z) == net.minecraft.init.Blocks.sand
+                        && run < 127) {
+                        run++;
+                    }
+                    c.sandRun[col] = (byte) run;
+                    final net.minecraft.block.Block floor = blockAt(sections, x, ts, z);
+                    c.gravelTop[col] = floor == net.minecraft.init.Blocks.gravel;
+                    c.clayCand[col] = c.water[col]
+                        && (floor == net.minecraft.init.Blocks.sand || floor == net.minecraft.init.Blocks.gravel
+                            || floor == net.minecraft.init.Blocks.dirt
+                            || floor == net.minecraft.init.Blocks.grass);
+                }
+            }
+            // Full-volume sand count, skipping empty sections: RWG terrain fills 5-7 of the 16, so most of the
+            // column space is a null pointer rather than 4096 reads.
+            for (int s = 0; s < sections.length; s++) {
+                final net.minecraft.world.chunk.storage.ExtendedBlockStorage sec = sections[s];
+                if (sec == null) continue;
+                for (int y = 0; y < 16; y++) {
+                    for (int x = 0; x < 16; x++) {
+                        for (int z = 0; z < 16; z++) {
+                            if (sec.getBlockByExtId(x, y, z) == net.minecraft.init.Blocks.sand) sandTotal++;
+                        }
+                    }
+                }
+            }
+            c.sandTotal = sandTotal;
+            return c;
+        }
+
+        private static net.minecraft.block.Block blockAt(
+            net.minecraft.world.chunk.storage.ExtendedBlockStorage[] sections, int x, int y, int z) {
+            if (y < 0 || y > 255) return net.minecraft.init.Blocks.air;
+            final net.minecraft.world.chunk.storage.ExtendedBlockStorage sec = sections[y >> 4];
+            return sec == null ? net.minecraft.init.Blocks.air : sec.getBlockByExtId(x, y & 15, z);
+        }
+
+        /**
+         * The original hand-rolled subsequence, kept behind {@code -Dprobe.prefilter.digestviaprovider=false} so
+         * the switch above can be A/B'd against the corpora it was golden-tested on. Delete once that comparison
+         * is recorded.
+         */
+        private Cols digestHandRolled(int cx, int cz) throws Exception {
             final Random rnd = (Random) fRand.get(gen);
             rnd.setSeed((long) cx * 341873128712L + (long) cz * 132897987541L);
             final net.minecraft.block.Block[] blocks = new net.minecraft.block.Block[65536];
@@ -298,7 +620,7 @@ public final class Prefilter {
             mReplace.invoke(gen, cx, cz, blocks, meta, biomes, base, noiseArg);
             caves.func_151539_a(null, world, cx, cz, blocks);
             // digest to ~3 KB before caching (a full Block[] chunk is 512 KB)
-            c = new Cols();
+            final Cols c = new Cols();
             for (int col = 0; col < 256; col++) {
                 final int off = col << 8; // col = x*16+z, matching RWG's (j*16+i)*256+k layout
                 int k = 63;
@@ -325,7 +647,6 @@ public final class Prefilter {
                 if (blocks[i] == net.minecraft.init.Blocks.sand) sandTotal++;
             }
             c.sandTotal = sandTotal;
-            cache.put(key, c);
             return c;
         }
 
@@ -366,7 +687,8 @@ public final class Prefilter {
         throw new NoSuchMethodException(cls.getName() + "." + String.join("/", names));
     }
 
-    private static Field findField(Class<?> cls, String... names) throws NoSuchFieldException {
+    /** Package-private: {@link BiomeTable} reads protected biome flags and RWG's private buckets through it. */
+    static Field findField(Class<?> cls, String... names) throws NoSuchFieldException {
         for (final String name : names) {
             for (Class<?> c = cls; c != null; c = c.getSuperclass()) {
                 try {
@@ -460,33 +782,65 @@ public final class Prefilter {
             final net.minecraft.world.gen.structure.StructureBoundingBox bb = bboxField(comp);
             if (bb == null) return out;
             final int mode = coordBaseMode(comp);
+            if (mode < 0 || mode > 3) return out; // coordBaseMode -1: orientation undecided, position undefined
             for (int i = 0; i < call[3]; i++) {
                 final int lx = call[0] + i, lz = call[2];
-                final int wx, wz;
-                switch (mode) { // StructureComponent.getXWithOffset / getZWithOffset
-                    case 0:
-                        wx = bb.minX + lx;
-                        wz = bb.minZ + lz;
-                        break;
-                    case 1:
-                        wx = bb.maxX - lz;
-                        wz = bb.minZ + lx;
-                        break;
-                    case 2:
-                        wx = bb.minX + lx;
-                        wz = bb.maxZ - lz;
-                        break;
-                    case 3:
-                        wx = bb.minX + lz;
-                        wz = bb.minZ + lx;
-                        break;
-                    default:
-                        return out; // coordBaseMode -1: orientation not decided, position undefined
-                }
-                out.add(cls + ":prof" + profs[i] + "@" + wx + "," + wz);
+                out.add(
+                    cls + ":prof"
+                        + profs[i]
+                        + "@"
+                        + xWithOffset(bb, mode, lx, lz)
+                        + ","
+                        + zWithOffset(bb, mode, lx, lz));
             }
         } catch (Exception ignored) {}
         return out;
+    }
+
+    /**
+     * {@code StructureComponent.getXWithOffset}, replicated for a component we hold reflectively.
+     *
+     * <p>
+     * Piece-local coordinates are stated before rotation; the piece's {@code coordBaseMode} decides how they map
+     * onto the world. Both the villager predictor and the chest module need this, so it lives in one place —
+     * writing the switch twice is how the two would eventually disagree.
+     *
+     * <p>
+     * Callers must reject {@code mode < 0} themselves: vanilla passes the local coordinate straight through for
+     * an undecided orientation, which is not a world position and must not be treated as one.
+     */
+    static int xWithOffset(net.minecraft.world.gen.structure.StructureBoundingBox bb, int mode, int lx, int lz) {
+        switch (mode) {
+            case 0:
+            case 2:
+                return bb.minX + lx;
+            case 1:
+                return bb.maxX - lz;
+            case 3:
+                return bb.minX + lz;
+            default:
+                return lx;
+        }
+    }
+
+    /** {@code StructureComponent.getZWithOffset}. See {@link #xWithOffset}. */
+    static int zWithOffset(net.minecraft.world.gen.structure.StructureBoundingBox bb, int mode, int lx, int lz) {
+        switch (mode) {
+            case 0:
+                return bb.minZ + lz;
+            case 1:
+            case 3:
+                return bb.minZ + lx;
+            case 2:
+                return bb.maxZ - lz;
+            default:
+                return lz;
+        }
+    }
+
+    /** {@code StructureComponent.getYWithOffset}: local Y is relative to the box floor once oriented. */
+    static int yWithOffset(net.minecraft.world.gen.structure.StructureBoundingBox bb, int mode, int ly) {
+        return mode == -1 ? ly : ly + bb.minY;
     }
 
     private static net.minecraft.world.gen.structure.StructureBoundingBox bboxField(Object comp) throws Exception {
@@ -513,6 +867,9 @@ public final class Prefilter {
         }
         return -1;
     }
+
+    /** -Dprobe.prefilter.villagechests=true: predict each village piece's chest contents (Stage 4). */
+    private static final boolean CHESTS_ENABLED = Boolean.getBoolean("probe.prefilter.villagechests");
 
     private static List<String> villageStarts(Object gen, World world, List<int[]> cells) throws Exception {
         final Map<?, ?> structureMap = (Map<?, ?>) STRUCTURE_MAP.get(gen);
@@ -546,6 +903,31 @@ public final class Prefilter {
                 final List<String> villagers = new ArrayList<>();
                 for (final Object comp : comps) villagers.addAll(predictVillagers(comp));
                 java.util.Collections.sort(villagers);
+                // Chest contents per piece. Uses exactly the inputs already gathered above — class, box and
+                // orientation — because F10's fork uses no terrain term.
+                final List<String> chests = new ArrayList<>();
+                if (CHESTS_ENABLED) {
+                    for (final Object comp : comps) {
+                        final net.minecraft.world.gen.structure.StructureBoundingBox cbb = bboxField(comp);
+                        if (cbb == null) continue;
+                        for (final VillageChestPrefilter.Predicted p : VillageChestPrefilter.predict(
+                            world.getSeed(),
+                            comp.getClass()
+                                .getName(),
+                            coordBaseMode(comp),
+                            cbb,
+                            cbb.minY)) {
+                            chests.add(
+                                "{\"piece\": \"" + p.piece
+                                    + "\", \"category\": \""
+                                    + p.category
+                                    + "\", \"chest\": "
+                                    + p.itemsJson
+                                    + "}");
+                        }
+                    }
+                    java.util.Collections.sort(chests);
+                }
                 final StringBuilder sb = new StringBuilder(64 + 64 * parts.size());
                 sb.append("{\"c\": [")
                     .append(cx)
@@ -559,7 +941,13 @@ public final class Prefilter {
                     .append(String.join("; ", parts))
                     .append("\", \"villagers\": \"")
                     .append(String.join("; ", villagers))
-                    .append("\"}");
+                    .append("\"");
+                if (CHESTS_ENABLED) {
+                    sb.append(", \"chests\": [")
+                        .append(String.join(", ", chests))
+                        .append("]");
+                }
+                sb.append("}");
                 out.add(sb.toString());
             } catch (Exception ex) {
                 out.add(
@@ -591,11 +979,18 @@ public final class Prefilter {
         final Object savedHandler = fSave.get(null);
         final Object savedStorage = fStore.get(null);
 
+        // Biome climate/humidity sidecar, written next to the JSONL. Needs a live chunk manager for the
+        // reachability section, so it rides the first seed's world rather than constructing its own; after the
+        // first call it is one boolean check per seed.
+        final File tableDir = new File(outPath).getAbsoluteFile()
+            .getParentFile();
+
         final long t0 = System.nanoTime();
         int done = 0;
         try (FileWriter w = new FileWriter(outPath)) {
             for (final long seed : seeds) {
                 final SeedProbeWorld world = new SeedProbeWorld(seed, rwg);
+                BiomeTable.dumpOnce(tableDir, world.getWorldChunkManager());
                 w.write(evaluate(world, seed, radiusChunks));
                 w.write("\n");
                 done++;
@@ -607,6 +1002,27 @@ public final class Prefilter {
         } finally {
             fSave.set(null, savedHandler);
             fStore.set(null, savedStorage);
+        }
+        // Coverage of the hand-built chest-site table, said out loud. A piece the table does not know produces
+        // no chest, which is indistinguishable in the output from a piece that genuinely has none.
+        if (CHESTS_ENABLED) {
+            final java.util.Set<String> skipped = VillageChestPrefilter.unpredictableSites();
+            if (!skipped.isEmpty()) {
+                WorldgenProbe.LOG.warn(
+                    "[prefilter] {} chest sites were deliberately NOT predicted: {}",
+                    skipped.size(),
+                    String.join(", ", skipped));
+            }
+            final java.util.Set<String> unknown = VillageChestPrefilter.unknownPieces();
+            if (unknown.isEmpty()) {
+                WorldgenProbe.LOG.info("[prefilter] chest-site table covered every piece class seen");
+            } else {
+                WorldgenProbe.LOG.warn(
+                    "[prefilter] {} piece classes are NOT in the chest-site table — any chests they place were "
+                        + "not predicted: {}",
+                    unknown.size(),
+                    String.join(", ", unknown));
+            }
         }
         final double secs = (System.nanoTime() - t0) / 1e9;
         WorldgenProbe.LOG.info(
@@ -635,6 +1051,21 @@ public final class Prefilter {
         try {
             final Object gen = villageGenerator();
             WORLD_OBJ.set(gen, world);
+            // Village starts must be read before any chunk is generated. provideChunk runs RWG's OWN village
+            // map-gen, which registers starts into the shared "Village" MapGenStructureData in
+            // world.perWorldStorage — and villageStarts nulls its generator's cache field, so func_143027_a
+            // would reload from that shared data and emit cells this pass never asked about. Each seed gets a
+            // fresh world, so the leak cannot cross seeds; this guard catches a future reordering within one.
+            if (world instanceof SeedProbeWorld) {
+                final VirginChunkProvider vp = ((SeedProbeWorld) world).virginProvider();
+                if (vp != null && vp.generatedCount() > 0) {
+                    WorldgenProbe.LOG.warn(
+                        "[prefilter] seed {}: {} chunks already generated before the village pass — village "
+                            + "cells may include starts registered by terrain generation",
+                        seed,
+                        vp.generatedCount());
+                }
+            }
             for (int cx2 = -radiusChunks; cx2 <= radiusChunks; cx2++) {
                 for (int cz2 = -radiusChunks; cz2 <= radiusChunks; cz2++) {
                     if ((Boolean) CAN_SPAWN.invoke(gen, cx2, cz2)) {
@@ -713,6 +1144,9 @@ public final class Prefilter {
         // --- terrain columns + spawn prediction (worldless RWG; -Dprobe.prefilter.terrain=-1 disables,
         // N = digest radius in chunks around the predicted spawn; default 4)
         final int terrainRadius = Integer.getInteger("probe.prefilter.terrain", 4);
+        // Hoisted: the dungeon stage below scans around the predicted spawn, and defaults to the origin when
+        // the terrain stage is disabled or failed rather than silently scanning somewhere arbitrary.
+        int spawnX = 0, spawnZ = 0;
         if (terrainRadius >= 0) {
             try {
                 final RwgTerrain terra = new RwgTerrain(world);
@@ -744,6 +1178,8 @@ public final class Prefilter {
                     sz += spawnRand.nextInt(64) - spawnRand.nextInt(64);
                     if (++iters == 1000) break;
                 }
+                spawnX = sx;
+                spawnZ = sz;
                 sb.append(", \"spawn\": [")
                     .append(sx)
                     .append(", 64, ")
@@ -817,6 +1253,51 @@ public final class Prefilter {
                     .append(waterTotal)
                     .append(", \"terrain_chunks\": ")
                     .append(terra.chunksGenerated());
+                // Self-test for the chunk provider: does world.getBlock answer the same terrain the digest
+                // describes? That is the whole contract — TerrainOracle.block falls through to world.getBlock
+                // for a non-WorldServer, so the fix jar's virgin-terrain reads are only as good as this.
+                // Run it with -Dprobe.prefilter.digestviaprovider=false for a non-circular check: the digest is
+                // then computed by the hand-rolled path and the reads come from the provider.
+                if (Boolean.getBoolean("probe.prefilter.selftest")) {
+                    int cols = 0, mismatch = 0;
+                    for (int cx2 = scx - terrainRadius; cx2 <= scx + terrainRadius; cx2++) {
+                        for (int cz2 = scz - terrainRadius; cz2 <= scz + terrainRadius; cz2++) {
+                            final RwgTerrain.Cols cc = terra.columns(cx2, cz2);
+                            for (int s = 0; s < 4; s++) {
+                                final int lx = (s & 1) * 8 + 3, lz = (s >> 1) * 8 + 3;
+                                final int wx = (cx2 << 4) + lx, wz = (cz2 << 4) + lz;
+                                int ts = 255;
+                                while (ts > 0) {
+                                    final net.minecraft.block.Block b = world.getBlock(wx, ts, wz);
+                                    if (b != net.minecraft.init.Blocks.air
+                                        && b.getMaterial() != net.minecraft.block.material.Material.air
+                                        && b != net.minecraft.init.Blocks.water) {
+                                        break;
+                                    }
+                                    ts--;
+                                }
+                                cols++;
+                                if (ts != cc.topSolid[(lx << 4) | lz]) mismatch++;
+                            }
+                        }
+                    }
+                    sb.append(", \"getblock_selftest\": {\"columns\": ")
+                        .append(cols)
+                        .append(", \"mismatch\": ")
+                        .append(mismatch)
+                        .append("}");
+                }
+                // Chunk-cache health. regen > 0 means the LRU evicted a chunk that was needed again, so this
+                // seed paid full terrain cost for it twice — a throughput bug that leaves no other trace.
+                if (world instanceof SeedProbeWorld) {
+                    final VirginChunkProvider vp = ((SeedProbeWorld) world).virginProvider();
+                    if (vp != null) {
+                        sb.append(", \"chunks_generated\": ")
+                            .append(vp.generatedCount())
+                            .append(", \"chunks_regenerated\": ")
+                            .append(vp.regeneratedCount());
+                    }
+                }
             } catch (Throwable t) {
                 WorldgenProbe.LOG.warn("[prefilter] terrain/spawn eval failed for {}: {}", seed, t.toString());
                 sb.append(", \"terrain_error\": \"")
@@ -824,6 +1305,95 @@ public final class Prefilter {
                         t.toString()
                             .replace("\"", "'"))
                     .append("\"");
+            }
+        }
+
+        // --- Witchery candidate cells. Pure arithmetic plus a biome lookup: the region formula reads no blocks
+        // and the handler shuffle is a function of the FML chunk seed, so this costs nothing terrain-wise.
+        final int witcheryRadius = Integer.getInteger("probe.prefilter.witchery", -1);
+        if (witcheryRadius >= 0) {
+            final String why = WitcheryPrefilter.resolve();
+            if (why != null) {
+                sb.append(", \"witchery_error\": \"")
+                    .append(why.replace("\"", "'"))
+                    .append("\"");
+            } else {
+                try {
+                    final List<String> cells = new ArrayList<>();
+                    for (final WitcheryPrefilter.Cell c : WitcheryPrefilter
+                        .candidates(world, spawnX >> 4, spawnZ >> 4, witcheryRadius)) {
+                        cells.add(
+                            "{\"cell\": [" + c.x
+                                + ", "
+                                + c.z
+                                + "], \"cs\": "
+                                + c.chunkSeed
+                                + ", \"biome\": "
+                                + c.biome
+                                + ", \"allowed\": "
+                                + c.allowed
+                                + ", \"order\": [\""
+                                + String.join("\", \"", c.order)
+                                + "\"]}");
+                    }
+                    sb.append(", \"witchery_cells\": [")
+                        .append(String.join(", ", cells))
+                        .append("]");
+                } catch (Throwable t) {
+                    WorldgenProbe.LOG.warn("[prefilter] witchery eval failed for {}: {}", seed, t.toString());
+                    sb.append(", \"witchery_error\": \"")
+                        .append(
+                            t.toString()
+                                .replace("\"", "'"))
+                        .append("\"");
+                }
+            }
+        }
+
+        // --- Roguelike dungeons: trigger scan is free arithmetic and acts as its own kill gate; construction is
+        // the expensive terminal stage and only runs for seeds that have a trigger in range.
+        // -Dprobe.prefilter.dungeon=N enables it, N = scan radius in chunks around the predicted spawn.
+        final int dungeonRadius = Integer.getInteger("probe.prefilter.dungeon", -1);
+        if (dungeonRadius >= 0 && RoguelikePrefilter.available()) {
+            try {
+                final int scx = spawnX >> 4, scz = spawnZ >> 4;
+                final List<int[]> triggers = RoguelikePrefilter.triggers(world, scx, scz, dungeonRadius);
+                sb.append(", \"dungeon_triggers\": ")
+                    .append(triggers.size());
+                if (triggers.isEmpty() && Boolean.getBoolean("probe.prefilter.gate.dungeon")) {
+                    return "{\"seed\": " + seed + ", \"kill\": \"dungeon\"}";
+                }
+                final List<String> dungeons = new ArrayList<>();
+                for (final int[] t : triggers) {
+                    final RoguelikePrefilter.Result r = RoguelikePrefilter.generate(world, seed, t[0], t[1]);
+                    final StringBuilder d = new StringBuilder(128);
+                    d.append("{\"trigger\": [")
+                        .append(r.triggerX)
+                        .append(", ")
+                        .append(r.triggerZ)
+                        .append("], \"chests\": [")
+                        .append(String.join(", ", r.chests))
+                        .append("]");
+                    if (r.error != null) {
+                        d.append(", \"error\": \"")
+                            .append(r.error.replace("\"", "'"))
+                            .append("\"");
+                    }
+                    d.append("}");
+                    dungeons.add(d.toString());
+                }
+                sb.append(", \"dungeons\": [")
+                    .append(String.join(", ", dungeons))
+                    .append("]");
+            } catch (Throwable t) {
+                WorldgenProbe.LOG.warn("[prefilter] dungeon eval failed for {}: {}", seed, t.toString());
+                sb.append(", \"dungeon_error\": \"")
+                    .append(
+                        t.toString()
+                            .replace("\"", "'"))
+                    .append("\"");
+            } finally {
+                RoguelikePrefilter.resetSliceWindow();
             }
         }
 

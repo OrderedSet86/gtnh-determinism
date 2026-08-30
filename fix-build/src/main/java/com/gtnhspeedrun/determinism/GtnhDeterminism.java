@@ -38,7 +38,16 @@ import cpw.mods.fml.common.registry.VillagerRegistry.IVillageCreationHandler;
  * region from pristine loot tables; FMLServerStartingEvent mutators (TooMuchLoot category rewrites) persist in the
  * static ChestGenHooks registry, so every later world creation in the same session rolled different spawn-window
  * chest loot from the same seed. Snapshot the tables at load-complete, restore before every server start.</li>
+ * <li>F9 — spawn-preload loot split ({@link com.gtnhspeedrun.determinism.worldgen.EarlyLootTables}): a cold boot
+ * generates its spawn region inside loadAllWorlds, before FMLServerStartingEvent, so chests there kept the
+ * pre-TooMuchLoot table permanently while every later chest used the post-rewrite one. TooMuchLoot's XML is what
+ * the pack intends, so it is applied before the first chunk exists and its own later run is suppressed.</li>
  * </ul>
+ *
+ * <p>
+ * F7 and F9 compose: F7 restores the load-complete tables before each server start, F9 then re-applies
+ * TooMuchLoot at loadAllWorlds, so every world in a session — first or fiftieth — generates against the same
+ * post-rewrite table.
  */
 @Mod(
     modid = GtnhDeterminism.MODID,
@@ -59,8 +68,29 @@ public class GtnhDeterminism {
      * chests/world; the fresh-session 'demo world' save matched the probe byte-exact). Restoring the load-complete
      * snapshot before EVERY server start makes each world roll like the first of a cold session, which is also
      * what dedicated servers and the seedlib corpora produce.
+     *
+     * <p>
+     * A category is three fields, not one. {@code countMin}/{@code countMax} decide how many stacks a chest draws,
+     * and TooMuchLoot moves them: {@code villageBlacksmith} is 3-9 before its rewrite and 4-11 after. An earlier
+     * version of this handler restored only {@code contents}, which rebuilt a table that never existed anywhere —
+     * the pristine item pool with the mutated roll count — and the extra {@code generateChestContents} iterations
+     * then shifted every later draw in that chunk. Snapshot and restore all three.
      */
-    private Map<String, List<Object>> lootSnapshot;
+    private Map<String, LootSnap> lootSnapshot;
+
+    /** One category's full restorable state. {@code contents} is the live list's elements, copied out. */
+    private static final class LootSnap {
+
+        final List<Object> contents;
+        final int min;
+        final int max;
+
+        LootSnap(List<Object> contents, int min, int max) {
+            this.contents = contents;
+            this.min = min;
+            this.max = max;
+        }
+    }
 
     private static Field lootContentsField() throws Exception {
         final Field f = ChestGenHooks.class.getDeclaredField("contents");
@@ -87,12 +117,20 @@ public class GtnhDeterminism {
             final Field contentsF = lootContentsField();
             int restored = 0;
             for (Map.Entry<String, ChestGenHooks> e : chestInfo().entrySet()) {
-                final List<Object> want = lootSnapshot.get(e.getKey());
+                final LootSnap want = lootSnapshot.get(e.getKey());
                 if (want == null) continue; // category registered after load-complete; leave untouched
-                final List<Object> live = (List<Object>) contentsF.get(e.getValue());
-                if (live.size() != want.size() || !live.equals(want)) restored++;
+                final ChestGenHooks hooks = e.getValue();
+                @SuppressWarnings("unchecked")
+                final List<Object> live = (List<Object>) contentsF.get(hooks);
+                if (live.size() != want.contents.size() || !live.equals(want.contents)
+                    || hooks.getMin() != want.min
+                    || hooks.getMax() != want.max) {
+                    restored++;
+                }
                 live.clear();
-                live.addAll(want);
+                live.addAll(want.contents);
+                hooks.setMin(want.min);
+                hooks.setMax(want.max);
             }
             LOG.info("Loot tables reset to load-complete state for this world ({} categories were mutated)", restored);
         } catch (Exception e) {
@@ -114,9 +152,12 @@ public class GtnhDeterminism {
             .registerWorldGenerator(new PendingSlices.SliceApplier(), Integer.MAX_VALUE);
         try {
             final Field contentsF = lootContentsField();
-            final Map<String, List<Object>> snap = new HashMap<>();
+            final Map<String, LootSnap> snap = new HashMap<>();
             for (Map.Entry<String, ChestGenHooks> e : chestInfo().entrySet()) {
-                snap.put(e.getKey(), new ArrayList<>((List<Object>) contentsF.get(e.getValue())));
+                final ChestGenHooks hooks = e.getValue();
+                @SuppressWarnings("unchecked")
+                final List<Object> contents = (List<Object>) contentsF.get(hooks);
+                snap.put(e.getKey(), new LootSnap(new ArrayList<>(contents), hooks.getMin(), hooks.getMax()));
             }
             lootSnapshot = snap;
             LOG.info("Loot-table snapshot captured ({} categories)", snap.size());

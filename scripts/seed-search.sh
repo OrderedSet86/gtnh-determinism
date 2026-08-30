@@ -9,7 +9,7 @@
 #               (ChestGenHooks pre/post-server snapshot restore) warm slots are certified
 #               byte-identical to true cold runs (4 seeds / 189 chests, 2.8.4); with older probe
 #               jars, spawn-window structure chests roll post-ServerStarting loot tables = wrong
-#               vs real worlds. Residual known noise: ore host-stone variants (HANDOFF).
+#               vs real worlds. Residual known noise: ore host-stone variants.
 #               2.8.4 memory: slots leak ~0.5G each — use PROBE_XMX=10G with batches of ~10.
 #
 # Output: <out-dir>/seed-<seed>.json (+ gtmats.json once), resume-safe (existing files skipped).

@@ -57,7 +57,7 @@ if [ -f java9args.txt ]; then JAVA_ARGS="@java9args.txt"; fi
 "$JAVA_BIN" $JAVA_ARGS \
   -Xmx6G -Xms6G \
   ${PROBE_EXTRA_ARGS:-} \
-  -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" -Dprobe.entities="${PROBE_ENTITIES:-false}" ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
+  -Dprobe.order="$ORDER" -Dprobe.radius="$RADIUS" -Dprobe.out="$OUT" -Dprobe.tedetail="${PROBE_TEDETAIL:-false}" -Dprobe.search="${PROBE_SEARCH:-false}" -Dprobe.entities="${PROBE_ENTITIES:-false}" ${PROBE_DIM:+-Dprobe.dim=$PROBE_DIM} ${PROBE_TFFEATURES:+-Dprobe.tffeatures=$PROBE_TFFEATURES} ${PROBE_DUMP:+-Dprobe.dump=$PROBE_DUMP} ${PROBE_TERAW:+-Dprobe.teraw=$PROBE_TERAW} ${PROBE_CX:+-Dprobe.cx=$PROBE_CX} ${PROBE_CZ:+-Dprobe.cz=$PROBE_CZ} \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
   -jar "$LAUNCH_JAR" nogui < /dev/null
 

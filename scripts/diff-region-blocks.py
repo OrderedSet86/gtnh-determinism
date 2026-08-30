@@ -3,6 +3,8 @@
 
 Usage: diff-region-blocks.py <worldA> <worldB> [minCX maxCX minCZ maxCZ] [--ids id1,id2,...]
 
+--ids keeps only positions where at least one side holds a listed block id.
+
 Handles NEID's 16-bit sections (Blocks16/Data16) as well as vanilla Blocks+Add+Data.
 Reports per-position block differences: (id:meta)A vs (id:meta)B, aggregated by
 transition pair and by chunk. Ground truth for whether live-probe block jitter
@@ -118,6 +120,18 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     a_dir, b_dir = args[0], args[1]
     window = tuple(map(int, args[2:6])) if len(args) >= 6 else None
+    # --ids restricts the report to positions where at least one side holds one of these block ids.
+    # Until 2026-08-29 this option was documented, accepted, and then silently discarded, so a filtered
+    # diff reported the whole world and any "only these blocks differ" conclusion drawn from it was wrong.
+    ids = None
+    for a in sys.argv[1:]:
+        if a.startswith("--ids="):
+            ids = {int(x) for x in a.split("=", 1)[1].split(",") if x.strip()}
+        elif a == "--ids":
+            nxt = sys.argv[sys.argv.index(a) + 1]
+            ids = {int(x) for x in nxt.split(",") if x.strip()}
+    if ids is not None:
+        print(f"filtering to {len(ids)} block ids")
     A = world_chunks(a_dir, window)
     B = world_chunks(b_dir, window)
     both = sorted(set(A) & set(B))
@@ -127,10 +141,16 @@ def main():
     chunk_counts = Counter()
     samples = defaultdict(list)
     total = 0
+    missing_sections = 0
     for (cx, cz) in both:
         sa, sb = A[(cx, cz)], B[(cx, cz)]
         for y_sec in sorted(set(sa) | set(sb)):
             if y_sec not in sa or y_sec not in sb:
+                # One side has no section here at all. With --ids there is nothing to attribute it to,
+                # so it is reported separately rather than folded into the filtered count.
+                if ids is not None:
+                    missing_sections += 1
+                    continue
                 chunk_counts[(cx, cz)] += 4096
                 total += 4096
                 continue
@@ -139,6 +159,8 @@ def main():
                 continue
             for i in range(4096):
                 if ia[i] != ib[i] or ma[i] != mb[i]:
+                    if ids is not None and ia[i] not in ids and ib[i] not in ids:
+                        continue
                     total += 1
                     chunk_counts[(cx, cz)] += 1
                     key = (f"{ia[i]}:{ma[i]}", f"{ib[i]}:{mb[i]}")

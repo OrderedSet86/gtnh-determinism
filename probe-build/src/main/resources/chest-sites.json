@@ -1,0 +1,1502 @@
+{
+ "sites": [
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsBigHouse1",
+   "mode": 0,
+   "category": "vn_plains_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 8,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsBigHouse1",
+   "mode": 1,
+   "category": "vn_plains_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 8
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsCartographer1",
+   "mode": 0,
+   "category": "vn_cartographer",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 0,
+   "lz": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsCartographer1",
+   "mode": 2,
+   "category": "vn_cartographer",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 0,
+   "lz": 6
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsFisherCottage1",
+   "mode": 0,
+   "category": "vn_fisher",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 6,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsFisherCottage1",
+   "mode": 2,
+   "category": "vn_fisher",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 6,
+   "ly": 0,
+   "lz": 6
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsFisherCottage1",
+   "mode": 3,
+   "category": "vn_fisher",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 0,
+   "lz": 6
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMediumHouse2",
+   "mode": 0,
+   "category": "vn_plains_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 10,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMediumHouse2",
+   "mode": 1,
+   "category": "vn_plains_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 0,
+   "lz": 10
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMediumHouse2",
+   "mode": 2,
+   "category": "vn_plains_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 10,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMediumHouse2",
+   "mode": 3,
+   "category": "vn_plains_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 10
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse7",
+   "mode": 3,
+   "category": "vn_plains_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 0,
+   "lz": 5
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTannery1",
+   "mode": 0,
+   "category": "vn_tannery",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 0,
+   "lz": 5
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTannery1",
+   "mode": 1,
+   "category": "vn_tannery",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 7
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTannery1",
+   "mode": 3,
+   "category": "vn_tannery",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 5,
+   "ly": 0,
+   "lz": 7
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsWeaponsmith1",
+   "mode": 1,
+   "category": "villageBlacksmith",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsWeaponsmith1",
+   "mode": 3,
+   "category": "villageBlacksmith",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 6,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaButchersShop2",
+   "mode": 3,
+   "category": "vn_butcher",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 6,
+   "ly": 0,
+   "lz": 5
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaCartographer1",
+   "mode": 0,
+   "category": "vn_cartographer",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 6,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaMediumHouse1",
+   "mode": 3,
+   "category": "vn_savanna_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaSmallHouse2",
+   "mode": 0,
+   "category": "vn_savanna_house",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaTannery1",
+   "mode": 0,
+   "category": "vn_tannery",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaWeaponsmith2",
+   "mode": 0,
+   "category": "villageBlacksmith",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 9,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentShack",
+   "mode": 1,
+   "category": "dungeonChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 1,
+   "ly": 1,
+   "lz": 2
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentShack",
+   "mode": 3,
+   "category": "railcraft:workshop",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 1,
+   "ly": 1,
+   "lz": 2
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageApothecary",
+   "mode": 0,
+   "category": "mineshaftCorridor",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageApothecary",
+   "mode": 1,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageApothecary",
+   "mode": 3,
+   "category": "WG:PHOTOWORKSHOP",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageApothecary",
+   "mode": 3,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageBookShop",
+   "mode": 0,
+   "category": "TinkerHouse",
+   "countDrawn": false,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageBookShop",
+   "mode": 0,
+   "category": "dungeonChest",
+   "countDrawn": false,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageBookShop",
+   "mode": 0,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageBookShop",
+   "mode": 2,
+   "category": "mineshaftCorridor",
+   "countDrawn": false,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageBookShop",
+   "mode": 2,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageKeep",
+   "mode": 0,
+   "category": "dungeonChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 13,
+   "ly": 20,
+   "lz": 12
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageKeep",
+   "mode": 1,
+   "category": "TinkerHouse",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 13,
+   "ly": 20,
+   "lz": 12
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageKeep",
+   "mode": 3,
+   "category": "TinkerHouse",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 13,
+   "ly": 20,
+   "lz": 12
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWatchTower",
+   "mode": 1,
+   "category": "TinkerHouse",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 5,
+   "ly": 13,
+   "lz": 5
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWatchTower",
+   "mode": 3,
+   "category": "WG:PHOTOWORKSHOP",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 5,
+   "ly": 13,
+   "lz": 5
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWatchTower",
+   "mode": 3,
+   "category": "mineshaftCorridor",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 5,
+   "ly": 13,
+   "lz": 5
+  },
+  {
+   "piece": "forestry.apiculture.worldgen.ComponentVillageBeeHouse",
+   "mode": 0,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 1,
+   "lz": 4
+  },
+  {
+   "piece": "forestry.apiculture.worldgen.ComponentVillageBeeHouse",
+   "mode": 1,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 1,
+   "lz": 4
+  },
+  {
+   "piece": "forestry.apiculture.worldgen.ComponentVillageBeeHouse",
+   "mode": 2,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 1,
+   "lz": 4
+  },
+  {
+   "piece": "forestry.apiculture.worldgen.ComponentVillageBeeHouse",
+   "mode": 3,
+   "category": "naturalistChest",
+   "countDrawn": false,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 7,
+   "ly": 1,
+   "lz": 4
+  },
+  {
+   "piece": "mods.railcraft.common.worldgen.ComponentWorkshop",
+   "mode": 0,
+   "category": "railcraft:workshop",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 9,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "mods.railcraft.common.worldgen.ComponentWorkshop",
+   "mode": 2,
+   "category": "railcraft:workshop",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 9,
+   "ly": 0,
+   "lz": 6
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 0,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 0,
+   "ly": 0,
+   "lz": 3
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 0,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 0,
+   "ly": 0,
+   "lz": 8
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 0,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 6
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 0,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 16
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 1,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 1,
+   "ly": 0,
+   "lz": 0
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 1,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 18,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 2,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 0,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 2,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 0,
+   "ly": 0,
+   "lz": 11
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 2,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 0,
+   "ly": 0,
+   "lz": 16
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 2,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 3
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 2,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 2,
+   "ly": 0,
+   "lz": 8
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 3,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 3,
+   "ly": 0,
+   "lz": 0
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 3,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 6,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 3,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 13,
+   "ly": 0,
+   "lz": 0
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Corridor",
+   "mode": 3,
+   "category": "mineshaftCorridor",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 27,
+   "type": "EntityMinecartChest",
+   "lx": 16,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 0,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 10,
+   "type": "CraftingStationLogic",
+   "lx": 1,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 0,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 1,
+   "lz": 5
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 0,
+   "category": "TinkerPatterns",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 30,
+   "type": "PatternChestLogic",
+   "lx": 1,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 1,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 10,
+   "type": "CraftingStationLogic",
+   "lx": 2,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 1,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 1,
+   "lz": 5
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 1,
+   "category": "TinkerPatterns",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 30,
+   "type": "PatternChestLogic",
+   "lx": 4,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 2,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 10,
+   "type": "CraftingStationLogic",
+   "lx": 1,
+   "ly": 0,
+   "lz": 2
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 2,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 1,
+   "lz": 5
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 2,
+   "category": "TinkerPatterns",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 30,
+   "type": "PatternChestLogic",
+   "lx": 1,
+   "ly": 0,
+   "lz": 4
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 3,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 10,
+   "type": "CraftingStationLogic",
+   "lx": 4,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 3,
+   "category": "TinkerHouse",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 4,
+   "ly": 1,
+   "lz": 5
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentToolWorkshop",
+   "mode": 3,
+   "category": "TinkerPatterns",
+   "countDrawn": true,
+   "src": "box-relative",
+   "size": 30,
+   "type": "PatternChestLogic",
+   "lx": 2,
+   "ly": 0,
+   "lz": 1
+  },
+  {
+   "piece": "thaumcraft.common.lib.world.ComponentWizardTower",
+   "mode": 0,
+   "category": "towerChestContents",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 6,
+   "lz": 2
+  },
+  {
+   "piece": "thaumcraft.common.lib.world.ComponentWizardTower",
+   "mode": 1,
+   "category": "towerChestContents",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 6,
+   "lz": 2
+  },
+  {
+   "piece": "thaumcraft.common.lib.world.ComponentWizardTower",
+   "mode": 3,
+   "category": "towerChestContents",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 2,
+   "ly": 6,
+   "lz": 2
+  },
+  {
+   "piece": "witchinggadgets.common.world.VillageComponentPhotoshop",
+   "mode": 0,
+   "category": "WG:PHOTOWORKSHOP",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 1,
+   "ly": 1,
+   "lz": 5
+  },
+  {
+   "piece": "witchinggadgets.common.world.VillageComponentPhotoshop",
+   "mode": 1,
+   "category": "WG:PHOTOWORKSHOP",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 1,
+   "ly": 1,
+   "lz": 5
+  },
+  {
+   "piece": "witchinggadgets.common.world.VillageComponentPhotoshop",
+   "mode": 2,
+   "category": "WG:PHOTOWORKSHOP",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 1,
+   "ly": 1,
+   "lz": 5
+  },
+  {
+   "piece": "witchinggadgets.common.world.VillageComponentPhotoshop",
+   "mode": 3,
+   "category": "WG:PHOTOWORKSHOP",
+   "countDrawn": true,
+   "src": "caller-local",
+   "size": 27,
+   "type": "TileEntityChest",
+   "lx": 1,
+   "ly": 1,
+   "lz": 5
+  }
+ ],
+ "chestless": [
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$DecorTorch",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$DecorTorch",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$DecorTorch",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$DecorTorch",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$PathVN",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$PathVN",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$PathVN",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.StructureVillageVN$PathVN",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAccessory1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAccessory1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAccessory1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen2",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen2",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen2",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen3",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsAnimalPen3",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsArmorerHouse1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsArmorerHouse1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsButcherShop1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsButcherShop1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsButcherShop1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsButcherShop2",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsFletcherHouse1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsLargeFarm1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsLargeFarm1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsLibrary1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsLibrary1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsLibrary2",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsLibrary2",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMasonsHouse1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMasonsHouse1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMediumHouse1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMediumHouse1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint2",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint2",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint3",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint4",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint4",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint5",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsMeetingPoint5",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsShepherdsHouse1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsShepherdsHouse1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallFarm1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallFarm1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse2",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse2",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse3",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse3",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse3",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse4",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse4",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse4",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse5",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse5",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse5",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse5",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse6",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse6",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse8",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsSmallHouse8",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStable1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStable1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStable2",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStable2",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStable2",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStreetDecor1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStreetDecor1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStreetDecor1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsStreetDecor1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTemple3",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTemple3",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTemple3",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTemple3",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTemple4",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTemple4",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsTemple4",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.PlainsStructures$PlainsToolSmith1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaAnimalPen1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaAnimalPen2",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaArmorer1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaButchersShop1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaLargeFarm1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaLibrary1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaMeetingPoint4",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaShepherd1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaSmallFarm",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaSmallHouse1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaSmallHouse3",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaSmallHouse6",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaSmallHouse8",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetDecor1",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetDecor1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetDecor1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetDecor1",
+   "mode": 3
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetSubstitute1",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetSubstitute2",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetSubstitute2",
+   "mode": 2
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetSubstitute3",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetSubstitute3",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaStreetSubstitute4",
+   "mode": 0
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaTemple1",
+   "mode": 1
+  },
+  {
+   "piece": "astrotibs.villagenames.village.biomestructures.SavannaStructures$SavannaToolSmith1",
+   "mode": 3
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageKeep",
+   "mode": 2
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWitchHut",
+   "mode": 0
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWitchHut",
+   "mode": 1
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWitchHut",
+   "mode": 2
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWitchHut",
+   "mode": 3
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.WorldHandlerVillageDistrict$Wall",
+   "mode": 0
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.WorldHandlerVillageDistrict$Wall",
+   "mode": 1
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.WorldHandlerVillageDistrict$Wall",
+   "mode": 2
+  },
+  {
+   "piece": "iguanaman.hungeroverhaul.util.ComponentVillageCustomField",
+   "mode": 0
+  },
+  {
+   "piece": "iguanaman.hungeroverhaul.util.ComponentVillageCustomField",
+   "mode": 1
+  },
+  {
+   "piece": "iguanaman.hungeroverhaul.util.ComponentVillageCustomField",
+   "mode": 2
+  },
+  {
+   "piece": "iguanaman.hungeroverhaul.util.ComponentVillageCustomField",
+   "mode": 3
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Cross",
+   "mode": -1
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Room",
+   "mode": -1
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Stairs",
+   "mode": 0
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Stairs",
+   "mode": 1
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Stairs",
+   "mode": 2
+  },
+  {
+   "piece": "net.minecraft.world.gen.structure.StructureMineshaftPieces$Stairs",
+   "mode": 3
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentSmeltery",
+   "mode": 0
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentSmeltery",
+   "mode": 1
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentSmeltery",
+   "mode": 2
+  },
+  {
+   "piece": "tconstruct.world.village.ComponentSmeltery",
+   "mode": 3
+  },
+  {
+   "piece": "thaumcraft.common.lib.world.ComponentBankerHome",
+   "mode": 1
+  },
+  {
+   "piece": "thaumcraft.common.lib.world.ComponentBankerHome",
+   "mode": 2
+  },
+  {
+   "piece": "thaumcraft.common.lib.world.ComponentBankerHome",
+   "mode": 3
+  }
+ ]
+}
