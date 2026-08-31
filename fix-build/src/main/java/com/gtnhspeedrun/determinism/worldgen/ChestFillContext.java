@@ -1,5 +1,7 @@
 package com.gtnhspeedrun.determinism.worldgen;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Random;
 
 import net.minecraft.entity.Entity;
@@ -90,6 +92,14 @@ public final class ChestFillContext {
         boolean itemsSeen;
         boolean countSeen;
         int count;
+        /**
+         * The exact array {@code getItems} returned. Identity, not equality: it is the only proof that the array
+         * the filler is about to use came from THIS capture. Without it the capture is just "the last table
+         * anyone asked for on this thread", which a caller that never calls {@code getItems} will silently
+         * inherit — and which table it inherits depends on generation order. Measured: the same chest filled
+         * from WG:PHOTOWORKSHOP under a rows walk and railcraft:workshop under a spiral walk.
+         */
+        WeightedRandomChestContent[] items;
     }
 
     /** The structure component the chest belongs to, in the coordinates that exist before terrain does. */
@@ -140,7 +150,7 @@ public final class ChestFillContext {
 
     // ------------------------------------------------------------------ capture
 
-    public static void notedItems(ChestGenHooks hooks) {
+    public static void notedItems(ChestGenHooks hooks, WeightedRandomChestContent[] items) {
         Table t = TABLE.get();
         if (t == null || t.hooks != hooks) {
             t = new Table();
@@ -148,6 +158,7 @@ public final class ChestFillContext {
             TABLE.set(t);
         }
         t.itemsSeen = true;
+        t.items = items;
     }
 
     public static void notedCount(ChestGenHooks hooks, int count) {
@@ -250,14 +261,25 @@ public final class ChestFillContext {
     /** Chest filler hook. Returns without touching anything when the capture did not line up. */
     public static void refillChest(WeightedRandomChestContent[] items, IInventory inv, int count) {
         if (Boolean.TRUE.equals(REFILLING.get())) return;
-        final Table t = consumeTable(count, "chest");
-        if (t == null) return;
+        final int[] noHooksRange = noHooksRange();
+        final Table t = consumeTable(count, items, noHooksRange == null ? "chest" : null);
+        if (t == null) {
+            refillNoHooks(items, inv, noHooksRange, "chest");
+            return;
+        }
         final long fork = fork(inv);
         if (fork == 0L) return; // no world or no position: leave stock's roll, which is still deterministic
         final Random rand = new Random(fork);
-        // A count the caller drew off the populate stream is re-derived; a literal it chose itself is already a
-        // constant and is kept, so the two cases differ only in whether the fork spends a draw on the count.
-        final int rolls = t.countSeen ? rollCount(t.hooks, rand) : count;
+        // The count is derived whether or not the caller drew one. A caller that passed its own count is not
+        // thereby deterministic — measured, ComponentVillageBeeHouse arrives with 10, 9, 7 and 5 at different
+        // villages — so leaving it alone left the chest's size a function of something other than its position.
+        // Deriving it costs one draw off the fork before the items, exactly as the drawn case already does.
+        //
+        // The exception is a table registered 0..0, which rollCount answers with 0: Forestry's naturalistChest
+        // reads 0..0 and deriving there would empty every bee-house chest. A table that never intended getCount
+        // to be called keeps whatever the caller chose.
+        final boolean degenerate = t.hooks.getMin() == 0 && t.hooks.getMax() == 0;
+        final int rolls = degenerate && !t.countSeen ? count : rollCount(t.hooks, rand);
         final WeightedRandomChestContent[] pool = t.hooks.getItems(rand);
         REFILLING.set(Boolean.TRUE);
         try {
@@ -276,14 +298,25 @@ public final class ChestFillContext {
     public static void refillDispenser(WeightedRandomChestContent[] items,
         net.minecraft.tileentity.TileEntityDispenser inv, int count) {
         if (Boolean.TRUE.equals(REFILLING.get())) return;
-        final Table t = consumeTable(count, "dispenser");
-        if (t == null) return;
+        final int[] noHooksRangeD = noHooksRange();
+        final Table t = consumeTable(count, items, noHooksRangeD == null ? "dispenser" : null);
+        if (t == null) {
+            refillNoHooks(items, inv, noHooksRangeD, "dispenser");
+            return;
+        }
         final long fork = fork(inv);
         if (fork == 0L) return;
         final Random rand = new Random(fork);
-        // A count the caller drew off the populate stream is re-derived; a literal it chose itself is already a
-        // constant and is kept, so the two cases differ only in whether the fork spends a draw on the count.
-        final int rolls = t.countSeen ? rollCount(t.hooks, rand) : count;
+        // The count is derived whether or not the caller drew one. A caller that passed its own count is not
+        // thereby deterministic — measured, ComponentVillageBeeHouse arrives with 10, 9, 7 and 5 at different
+        // villages — so leaving it alone left the chest's size a function of something other than its position.
+        // Deriving it costs one draw off the fork before the items, exactly as the drawn case already does.
+        //
+        // The exception is a table registered 0..0, which rollCount answers with 0: Forestry's naturalistChest
+        // reads 0..0 and deriving there would empty every bee-house chest. A table that never intended getCount
+        // to be called keeps whatever the caller chose.
+        final boolean degenerate = t.hooks.getMin() == 0 && t.hooks.getMax() == 0;
+        final int rolls = degenerate && !t.countSeen ? count : rollCount(t.hooks, rand);
         final WeightedRandomChestContent[] pool = t.hooks.getItems(rand);
         REFILLING.set(Boolean.TRUE);
         try {
@@ -306,6 +339,101 @@ public final class ChestFillContext {
         }
     }
 
+    // ------------------------------------------------------------ chests that never ask Forge for a table
+
+    /** piece class name -> inclusive roll range, from {@code chest-nohooks.json}. */
+    private static Map<String, int[]> noHooks;
+
+    /**
+     * Pieces that fill through {@code generateStructureChestContents} but pass their own compile-time array and
+     * their own count, so there is no {@link ChestGenHooks} to capture and {@link #consumeTable} rightly refuses
+     * them.
+     *
+     * <p>
+     * Their count comes off the chunk-populate {@code Random}. That Random is position-seeded, so these chests
+     * are already deterministic — but reaching the count means replaying the populate prologue for the chunk,
+     * which the worldless prefilter does not do. Redrawing it from the chest's own fork over the SAME range the
+     * mod uses keeps the distribution and makes the chest a function of its position alone.
+     */
+    private static synchronized Map<String, int[]> noHooks() {
+        if (noHooks != null) return noHooks;
+        final Map<String, int[]> m = new HashMap<>();
+        try (java.io.InputStream in = ChestFillContext.class.getResourceAsStream("/chest-nohooks.json")) {
+            if (in == null) {
+                GtnhDeterminism.LOG.warn("chest-nohooks.json missing from the fix jar; no-hooks chests keep stock");
+            } else {
+                final StringBuilder sb = new StringBuilder();
+                final java.io.InputStreamReader r = new java.io.InputStreamReader(
+                    in,
+                    java.nio.charset.StandardCharsets.UTF_8);
+                final char[] buf = new char[8192];
+                for (int n; (n = r.read(buf)) > 0;) sb.append(buf, 0, n);
+                final String all = sb.toString();
+                for (final String obj : all.substring(Math.max(0, all.indexOf("\"sites\"")))
+                    .split("\\}")) {
+                    if (!obj.contains("\"piece\"")) continue;
+                    final String piece = jsonStr(obj, "piece");
+                    final int min = jsonInt(obj, "min"), max = jsonInt(obj, "max");
+                    if (!piece.isEmpty() && max >= min) m.put(piece, new int[] { min, max });
+                }
+            }
+        } catch (Exception e) {
+            GtnhDeterminism.LOG.warn("could not read chest-nohooks.json: {}", e.toString());
+        }
+        GtnhDeterminism.LOG.info("no-hooks chest table: {} piece classes", m.size());
+        noHooks = m;
+        return m;
+    }
+
+    private static String jsonStr(String obj, String field) {
+        final int i = obj.indexOf("\"" + field + "\":");
+        if (i < 0) return "";
+        final int a = obj.indexOf('"', i + field.length() + 3);
+        final int b = obj.indexOf('"', a + 1);
+        return a < 0 || b < 0 ? "" : obj.substring(a + 1, b);
+    }
+
+    private static int jsonInt(String obj, String field) {
+        final int i = obj.indexOf("\"" + field + "\":");
+        if (i < 0) return -1;
+        int a = i + field.length() + 3;
+        while (a < obj.length() && (obj.charAt(a) == ' ' || obj.charAt(a) == ':')) a++;
+        int b = a;
+        while (b < obj.length() && (Character.isDigit(obj.charAt(b)) || obj.charAt(b) == '-')) b++;
+        return b > a ? Integer.parseInt(obj.substring(a, b)) : -1;
+    }
+
+    /** The range for the piece currently generating, or null when this is not one of them. */
+    private static int[] noHooksRange() {
+        final java.util.ArrayDeque<Site> stack = SITE.get();
+        final Site s = stack.isEmpty() ? null : stack.peek();
+        return s == null || s.piece == null ? null : noHooks().get(s.piece);
+    }
+
+    /**
+     * Refills a no-hooks chest from its position fork, using the caller's own item array. Returns false when the
+     * piece has no recorded range, which leaves stock's roll exactly as before.
+     */
+    private static boolean refillNoHooks(WeightedRandomChestContent[] items, IInventory inv, int[] range, String what) {
+        if (range == null || items == null || items.length == 0) return false;
+        final long fork = fork(inv);
+        if (fork == 0L) return false;
+        final Random rand = new Random(fork);
+        // Count first, then contents — the same order the hooks path uses, so the two grades of chest cannot
+        // drift apart in how many draws they spend before the items.
+        final int rolls = range[0] + rand.nextInt(range[1] - range[0] + 1);
+        REFILLING.set(Boolean.TRUE);
+        try {
+            clear(inv);
+            WeightedRandomChestContent.generateChestContents(rand, items, inv, rolls);
+        } finally {
+            REFILLING.remove();
+        }
+        trace(what, inv, rolls, null, false);
+        noteRefill(what);
+        return true;
+    }
+
     /**
      * Accepts when the item array demonstrably came from a {@link ChestGenHooks} we saw.
      *
@@ -316,10 +444,13 @@ public final class ChestFillContext {
      * leave them stream-derived for no gain. A count that WAS drawn but does not match the one that arrived means
      * the caller did something between the two calls, and that chest is left alone.
      */
-    private static Table consumeTable(int count, String what) {
+    private static Table consumeTable(int count, WeightedRandomChestContent[] items, String what) {
         final Table t = TABLE.get();
         TABLE.remove();
-        if (t != null && t.itemsSeen && (!t.countSeen || t.count == count)) return t;
+        if (t != null && t.itemsSeen && t.items == items && (!t.countSeen || t.count == count)) return t;
+        // A null `what` means the caller has a no-hooks rule for this piece and will handle it; not finding a
+        // ChestGenHooks capture is the expected outcome there, not a gap worth warning about.
+        if (what == null) return null;
         if (fallbacks++ == 0) {
             // Name the caller. A fallback is the one path where this fix does nothing, and "did nothing" is
             // indistinguishable from "worked" unless the log says which chest it was and who filled it.
@@ -421,7 +552,18 @@ public final class ChestFillContext {
         final int lx = s == null ? 0 : s.explicitLocal ? s.localX : x - s.minX;
         final int ly = s == null ? 0 : s.explicitLocal ? s.localY : 0;
         final int lz = s == null ? 0 : s.explicitLocal ? s.localZ : z - s.minZ;
-        final long local = s == null ? (x * 341873128712L + y * 132897987541L + z)
+        // The absolute branch drops Y for a different reason than the box-relative one above, and the reason is
+        // measured. Witchery's surface structures are FML IWorldGenerators, so GameRegistry.generateWorld runs
+        // them AFTER the full decoration pass — their calcGroundHeight reads decorated terrain. The worldless
+        // prefilter has only virgin terrain, and where decoration raised the sampled column the structure lands
+        // one block lower there than in the real world. Measured: a coven dispenser at (39,64,71) in the world,
+        // predicted at (39,63,71). With Y in the fork that one-block disagreement silently changed the contents.
+        //
+        // Dropping Y makes the contents a function of XZ alone, so the prediction survives it. The cost is that
+        // two chests sharing an XZ column at different heights now share a fork and therefore their contents.
+        // That is accepted: it is rare, it is deterministic, and duplicated loot is a far smaller defect than
+        // contents that are wrong in a way nothing downstream can detect.
+        final long local = s == null ? (x * 341873128712L + z * 132897987541L)
             : (s.minX * 341873128712L + s.minZ * 132897987541L
                 + s.piece.hashCode() * 4987142L
                 + lx * 3129871L
@@ -557,13 +699,16 @@ public final class ChestFillContext {
             x,
             y,
             z,
-            categoryOf(hooks),
+            // A no-hooks chest has no category and no table range: it carried its own array and its range came
+            // from chest-nohooks.json, so the fields that describe a ChestGenHooks are reported as absent rather
+            // than as zero, which would read as a real 0..0 table.
+            hooks == null ? "(no-hooks)" : categoryOf(hooks),
             rolls,
             // The table's roll range AT GENERATION TIME. The prefilter reads the same range from a live
             // ChestGenHooks in a process that never generated this world; if the two ever disagree, every roll it
             // derives is off by a draw and the contents are wrong for a reason no chest diff would explain.
-            hooks.getMin(),
-            hooks.getMax(),
+            hooks == null ? -1 : hooks.getMin(),
+            hooks == null ? -1 : hooks.getMax(),
             // The inventory's slot count. generateChestContents places every stack at
             // rand.nextInt(getSizeInventory()), so a consumer that rolls into a differently sized inventory gets
             // a different slot for every item AND a different stream after it. Not all of these are 27-slot

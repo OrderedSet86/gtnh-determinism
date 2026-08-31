@@ -1,0 +1,54 @@
+{
+ "_comment": [
+  "Structure pieces that fill a chest through generateStructureChestContents but never ask Forge for a",
+  "loot table: they pass their own compile-time WeightedRandomChestContent[] and their own roll count.",
+  "",
+  "The count is drawn from the chunk-populate Random. That Random IS position-seeded -- RWG reseeds it from",
+  "(worldSeed, cx, cz) immediately before the structure generators run -- so these chests are deterministic",
+  "today. What they are not is CHEAP to compute: reaching the count means replaying the populate prologue",
+  "(the PopulateChunkEvent.Pre handlers, then the mineshaft and stronghold generators) for the chunk, which",
+  "the worldless stage-0 prefilter does not do.",
+  "",
+  "F10 therefore redraws the count from the chest's own position fork instead, over the range the mod itself",
+  "uses. Same distribution, same pool, no dependence on anything but the chest's position -- so the prefilter",
+  "can predict it with the same two lines the fix runs.",
+  "",
+  "min and max are INCLUSIVE and are read from the mod's bytecode, not inferred from samples. field is the",
+  "static array the piece passes. Both jars load this file; they must agree, and the acceptance test is a",
+  "prefilter-vs-world diff, not inspection.",
+  "",
+  "Not covered: com.emoniph.witchery.worldgen.ComponentVillageBookShop. It never calls",
+  "generateStructureChestContents at all -- it places the chest and writes slots directly through",
+  "TileEntityChest.setInventorySlotContents -- so no hook sees it and neither jar can touch it."
+ ],
+ "sites": [
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageKeep",
+   "field": "villageTowerChestContents",
+   "min": 3,
+   "max": 8,
+   "src": "3 + rand.nextInt(6)"
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageApothecary",
+   "field": "villageApothecaryChestContents",
+   "min": 2,
+   "max": 5,
+   "src": "2 + rand.nextInt(4)"
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentVillageWatchTower",
+   "field": "villageTowerChestContents",
+   "min": 2,
+   "max": 5,
+   "src": "2 + rand.nextInt(4)"
+  },
+  {
+   "piece": "com.emoniph.witchery.worldgen.ComponentShack",
+   "field": "shackChestContents",
+   "min": 1,
+   "max": 3,
+   "src": "1 + rand.nextInt(3)"
+  }
+ ]
+}

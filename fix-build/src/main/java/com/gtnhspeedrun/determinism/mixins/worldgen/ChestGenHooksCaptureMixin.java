@@ -39,7 +39,7 @@ public class ChestGenHooksCaptureMixin {
         at = @At("RETURN"),
         require = 1)
     private void gtnhdet$noteItems(Random rnd, CallbackInfoReturnable<WeightedRandomChestContent[]> cir) {
-        ChestFillContext.notedItems((ChestGenHooks) (Object) this);
+        ChestFillContext.notedItems((ChestGenHooks) (Object) this, cir.getReturnValue());
     }
 
     @Inject(method = "getCount(Ljava/util/Random;)I", at = @At("RETURN"), require = 1)
