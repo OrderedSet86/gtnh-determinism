@@ -1,0 +1,12 @@
+-1620438385926732085: side 12 at [14, 7]  gap 9  humidSide 1 at [-3, 2]  humidChunks 1  columns all
+-3930022213432332047: side 24 at [-15, -8]  gap 1  humidSide 3 at [-15, -15]  humidChunks 50  columns all
+-4339491790374404715: side 10 at [-20, -20]  gap 1  humidSide 13 at [-3, -24]  humidChunks 394  columns all
+-8754235096474540153: side 16 at [-5, -19]  gap 1  humidSide 8 at [9, 4]  humidChunks 127  columns all
+1616826333299740197: side 9 at [7, 7]  gap 1  humidSide 9 at [-6, 6]  humidChunks 405  columns all
+3894202525543153358: side 13 at [2, 8]  gap 2  humidSide 2 at [-13, 3]  humidChunks 64  columns all
+5473170400133757082: side 5 at [13, 10]  gap 7  humidSide 8 at [-13, -12]  humidChunks 424  columns all
+590749103374828709: side 13 at [4, -29]  gap 1  humidSide 16 at [-2, -14]  humidChunks 599  columns all
+681789490782100011: side 5 at [9, 5]  gap 1  humidSide 20 at [-14, -15]  humidChunks 741  columns all
+7312478273775840697: side 15 at [-1, -2]  gap 1  humidSide 2 at [-15, -15]  humidChunks 6  columns all
+8236969246616475863: side 7 at [-33, 8]  gap 1  humidSide 4 at [-24, 14]  humidChunks 41  columns all
+978943473819193190: side 9 at [-1, -6]  gap 4  humidSide 1 at [-5, 5]  humidChunks 2  columns all

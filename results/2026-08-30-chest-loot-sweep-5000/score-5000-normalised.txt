@@ -1,0 +1,160 @@
+=== loot-score: 5000 seeds, stage-0 prefilter, radius 60 chunks ===
+
+#1   seed 4257935213167124281   score 399833.376684   (uncapped 399901.146684, capped away 67.76999999996042)
+     spawn [-137, 64, 21]      chests in scope: 516 roguelike, 24 village
+     top items: Platinum Ingot x8 (298480), Block of Steel x1 (47170), Alumite Large Plate x1 (9314), Piston Boots x2 (7282), Cobalt Hammer Head x3 (6426)
+     representative chests
+       [1] roguelike   (-449, 7, -210)   388 blocks from spawn   marginal 298482.9415 (raw 298482.9415)
+           /tp -449 8 -210
+           Platinum Ingot x8 (298480), Common Treasure x3 (2.9415)
+       [2] village villageBlacksmith   (126, 64, -763)   Y NOMINAL   827 blocks from spawn   marginal 48017.973340000004 (raw 48017.97334)
+           /tp 126 65 -763
+           Block of Steel x1 (47170), Iron Screw x6 (825.5999999999999), Steel Ingot x17 (22.083), Bronze Ingot x9 (0.29034)
+
+#2   seed 615833437261930994   score 375403.408018   (uncapped 375569.173018, capped away 165.76499999995576)
+     spawn [21, 64, 68]      chests in scope: 578 roguelike, 55 village
+     top items: Platinum Ingot x7 (261170), Block of Steel x1 (47170), Division Sigil x1 (16190), Stainless Steel Ingot x2 (11416), Ardite Large Plate x3 (6411)
+     representative chests
+       [1] roguelike   (339, 7, 508)   543 blocks from spawn   marginal 264176.9098 (raw 264176.9098)
+           /tp 339 8 508
+           Platinum Ingot x7 (261170), Aluminium Ingot x1 (3005), Cast Iron Ingot x3 (1.9098000000000002)
+       [2] village villageBlacksmith   (814, 64, 1034)   Y NOMINAL   1250 blocks from spawn   marginal 47312.40963 (raw 47312.40963)
+           /tp 814 65 1034
+           Block of Steel x1 (47170), Brass Ingot x6 (142.38), Gold Ingot x1 (0.02963)
+
+#3   seed 1737259525841610519   score 341171.67932000005   (uncapped 341223.63632, capped away 51.95699999993667)
+     spawn [-691, 64, -77]      chests in scope: 446 roguelike, 28 village
+     top items: Platinum Ingot x8 (298480), Division Sigil x1 (16190), Alumite Large Plate x1 (9314), Stainless Steel Ingot x1 (5708), Chrome Dust x6 (2052.6000000000004)
+     representative chests
+       [1] roguelike   (-1357, 10, -61)   666 blocks from spawn   marginal 298567.05448600004 (raw 298567.05448600004)
+           /tp -1357 11 -61
+           Platinum Ingot x8 (298480), Nickel Ingot x6 (85.14), Cast Iron Ingot x3 (1.9098000000000002), Redstone x3 (0.004686)
+       [2] roguelike   (-678, 31, 348)   425 blocks from spawn   marginal 16190.1463 (raw 16190.1463)
+           /tp -678 32 348
+           Division Sigil x1 (16190), Ghast Tear x1 (0.1463)
+
+#4   seed -8332750211525018475   score 316229.791366   (uncapped 316311.115366, capped away 81.32399999996414)
+     spawn [-60, 64, -69]      chests in scope: 542 roguelike, 27 village
+     top items: Platinum Ingot x7 (261170), Alumite Large Plate x2 (18628), Hopper Cart x1 (8562), Cobalt Hammer Head x2 (4284), Miner's Backpack x6 (3637.7999999999997)
+     representative chests
+       [1] roguelike   (198, 7, -511)   512 blocks from spawn   marginal 261170 (raw 261170)
+           /tp 198 8 -511
+           Platinum Ingot x7 (261170)
+       [2] village railcraft:workshop   (263, 64, -614)   Y NOMINAL   634 blocks from spawn   marginal 11719.436300000001 (raw 11719.436300000001)
+           /tp 263 65 -614
+           Hopper Cart x1 (8562), Hopper x4 (3149.6), Coal Coke x9 (7.8363000000000005)
+
+#5   seed -5509591735660387661   score 312454.593541   (uncapped 312572.490541, capped away 117.8969999999972)
+     spawn [-44, 64, 63]      chests in scope: 594 roguelike, 63 village
+     top items: Zero Point Module x1 (250000), Division Sigil x1 (16190), Alumite Large Plate x1 (9314), Stainless Steel Ingot x1 (5708), 1x Tin Wire x7 (4022.9000000000005)
+     representative chests
+       [1] roguelike   (384, 7, 588)   677 blocks from spawn   marginal 250000 (raw 250000)
+           /tp 384 8 588
+           Zero Point Module x1 (250000)
+       [2] roguelike   (439, 30, 572)   702 blocks from spawn   marginal 16190 (raw 16190)
+           /tp 439 31 572
+           Division Sigil x1 (16190)
+
+#6   seed 8427820319450676711   score 306111.511453   (uncapped 306156.691453, capped away 45.179999999993015)
+     spawn [6, 64, 34]      chests in scope: 535 roguelike, 16 village
+     top items: Platinum Ingot x7 (261170), Alumite Large Plate x2 (18628), Bronze Pickaxe x1 (4252), Cobalt Large Plate x2 (4224), Piston Boots x1 (3641)
+     representative chests
+       [1] roguelike   (-590, 7, -521)   814 blocks from spawn   marginal 261176.82629000003 (raw 261176.82629)
+           /tp -590 8 -521
+           Platinum Ingot x7 (261170), Red Alloy Ingot x3 (2.5632), Cast Iron Ingot x4 (2.5464), Diamond x1 (0.8144), Iron Ingot x7 (0.8134), Gold Ingot x3 (0.08889)
+       [2] roguelike   (949, 21, 591)   1095 blocks from spawn   marginal 9693.09744 (raw 9693.09744)
+           /tp 949 22 591
+           Alumite Large Plate x1 (9314), Alumite Hammer Head x1 (379), Lapis Lazuli x30 (0.09744)
+
+#7   seed -6241510188456511856   score 292394.865712   (uncapped 308694.155712, capped away 16299.289999999979)
+     spawn [33, 64, -52]      chests in scope: 508 roguelike, 16 village
+     top items: Zero Point Module x1 (250000), Division Sigil x1 (16190, 2 found, capped at 1), Chrome Dust x10 (3421.0), Aluminium Ingot x1 (3005), Ultimate Stew x1 (2439)
+     representative chests
+       [1] roguelike   (-490, 10, -19)   524 blocks from spawn   marginal 250005.2243 (raw 250005.2243)
+           /tp -490 11 -19
+           Zero Point Module x1 (250000), Manganese Ingot x2 (5.078), Ghast Tear x1 (0.1463)
+       [2] roguelike   (-464, 21, 36)   505 blocks from spawn   marginal 16204.395999999999 (raw 16204.396)
+           /tp -464 22 36
+           Division Sigil x1 (16190), Manganese Ingot x5 (12.695), Tin Ingot x10 (1.701)
+
+#8   seed 8386672438169610712   score 227238.36097100002   (uncapped 227297.094971, capped away 58.73399999999674)
+     spawn [213, 64, 107]      chests in scope: 575 roguelike, 30 village
+     top items: Platinum Ingot x5 (186550), Stainless Steel Ingot x2 (11416), Alumite Large Plate x1 (9314), Chrome Dust x11 (3763.1000000000004), Slime Boots x1 (2495)
+     representative chests
+       [1] roguelike   (309, 7, -700)   813 blocks from spawn   marginal 186550 (raw 186550)
+           /tp 309 8 -700
+           Platinum Ingot x5 (186550)
+       [2] roguelike   (-433, 20, -591)   951 blocks from spawn   marginal 9601.457552000002 (raw 9601.457552)
+           /tp -433 21 -591
+           Alumite Large Plate x1 (9314), Steel Tough Rod x1 (285.3), Flint and Steel x1 (1.081), Ender Pearl x3 (1.0454999999999999), Lapis Lazuli x5 (0.01624), Clay x7 (0.014811999999999999)
+
+#9   seed 4419113319215885804   score 182453.419698   (uncapped 182505.376698, capped away 51.95699999999488)
+     spawn [873, 64, -190]      chests in scope: 430 roguelike, 22 village
+     top items: Platinum Ingot x3 (111930), Alumite Large Plate x2 (18628), Division Sigil x1 (16190), Dezil's Marshmallow x2 (6872), Ardite Large Plate x2 (4274)
+     representative chests
+       [1] roguelike   (1836, 11, -531)   1022 blocks from spawn   marginal 111930.8144 (raw 111930.8144)
+           /tp 1836 12 -531
+           Platinum Ingot x3 (111930), Diamond x1 (0.8144)
+       [2] roguelike   (1791, 11, -545)   984 blocks from spawn   marginal 16190.8144 (raw 16190.8144)
+           /tp 1791 12 -545
+           Division Sigil x1 (16190), Diamond x1 (0.8144)
+
+#10  seed -2767344775837791840   score 176092.008421   (uncapped 176171.073421, capped away 79.06500000000233)
+     spawn [429, 64, -136]      chests in scope: 597 roguelike, 28 village
+     top items: Platinum Ingot x4 (149240), Cobalt Large Plate x3 (6336), Miner's Backpack x4 (2425.2), Ardite Excavator Head x1 (2163), Cobalt Hammer Head x1 (2142)
+     representative chests
+       [1] roguelike   (540, 7, 164)   320 blocks from spawn   marginal 149240 (raw 149240)
+           /tp 540 8 164
+           Platinum Ingot x4 (149240)
+       [2] roguelike   (1030, 10, 480)   861 blocks from spawn   marginal 4275.084448 (raw 4275.084448)
+           /tp 1030 11 480
+           Ardite Excavator Head x1 (2163), Cobalt Large Plate x1 (2112), Lapis Lazuli x26 (0.084448)
+
+wrote top 10 seeds to results/2026-08-30-chest-loot-sweep-5000/top10-seeds-normalised.txt
+
+=== diagnostics ===
+item stacks in scope        : 54011022
+  matched by the value table: 11195132
+  unvalued                  : 42815890
+  no display name           : 0
+seeds killed by a gate      : 0
+
+value-table entries that appeared ZERO times: 0 of 121
+
+most frequent items carrying NO value (candidates for the table):
+  13074440  Gravel
+  12013952  Bone
+  9134732  Torch
+  8185699  Arrow of Weakness
+  7270722  Oak Leaves
+  6056266  String
+  5709957  Ice
+  5540678  Sand
+  4480072  Book
+  4184845  Cobweb
+  3087540  Snowball
+  2873099  Aurora
+  2868831  Ztone Tile
+  2813270  Gunpowder
+  1913829  Powderbarrel
+  1808835  Paper
+  1507275  Grass
+  1435217  Sandstone
+  1246777  Arrow of Healing
+  1239577  Arrow of Slowness
+  1158991  Bitt ⓪
+  1158614  Svelstone block
+  1157163  Smooth Stone
+  1155909  Lave ⓪
+  1152857  Anti Block
+
+loot sources and what this run saw:
+  roguelike REWARD           NOT SEEN   — DEAD in this pack. The REWARD loot table is registered (SettingsLootRules maps Treasure.REWARD -> Loot.REWARD, and config/roguelike_dungeons/settings/loot_reward.json defines 5 levels), but the only room that places a REWARD chest, DungeonRoom.REWARD, is in no room pool this pack uses: not the mod's builtin SettingsRooms (15 rooms, no REWARD) and not any of GTNH's six rooms_*.json. Measured: 0 of ~2.7M roguelike chests over 5000 seeds.
+  roguelike                  seen       — stage 0 predicts these exactly, including real Y
+  village pieces             seen       — stage 0 predicts contents exactly; Y is the piece's nominal ground level
+  chest1-4                   NOT SEEN   — LootGames minigame rewards, not worldgen chests. Rolled from an unseeded static Random when a player wins, so not a function of the seed at all.
+  stronghold                 NOT SEEN   — generates (3 per world, no biome gate under RWG) but the first ring sits ~640-1150 blocks out.
+  vanilla WorldGenDungeons   NOT SEEN   — existence is route-dependent, held pending the GregTech ore live-terrain read.
+  mineshaft                  NOT SEEN   — chest presence is a 1-in-100 draw inside addComponentParts; needs a replay against a write-absorbing world.
+  pyramid / igloo            NOT SEEN   — DEAD in this pack: RWG never constructs MapGenScatteredFeature.
+  (pass --loot-tables <chestloot.csv> for EV per chest against this value table)

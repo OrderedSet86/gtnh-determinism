@@ -1,0 +1,22 @@
+Cost A/B, GTNH daily-707, 2000 random seeds (random:2000:7), gated sweep configuration:
+  PREFILTER_RADIUS=64 PREFILTER_TERRAIN=4
+  PREFILTER_GATE_VILLAGEDIST=12
+  PREFILTER_GATE_PIECES=VillageComponentPhotoshop,ComponentToolWorkshop,ComponentSmeltery
+  PREFILTER_GATE_WATER=32
+
+gated, no biome stage : done: 2000 seeds in 171.4 s (11 seeds/s)   85.7 ms/seed
+gated, biomeregion=4  : done: 2000 seeds in 172.2 s (11 seeds/s)   86.1 ms/seed
+attributable          : 0.8 s over 2000 seeds = 0.4 ms/seed (0.5%)
+
+Kills: village 1399, water 292 -> 309 survivors reached the biome stage (~2.6 ms each).
+85.7 ms/seed matches the baseline recorded in results/2026-08-29-roguelike-prefilter.
+
+--- terrain radius 15, 100 seeds (random:100:7), gated, biomeregion=4 ---
+terrain=15, gate at 15 (current default) : 56.9 s   569 ms/seed
+terrain=15, gate at 4  (staged)          : 33.7 s   337 ms/seed  (-41%)
+terrain=15, gate at 4  + hand-rolled     : 28.1 s   281 ms/seed  (-51%)
+terrain=4,  gate at 4  (reference)       :  8.9 s    89 ms/seed
+
+Survivors: gate@15 = 30, gate@4 = 16 (strict subset). 14 extra kills on route-local water.
+For all 16 common survivors, terrain / water_total / spawn / villages / village_starts /
+biomeregion are byte-identical across all three configurations.

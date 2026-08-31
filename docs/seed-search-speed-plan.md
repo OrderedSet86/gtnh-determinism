@@ -47,7 +47,13 @@ This is how the vanilla-Minecraft seed-hunting community searches 2⁴⁸ struct
 finalists.** Our analog is designed in `harness-speed.md` §C and is exact rather than
 reimplemented — it calls the real mod classes in-JVM with no WorldServer:
 
-- **Stage 0 — pure-math prefilter, ~50-200 seeds/s/thread (10⁵-10⁶ seeds/hour)**:
+- **Stage 0 — worldless prefilter, ~50-200 seeds/s/thread (10⁵-10⁶ seeds/hour)**:
+  *(Called "pure-math" when this was written, 2026-07-23. That is no longer accurate and the
+  old name misleads — stage 0 now builds real `Chunk` objects from the pack's own generator and
+  runs Roguelike's real dungeon generator against them. "Worldless" means no `WorldServer` and
+  no save directory, not "no generation". Measured on daily-707 with the terrain and dungeon
+  modules enabled on gate survivors it is ~11 seeds/s, not 50-200; the higher figure is the
+  arithmetic-only configuration. See `seedsearch/README.md` for what it can and cannot answer.)*
   `ChunkManagerRealistic` needs only `getSeed()` → spawn-area biomes, ocean/river checks;
   RWG village existence AND chunk position are exactly predictable; GT vein try-order
   (attempt-1 vein probable); Roguelike trigger grid; eldritch ring candidates

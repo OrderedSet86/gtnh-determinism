@@ -1,0 +1,11 @@
+[prefilter][timing] 200 seeds, 293.3 s wall
+[prefilter][timing] 1466.3 ms/seed measured
+[prefilter][timing]   village.cellscan       :     189.9 ms total,    0.95 ms/seed,   0.1% of wall,       200 calls, 949.6 us/call
+[prefilter][timing]   villageStarts          :    7648.5 ms total,   38.24 ms/seed,   2.6% of wall,       200 calls, 38242.5 us/call
+[prefilter][timing]   RwgTerrain.ctor        :     225.3 ms total,    1.13 ms/seed,   0.1% of wall,       200 calls, 1126.7 us/call
+[prefilter][timing]   chunkgen               :  180820.9 ms total,  904.10 ms/seed,  61.7% of wall,    107562 calls, 1681.1 us/call
+[prefilter][timing]   spawn.walk             :   21369.4 ms total,  106.85 ms/seed,   7.3% of wall,       200 calls, 106847.0 us/call
+[prefilter][timing]   terrain.digest         :   28268.0 ms total,  141.34 ms/seed,   9.6% of wall,       200 calls, 141339.8 us/call
+[prefilter][timing]   dungeon.triggers       :     389.0 ms total,    1.94 ms/seed,   0.1% of wall,       200 calls, 1944.8 us/call
+[prefilter][timing]   dungeon.generate       :  234163.1 ms total, 1170.82 ms/seed,  79.8% of wall,      1068 calls, 219253.8 us/call
+[prefilter][timing]   seed.total             :  293101.6 ms total, 1465.51 ms/seed,  99.9% of wall,       200 calls, 1465508.1 us/call
