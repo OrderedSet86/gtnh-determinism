@@ -316,6 +316,8 @@ public class WorldgenProbe {
             // read the dungeonChest and mineshaftCorridor categories rather than registering a table.
             ChestLootExport.writeCombined(ChestLootExport.dir());
             ChestLootExport.writeLootBags(cfg, ChestLootExport.dir());
+            ChestLootExport.writeEnchantments(ChestLootExport.dir());
+            ChestLootExport.writeItemAttributes(ChestLootExport.dir());
         }
         MinecraftForge.EVENT_BUS.register(POP_LISTENER);
         final String daemonDir = System.getProperty("probe.daemon");
@@ -3249,7 +3251,7 @@ public class WorldgenProbe {
             java.util.Collections.sort(v);
             String dig;
             try {
-                dig = shortDigest(String.join(" ", v));
+                dig = shortDigest(String.join("\0", v));
             } catch (Exception ex) {
                 dig = "err";
             }
