@@ -121,7 +121,7 @@ def main():
                 continue
             c["corpus_cells"] += 1
             actual, reason = actual_mix(counter, args.material_floor)
-            pred, _ = vp.predict(r.seed, cell[0], cell[1], dim=args.dim, token=token)
+            pred, att = vp.predict(r.seed, cell[0], cell[1], dim=args.dim, token=token)
             predname = pred["name"] if pred else None
             if predname is None:
                 c["no_eligible_draw"] += 1
@@ -139,9 +139,9 @@ def main():
             # tMinY, so what decides it is where this vein actually landed: ore.mix.gold has minY 30
             # but rolls tMinY up to 54, and lumping it with minY-10 mixes blurs the split that is the
             # whole finding. TF_GROUND is WorldProviderTwilightForest.getAverageGroundLevel().
-            t_min_y = vp.vein_geometry(pred, cell[0], cell[1], dim=args.dim,
-                                       world_seed=r.seed)["tMinY"]
-            b = "low" if t_min_y <= args.ground else "high"
+            geom = vp.vein_geometry(pred, cell[0], cell[1], dim=args.dim, attempt=att,
+                                    world_seed=r.seed)
+            b = ("low" if geom["tMinY"] <= args.ground else "high") if geom else "no-meta"
             hit = predname == actual
             c["matched" if hit else "identity_flip"] += 1
             band[b]["n"] += 1

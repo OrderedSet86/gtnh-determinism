@@ -12,7 +12,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 javac -d "$tmp" XSTR.java VeinSweep.java
-java -cp "$tmp" VeinSweep ../data/oremixes-gtnh-daily707.json > "$tmp/sweep.txt"
+java -cp "$tmp" VeinSweep ../data/oremixes-gtnh-2.8.4.json > "$tmp/sweep.txt"
+# VeinSweep implements the LEGACY (GT 5.09.51 / GTNH 2.8.4) walk, so the python side must be
+# pinned to the same algorithm and table: on daily tables vein_predict auto-selects the FNV
+# protocol and every comparison here would be apples-to-oranges.
+GTNH_OREMIXES=$(cd ../data && pwd)/oremixes-gtnh-2.8.4.json GTNH_VEIN_ALGO=legacy \
 PYTHONPATH=.. python3 - "$tmp/sweep.txt" <<'PY'
 import sys
 import vein_predict as vp

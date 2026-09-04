@@ -1,0 +1,98 @@
+=== multi-criteria: 4675 seeds with a valid spawn (325 dropped for spawn_iters==0) ===
+
+bars: village 200   circle 500   biome 5x5 within 200   TF 500
+
+criteria met: {6: 7, 5: 71, 4: 423, 3: 787, 2: 1819, 1: 1362, 0: 206}
+individually: village 856   circle 3332   no-rain 884   humid 3140   touching 617   dungeon 621
+pass loot Min gate: 1329
+
+#1  seed -4375987282778720440   loot 245,847   6/6 [VCNHAD]   MIN-FAIL
+      spawn        /tp 148 64 122
+      village      OK    174 blocks  /tp 136 64 296
+      coven circle OK    324 blocks  /tp 471 64 93
+      no-rain 9x9  OK     85 blocks to edge  (centre 156)  /tp -8 200 120
+      humid 13x13   OK    108 blocks to edge  (centre 240)  /tp 264 200 -88
+      rl dungeon   OK     94 blocks  /tp 200 200 200 (trigger chunk, +-8 blocks)
+      biome pair   OK      0 chunk gap, 5x5 each   /tp 24 200 16
+
+#2  seed 3950181539711735573   loot 221,775   6/6 [VCNHAD]
+      spawn        /tp 102 64 -47
+      village      OK     87 blocks  /tp 104 64 40
+      coven circle OK    425 blocks  /tp 487 64 -227
+      no-rain 15x15 OK     78 blocks to edge  (centre 246)  /tp 264 200 -232
+      humid 20x20   OK      0 blocks to edge  (centre 159)  /tp 112 200 112
+      rl dungeon   OK    172 blocks  /tp 136 200 -216 (trigger chunk, +-8 blocks)
+      biome pair   OK      0 chunk gap, 5x5 each   /tp 144 200 -112
+
+#3  seed -8195513345413032523   loot 214,301   6/6 [VCNHAD]   MIN-FAIL
+      spawn        /tp 21 64 -165
+      village      OK    174 blocks  /tp 40 64 8
+      coven circle OK    241 blocks  /tp -201 64 -259
+      no-rain 11x11 OK    194 blocks to edge  (centre 317)  /tp -200 200 -392
+      humid 25x25   OK      0 blocks to edge  (centre 154)  /tp -88 200 -56
+      rl dungeon   OK     90 blocks  /tp 56 200 -248 (trigger chunk, +-8 blocks)
+      biome pair   OK      1 chunk gap, 5x5 each   /tp -24 200 -264
+
+#4  seed -5029100832460124214   loot 208,109   6/6 [VCNHAD]   MIN-FAIL
+      spawn        /tp 33 64 16
+      village      OK    183 blocks  /tp 216 64 24
+      coven circle OK    228 blocks  /tp 167 64 -169
+      no-rain 9x9  OK    162 blocks to edge  (centre 240)  /tp -200 200 -40
+      humid 26x26   OK      0 blocks to edge  (centre 147)  /tp 144 200 -80
+      rl dungeon   OK    138 blocks  /tp 8 200 152 (trigger chunk, +-8 blocks)
+      biome pair   OK      0 chunk gap, 5x5 each   /tp -96 200 24
+
+#5  seed -4965571797244288235   loot 169,912   6/6 [VCNHAD]
+      spawn        /tp 130 64 296
+      village      OK    153 blocks  /tp 280 64 264
+      coven circle OK    390 blocks  /tp 503 64 183
+      no-rain 8x8  OK      8 blocks to edge  (centre 85)  /tp 176 200 368
+      humid 11x11   OK    185 blocks to edge  (centre 310)  /tp 344 200 520
+      rl dungeon   OK     48 blocks  /tp 136 200 344 (trigger chunk, +-8 blocks)
+      biome pair   OK      0 chunk gap, 5x5 each   /tp 80 200 320
+
+#6  seed -252447730297985784   loot 114,744   6/6 [VCNHAD]   MIN-FAIL
+      spawn        /tp 72 64 111
+      village      OK    142 blocks  /tp 168 64 216
+      coven circle OK    491 blocks  /tp -201 64 -297
+      no-rain 9x9  OK    186 blocks to edge  (centre 284)  /tp 312 200 -40
+      humid 11x11   OK     72 blocks to edge  (centre 183)  /tp 232 200 200
+      rl dungeon   OK     90 blocks  /tp 152 200 152 (trigger chunk, +-8 blocks)
+      biome pair   OK      1 chunk gap, 5x5 each   /tp 232 200 56
+
+#7  seed -489324692328004013   loot 94,128   6/6 [VCNHAD]   MIN-FAIL
+      spawn        /tp -66 64 123
+      village      OK    187 blocks  /tp 104 64 200
+      coven circle OK    488 blocks  /tp -297 64 -307
+      no-rain 5x5  OK    101 blocks to edge  (centre 141)  /tp -56 200 264
+      humid 14x14   OK     95 blocks to edge  (centre 237)  /tp -272 200 240
+      rl dungeon   OK    158 blocks  /tp 88 200 88 (trigger chunk, +-8 blocks)
+      biome pair   OK      0 chunk gap, 5x5 each   /tp -96 200 224
+
+#8  seed -5513991934105820763   loot 313,781   5/6 [VCNHA]
+      spawn        /tp 190 64 54
+      village      OK    120 blocks  /tp 120 64 152
+      coven circle OK    466 blocks  /tp -227 64 -153
+      no-rain 7x7  OK    194 blocks to edge  (centre 252)  /tp 440 200 88
+      humid 15x15   OK     79 blocks to edge  (centre 245)  /tp 344 200 -136
+      rl dungeon         443 blocks  /tp -216 200 232 (trigger chunk, +-8 blocks)
+      biome pair   OK      1 chunk gap, 5x5 each   /tp 352 200 24
+
+#9  seed 3960981623850638991   loot 272,864   5/6 [VNHAD]
+      spawn        /tp -529 64 245
+      village      OK     80 blocks  /tp -552 64 168
+      coven circle       584 blocks  /tp 7 64 477
+      no-rain 7x7  OK    182 blocks to edge  (centre 257)  /tp -744 200 104
+      humid 13x13   OK    102 blocks to edge  (centre 205)  /tp -536 200 40
+      rl dungeon   OK    167 blocks  /tp -664 200 344 (trigger chunk, +-8 blocks)
+      biome pair   OK      0 chunk gap, 5x5 each   /tp -624 200 144
+
+#10  seed 3447350603108442410   loot 265,184   5/6 [VCHAD]
+      spawn        /tp 130 64 104
+      village      OK    117 blocks  /tp 216 64 184
+      coven circle OK    226 blocks  /tp 55 64 317
+      no-rain 7x7        229 blocks to edge  (centre 306)  /tp -120 200 280
+      humid 19x19   OK      9 blocks to edge  (centre 222)  /tp -24 200 -56
+      rl dungeon   OK     99 blocks  /tp 72 200 184 (trigger chunk, +-8 blocks)
+      biome pair   OK      0 chunk gap, 5x5 each   /tp 64 200 256
+

@@ -1440,6 +1440,9 @@ public class WorldgenProbe {
     }
 
     private void runProbe(WorldServer world, String order, int radius, String out) throws Exception {
+        // Full-gen runs need the raise too: the prefilter path gets it via OreVeinTableDump.dumpOnce,
+        // but a dim-7 ground-truth walk goes through here.
+        if (Boolean.getBoolean("probe.gtdebug")) OreVeinTableDump.enableGtDebugLogging();
         final long seed = world.getSeed();
         final int dim = probeDim();
         final int walkR = radius + 1;
@@ -1471,6 +1474,8 @@ public class WorldgenProbe {
             if (++n % 100 == 0) LOG.info("[probe] generated {}/{} chunks", n, walk.size());
         }
         LOG.info("[probe] generation done in {} ms, hashing…", System.currentTimeMillis() - t0);
+        // Live-path vein selections, next to the report. See OreVeinTableDump.dumpVeinCache.
+        OreVeinTableDump.dumpVeinCache(new File(out + ".veincache.json"));
 
         // -Dprobe.nohash=true (seed-search fast path): skip the SHA-256 chunk digests — searchlib only reads the
         // "search" section. TE materialization still runs (the ore histogram needs GT ore TEs to exist).

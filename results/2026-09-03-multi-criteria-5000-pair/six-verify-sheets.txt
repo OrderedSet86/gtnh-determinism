@@ -1,0 +1,168 @@
+==============================================================================
+seed -5029100832460124214      loot 208,109      spawn_iters 1
+==============================================================================
+  SPAWN            /tp 33 64 16
+
+  VILLAGE          /tp 216 200 24       183 blocks   [Y unknown — fly down]
+                   expect 35 pieces, 5 predicted chests
+  COVEN CIRCLE     /tp 167 63 -169         228 blocks   [Y predicted, may be 1 low]
+                   TileEntityDispenser here: Cast Iron Ingot x6, Mundane Ring x1, Cast Iron Ingot x2, Mundane Ring x1, Ultimate Stew x2, Magnesium Ingot x5
+  NO-RAIN 9x9      /tp -200 200 -40       240 blocks   [square CENTRE, 144 across; Y unknown — fly down]
+  HUMID 26x26        /tp 144 200 -80       147 blocks   [square CENTRE, 416 across; Y unknown — fly down]
+  BIOME PAIR       no-rain 5x5 centre /tp -136 200 -8   humid 5x5 centre /tp -56 200 56   gap 0 chunks
+  RL DUNGEON       /tp 8 200 152       138 blocks   [trigger chunk, +-8 blocks; entrance tower on the surface]
+
+  TOP 4 LOOT CHESTS
+    /tp 19 22 159   roguelike   10,000 pts   [Y exact]
+       Fired Clay Bucket x1, Gravel x7, Grass x1, File x1, Grass x1
+    /tp 965 21 -638   roguelike    2,767 pts   [Y exact]
+       Clay x3, Cobalt Ingot x3, Book x4, Lapis Lazuli x6, Cobweb x3
+    /tp -528 32 -754   roguelike    2,576 pts   [Y exact]
+       Grass x1, Mixed Salad x1, Grass x1, Cornish Pasty x1, Miner's Backpack x1
+    /tp 153 51 -478   roguelike    2,556 pts   [Y exact]
+       Cobweb x4, Grass x1, Coal x4, Gravel x7, Miner's Backpack x1
+
+==============================================================================
+seed -489324692328004013      loot 94,128      spawn_iters 59
+==============================================================================
+  SPAWN            /tp -66 64 123
+
+  VILLAGE          /tp 104 200 200       187 blocks   [Y unknown — fly down]
+                   expect 49 pieces, 6 predicted chests
+  COVEN CIRCLE     /tp -297 76 -307         488 blocks   [Y predicted, may be 1 low]
+                   TileEntityDispenser here: Melon Seeds x4, Silver Ingot x3, Thaumium Ingot x1, Zinc Ingot x1
+  NO-RAIN 5x5      /tp -56 200 264       141 blocks   [square CENTRE, 80 across; Y unknown — fly down]
+  HUMID 14x14        /tp -272 200 240       237 blocks   [square CENTRE, 224 across; Y unknown — fly down]
+  BIOME PAIR       no-rain 5x5 centre /tp -56 200 264   humid 5x5 centre /tp -136 200 184   gap 0 chunks
+  RL DUNGEON       /tp 88 200 88       158 blocks   [trigger chunk, +-8 blocks; entrance tower on the surface]
+
+  TOP 4 LOOT CHESTS
+    /tp 311 65 848   village      3,110 pts   [Y nominal]
+       Work Cart x1, Coal Coke x9, Coal Coke x4, Engineer's Overalls x1, Work Cart x1
+    /tp 65 41 -9   roguelike    2,523 pts   [Y exact]
+       Paper x6, Splash Potion of Harming x1, Piston Boots x1, Ice x6, Ice x6
+    /tp 142 32 45   roguelike    2,522 pts   [Y exact]
+       Arrow of Weakness x10, Redstone x21, Toasted Coconut x2, Snowball x3, Toasted Coconut x2
+    /tp 133 21 -43   roguelike    1,891 pts   [Y exact]
+       Snowball x4, Torch x3, Tanzanite x1, Redstone x23, Bronze Ingot x7
+
+==============================================================================
+seed -4965571797244288235      loot 169,912      spawn_iters 49
+==============================================================================
+  SPAWN            /tp 130 64 296
+
+  VILLAGE          /tp 280 200 264       153 blocks   [Y unknown — fly down]
+                   expect 13 pieces, 4 predicted chests
+  COVEN CIRCLE     /tp 503 98 183         390 blocks   [Y predicted, may be 1 low]
+                   TileEntityDispenser here: Pile of Ashes x4, Crowbar x1, Pile of Ashes x4, Supreme Pizza x3
+  NO-RAIN 8x8      /tp 176 200 368       85 blocks   [square CENTRE, 128 across; Y unknown — fly down]
+  HUMID 11x11        /tp 344 200 520       310 blocks   [square CENTRE, 176 across; Y unknown — fly down]
+  BIOME PAIR       no-rain 5x5 centre /tp 120 200 280   humid 5x5 centre /tp 40 200 360   gap 0 chunks
+  RL DUNGEON       /tp 136 200 344       48 blocks   [trigger chunk, +-8 blocks; entrance tower on the surface]
+
+  TOP 4 LOOT CHESTS
+    /tp 99 22 281   roguelike   10,845 pts   [Y exact]
+       Gravel x7, Steel Large Plate x1, Gravel x7, Laboratory Block x50, Hammer x1
+    /tp 55 21 263   roguelike   10,250 pts   [Y exact]
+       Arrow of Weakness x7, Gravel x7, Crowbar x1, Enchanted Book x1, Wire Cutter x1
+    /tp -528 65 252   village      8,105 pts   [Y nominal]
+       Hopper x4, Wooden Rail x12, Hopper x4, Track x28, Reinforced Rail x11
+    /tp 1074 65 -621   village      3,355 pts   [Y nominal]
+       Magnifying Glass x1, Hopper x3, Engineer's Overalls x1, TNT Cart x3, Standard Rail x12
+
+==============================================================================
+seed 3950181539711735573      loot 221,775      spawn_iters 218
+==============================================================================
+  SPAWN            /tp 102 64 -47
+
+  VILLAGE          /tp 104 200 40       87 blocks   [Y unknown — fly down]
+                   expect 73 pieces, 15 predicted chests
+  COVEN CIRCLE     /tp 487 66 -227         425 blocks   [Y predicted, may be 1 low]
+                   TileEntityDispenser here: Pumpkin Seeds x4, Minecart x1, Track x10, Knowledge Note x1
+  NO-RAIN 15x15      /tp 264 200 -232       246 blocks   [square CENTRE, 240 across; Y unknown — fly down]
+  HUMID 20x20        /tp 112 200 112       159 blocks   [square CENTRE, 320 across; Y unknown — fly down]
+  BIOME PAIR       no-rain 5x5 centre /tp 184 200 -152   humid 5x5 centre /tp 104 200 -72   gap 0 chunks
+  RL DUNGEON       /tp 136 200 -216       172 blocks   [trigger chunk, +-8 blocks; entrance tower on the surface]
+
+  TOP 4 LOOT CHESTS
+    /tp -539 21 -387   roguelike   10,837 pts   [Y exact]
+       Arrow of Weakness x8, Fired Clay Bucket x1, Shears x1, Oak Leaves x3, End Stone Bricks x52
+    /tp 99 21 -245   roguelike   10,178 pts   [Y exact]
+       Bone x7, Magnetic Steel Excavator Head x1, Grass x1, Gravel x7, Aurora x57
+    /tp -600 11 -322   roguelike    3,216 pts   [Y exact]
+       Cobalt Hammer Head x1, Phial of Enchanter's Concentrate x2, Arrow of Healing x7, Oak Leaves x3, Enchanted Book x1
+    /tp -615 21 -352   roguelike    3,101 pts   [Y exact]
+       Bronze Ingot x10, Powderbarrel x3, Clay x4, String x4, Lapis Lazuli x7
+
+==============================================================================
+seed -8195513345413032523      loot 214,301      spawn_iters 67
+==============================================================================
+  SPAWN            /tp 21 64 -165
+
+  VILLAGE          /tp 40 200 8       174 blocks   [Y unknown — fly down]
+                   expect 89 pieces, 16 predicted chests
+  COVEN CIRCLE     /tp -201 81 -259         241 blocks   [Y predicted, may be 1 low]
+                   TileEntityDispenser here: Block of Steel x1, Block of Steel x1, Pile of Ashes x8, Certus Quartz x2
+  NO-RAIN 11x11      /tp -200 200 -392       317 blocks   [square CENTRE, 176 across; Y unknown — fly down]
+  HUMID 25x25        /tp -88 200 -56       154 blocks   [square CENTRE, 400 across; Y unknown — fly down]
+  BIOME PAIR       no-rain 5x5 centre /tp -72 200 -312   humid 5x5 centre /tp 24 200 -216   gap 1 chunks
+  RL DUNGEON       /tp 56 200 -248       90 blocks   [trigger chunk, +-8 blocks; entrance tower on the surface]
+
+  TOP 4 LOOT CHESTS
+    /tp -820 21 18   roguelike   10,836 pts   [Y exact]
+       Paper x2, Lapis Lazuli x22, Steel Excavator Head x1, Arrow of Slowness x6, Emerald x1
+    /tp 327 12 525   roguelike    3,309 pts   [Y exact]
+       Bone x3, Powderbarrel x3, Rare Treasure x1, Lunch Bag x1, Enchanted Book x1
+    /tp 100 12 -339   roguelike    3,249 pts   [Y exact]
+       Ruby x1, Arrow of Weakness x5, Flint and Steel x1, Froglight x60, Soft Mallet x1
+    /tp 858 65 -545   village      3,075 pts   [Y nominal]
+       Coal x9, Coal Coke x6, Minecart x1, Standard Rail x8, Stone Tie x16
+
+==============================================================================
+seed -252447730297985784      loot 114,744      spawn_iters 44
+==============================================================================
+  SPAWN            /tp 72 64 111
+
+  VILLAGE          /tp 168 200 216       142 blocks   [Y unknown — fly down]
+                   expect 44 pieces, 6 predicted chests
+  COVEN CIRCLE     /tp -201 63 -297         491 blocks   [Y predicted, may be 1 low]
+                   TileEntityDispenser here: Bread x1, Silver Ingot x2, Sausage in Bread x1, Creosote Bottle x5
+  NO-RAIN 9x9      /tp 312 200 -40       284 blocks   [square CENTRE, 144 across; Y unknown — fly down]
+  HUMID 11x11        /tp 232 200 200       183 blocks   [square CENTRE, 176 across; Y unknown — fly down]
+  BIOME PAIR       no-rain 5x5 centre /tp 248 200 8   humid 5x5 centre /tp 216 200 104   gap 1 chunks
+  RL DUNGEON       /tp 152 200 152       90 blocks   [trigger chunk, +-8 blocks; entrance tower on the surface]
+
+  TOP 4 LOOT CHESTS
+    /tp 187 65 257   village      4,000 pts   [Y nominal]
+       Creosote Bottle x13, Reinforced Rail x16, Hopper x1, Hopper x3, Track x30
+    /tp 102 21 158   roguelike    3,061 pts   [Y exact]
+       Arrow of Healing x4, Tumbaga Ingot x10, Torch x9, String x2, Bronze Ingot x7
+    /tp 140 41 233   roguelike    2,668 pts   [Y exact]
+       Sandstone x4, Bone x3, Bold Brigandine x1, Sand x11, Baked Sweet Potato x1
+    /tp 176 32 201   roguelike    2,557 pts   [Y exact]
+       Bone x11, Lingering Potion of Weakness x1, Baked Ham x2, Bone x9, Bone x8
+
+==============================================================================
+seed -4375987282778720440      loot 245,847      spawn_iters 32
+==============================================================================
+  SPAWN            /tp 148 64 122
+
+  VILLAGE          /tp 136 200 296       174 blocks   [Y unknown — fly down]
+                   expect 90 pieces, 15 predicted chests
+  COVEN CIRCLE     /tp 471 132 93         324 blocks   [Y predicted, may be 1 low]
+                   TileEntityDispenser here: Basic Turret Base Crank x1, Thorns x4, Gold Ingot x2, Chest Cart x1, Mundane Amulet x1
+  NO-RAIN 9x9      /tp -8 200 120       156 blocks   [square CENTRE, 144 across; Y unknown — fly down]
+  HUMID 13x13        /tp 264 200 -88       240 blocks   [square CENTRE, 208 across; Y unknown — fly down]
+  BIOME PAIR       no-rain 5x5 centre /tp 8 200 56   humid 5x5 centre /tp 40 200 -24   gap 0 chunks
+  RL DUNGEON       /tp 200 200 200       94 blocks   [trigger chunk, +-8 blocks; entrance tower on the surface]
+
+  TOP 4 LOOT CHESTS
+    /tp -402 11 167   roguelike    3,235 pts   [Y exact]
+       Gravel x7, Powderbarrel x3, Name Tag x1, Cherry Sapling x1, Enchanted Book x1
+    /tp 978 21 -503   roguelike    3,078 pts   [Y exact]
+       Tumbaga Ingot x13, Arrow of Slowness x3, Sandstone x3, Sand x10, Redstone x10
+    /tp 509 21 -837   roguelike    2,811 pts   [Y exact]
+       Bronze Ingot x11, Redstone x19, Bronze Ingot x7, Redstone x6, Ruby x1
+    /tp 200 21 150   roguelike    2,783 pts   [Y exact]
+       Bronze Ingot x6, Red Alloy Ingot x4, Torch x7, Bronze Ingot x13, Cobalt Ingot x3
+

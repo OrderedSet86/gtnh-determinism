@@ -1279,6 +1279,7 @@ public final class Prefilter {
             for (final long seed : seeds) {
                 final SeedProbeWorld world = new SeedProbeWorld(seed, rwg);
                 if (tier1 < 0) BiomeTable.dumpOnce(tableDir, world.getWorldChunkManager());
+                if (tier1 < 0) OreVeinTableDump.dumpOnce(tableDir, seed);
                 final long tSeed = Timing.start();
                 w.write(tier1 >= 0 ? evaluateTier1(world, seed, tier1) : evaluate(world, seed, radiusChunks));
                 Timing.add("seed.total", tSeed);
@@ -1649,6 +1650,7 @@ public final class Prefilter {
         // digest relies on for a high hit rate.
         final int biomeRadius = Integer.getInteger("probe.prefilter.biomeregion", -1);
         if (biomeRadius >= 0) {
+            final long tBiome = Timing.start();
             final int minSide = Integer.getInteger("probe.prefilter.biomeregion.min", 5);
             final int humidity = Integer.getInteger("probe.prefilter.biomeregion.humidity", 14);
             // Default -1 = confirm the whole window. Correctness first: this stage runs last, so it only ever
@@ -1660,6 +1662,9 @@ public final class Prefilter {
                 .evaluate(world, spawnX >> 4, spawnZ >> 4, biomeRadius, minSide, humidity, confirm);
             sb.append(", \"biomeregion\": ")
                 .append(br.toJson());
+            // Recorded BEFORE the kill gate: a gated run returns out of this block for killed seeds, and their
+            // evaluate() cost is exactly the number this timer exists to expose.
+            Timing.add("biomeregion", tBiome);
             // Gate: SIDE[,MAXGAP]. A seed is killed when it has no square of at least SIDE, or when the
             // nearest humid chunk is farther than MAXGAP. Reported as its own kill label so a sweep run with
             // this gate is never pooled with one run without it.
@@ -1677,6 +1682,7 @@ public final class Prefilter {
         // and the handler shuffle is a function of the FML chunk seed, so this costs nothing terrain-wise.
         final int witcheryRadius = Integer.getInteger("probe.prefilter.witchery", -1);
         if (witcheryRadius >= 0) {
+            final long tWitch = Timing.start();
             final String why = WitcheryPrefilter.resolve();
             if (why != null) {
                 sb.append(", \"witchery_error\": \"")
@@ -1719,6 +1725,7 @@ public final class Prefilter {
                         .append("\"");
                 }
             }
+            Timing.add("witchery", tWitch);
         }
 
         // --- Roguelike dungeons: trigger scan is free arithmetic and acts as its own kill gate; construction is

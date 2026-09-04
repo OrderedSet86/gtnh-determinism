@@ -55,6 +55,16 @@ final class BiomeRegionPrefilter {
         int gap = -1;
         int bestX, bestZ;
         int humidX, humidZ, humidBonus;
+        /**
+         * Best TOUCHING PAIR: one >= minSide no-rain square and one >= minSide humid square, chosen to
+         * MINIMISE the chunk gap between them (tie-break: nearer the window centre, i.e. spawn). Distinct
+         * from the two largest squares above, which are found independently and can sit far apart while a
+         * qualifying adjacent pair exists elsewhere — the failure a largest-squares-only report cannot see.
+         * pairGap -1 = no qualifying pair in the window.
+         */
+        int pairGap = -1;
+        int pairDryX, pairDryZ, pairHumX, pairHumZ, pairSide;
+
         /** "A" = Tier A only, "B" = Tier B confirmed, "Ab" = confirm budget ran out mid-way. */
         String tier = "A";
         int chunksConfirmed;
@@ -87,6 +97,20 @@ final class BiomeRegionPrefilter {
                     .append(humidZ)
                     .append("], \"hb\": ")
                     .append(humidBonus);
+            }
+            if (pairGap >= 0) {
+                sb.append(", \"pd\": [")
+                    .append(pairDryX)
+                    .append(", ")
+                    .append(pairDryZ)
+                    .append("], \"ph\": [")
+                    .append(pairHumX)
+                    .append(", ")
+                    .append(pairHumZ)
+                    .append("], \"pg\": ")
+                    .append(pairGap)
+                    .append(", \"ps\": ")
+                    .append(pairSide);
             }
             sb.append(", \"t\": \"")
                 .append(tier)
@@ -242,10 +266,13 @@ final class BiomeRegionPrefilter {
         for (int i = 0; i < span; i++) {
             for (int j = 0; j < span; j++) humidMask[i][j] = hum[i][j] >= humidity;
         }
-        final int[] humBig = maxSquare(humidMask, new int[span][span]);
+        final int[][] humDp = new int[span][span];
+        final int[] humBig = maxSquare(humidMask, humDp);
         r.humidSide = humBig[0];
         r.humidCornerX = ox + humBig[1];
         r.humidCornerZ = oz + humBig[2];
+
+        bestPair(r, dp, humDp, span, ox, oz, radius, minSide);
 
         r.gap = -1;
         if (r.side < minSide) return;
@@ -315,6 +342,59 @@ final class BiomeRegionPrefilter {
     }
 
     /** Largest all-true square as {@code [side, i, j]} of its min corner; fills {@code dp} for the caller. */
+    /**
+     * Best touching pair of minSide x minSide squares, one per mask, minimising the inter-square chunk gap.
+     *
+     * <p>
+     * Searches ALL anchors where a square of at least minSide fits (dp >= minSide), not just the largest
+     * square of each kind: the largest dry and largest humid square can sit 20 chunks apart while a
+     * qualifying pair touches elsewhere, and a report built only from maxima rejects that seed invisibly.
+     * Fixed at minSide x minSide because any larger qualifying square CONTAINS a minSide one, so minimising
+     * over minSide squares is exact for the "a >= minSide square of each, close together" criterion.
+     *
+     * <p>
+     * O(anchors^2), worst case span^4: 531k comparisons at radius 13, 2.3M at radius 19 — microseconds of arithmetic
+     * against a
+     * stage that spends a second generating chunks. Tie-break is distance of the pair midpoint from the
+     * window centre, which is the predicted spawn.
+     */
+    private static void bestPair(Result r, int[][] dryDp, int[][] humDp, int span, int ox, int oz, int radius,
+        int minSide) {
+        int bestGap = Integer.MAX_VALUE;
+        long bestTie = Long.MAX_VALUE;
+        for (int i = minSide - 1; i < span; i++) {
+            for (int j = minSide - 1; j < span; j++) {
+                if (dryDp[i][j] < minSide) continue;
+                final int dx0 = i - minSide + 1, dz0 = j - minSide + 1;
+                for (int a = minSide - 1; a < span; a++) {
+                    for (int b = minSide - 1; b < span; b++) {
+                        if (humDp[a][b] < minSide) continue;
+                        final int hx0 = a - minSide + 1, hz0 = b - minSide + 1;
+                        final int gx = Math.max(0, Math.max(hx0 - i - 1, dx0 - a - 1));
+                        final int gz = Math.max(0, Math.max(hz0 - j - 1, dz0 - b - 1));
+                        final int gap = Math.max(gx, gz);
+                        if (gap > bestGap) continue;
+                        final long mx = dx0 + hx0 + minSide - 1 - 2L * radius; // pair midpoint*2 - centre*2
+                        final long mz = dz0 + hz0 + minSide - 1 - 2L * radius;
+                        final long tie = mx * mx + mz * mz;
+                        if (gap < bestGap || tie < bestTie) {
+                            bestGap = gap;
+                            bestTie = tie;
+                            r.pairDryX = ox + dx0;
+                            r.pairDryZ = oz + dz0;
+                            r.pairHumX = ox + hx0;
+                            r.pairHumZ = oz + hz0;
+                        }
+                    }
+                }
+            }
+        }
+        if (bestGap != Integer.MAX_VALUE) {
+            r.pairGap = bestGap;
+            r.pairSide = minSide;
+        }
+    }
+
     private static int[] maxSquare(boolean[][] grid, int[][] dp) {
         final int n = grid.length, m = grid[0].length;
         int best = 0, bi = 0, bj = 0;

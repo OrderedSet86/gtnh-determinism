@@ -51,10 +51,18 @@ def dist(ax, az, bx, bz):
     return math.hypot(ax - bx, az - bz)
 
 
-def nearest_village(row):
+def nearest_village(row, piece=None):
+    """Closest village start, optionally restricted to villages whose layout contains `piece`.
+
+    The piece filter reads the layout string the prefilter already emits, so "a village with a TC
+    smeltery" costs nothing extra at sweep time — but it can only be computed from RAW rows, which is
+    why extract() precomputes the smeltery variant into the summary.
+    """
     sx, _, sz = row["spawn"]
     best = None
     for v in row.get("village_starts") or []:
+        if piece and piece not in (v.get("pieces") or ""):
+            continue
         cx, cz = v["c"]
         bx, bz = cx * 16 + 8, cz * 16 + 8
         d = dist(sx, sz, bx, bz)
@@ -83,6 +91,26 @@ def nearest_circle(row):
     return best
 
 
+def nearest_dungeon(row):
+    """Closest Roguelike dungeon TRIGGER chunk to spawn, as (dist, x, z).
+
+    The row records the trigger chunk, not the entrance block, so the position is chunk-resolution:
+    the tower stands somewhere inside those 16 blocks. Good enough against a 200-block bar; not good
+    enough to quote as an exact entrance coordinate.
+    """
+    sx, _, sz = row["spawn"]
+    best = None
+    for d in row.get("dungeons") or []:
+        t = d.get("trigger")
+        if not t:
+            continue
+        bx, bz = t[0] * 16 + 8, t[1] * 16 + 8
+        dd = dist(sx, sz, bx, bz)
+        if best is None or dd < best[0]:
+            best = (dd, bx, bz)
+    return best
+
+
 def biome_squares(row):
     """((side, dist, centreX, centreZ, cornerCX, cornerCZ) | None) for the no-rain and humid squares.
 
@@ -104,6 +132,25 @@ def biome_squares(row):
         out.append((side, dist(sx, sz, cx * 16, cz * 16), int(cx * 16), int(cz * 16),
                     corner[0], corner[1]))
     return out[0], out[1]
+
+
+def edge_dist(spawn, sq):
+    """Distance from spawn to the NEAREST EDGE of a biome square, in blocks. 0 when spawn is inside.
+
+    The stored per-square distance is to the CENTRE, which penalises large squares: a 19x19 whose edge
+    you can see from spawn has its centre 150+ blocks in. The bar is about reaching the region, so the
+    edge is the honest measure; the centre stays in the output as the /tp target because it is the only
+    point guaranteed inside the square.
+    """
+    if not sq:
+        return None
+    sx, _, sz = spawn
+    side, _cd, _cx, _cz, ccx, ccz = sq
+    x0, z0 = ccx * 16, ccz * 16
+    x1, z1 = x0 + side * 16 - 1, z0 + side * 16 - 1
+    dx = max(x0 - sx, 0, sx - x1)
+    dz = max(z0 - sz, 0, sz - z1)
+    return math.hypot(dx, dz)
 
 
 def square_gap(a, b):
@@ -169,11 +216,19 @@ def extract(value_table, jsonl, radius, tf_window, want_tf):
             continue
         score, _unc, _marg, qty = ls.score_seed(s.in_scope(radius), values, limits)
         v, c = nearest_village(row), nearest_circle(row)
+        vs = nearest_village(row, piece="ComponentSmeltery")
         dry, hum = biome_squares(row)
         t = shard_reach(tf, s.seed, s.spawn, tf_window) if want_tf else None
+        # Best touching PAIR, when the sweep is new enough to emit it (pd/ph/pg/ps). Stored as the two
+        # corner-chunk pairs plus side and gap; rank-side edge distances derive from those.
+        br = row.get("biomeregion") or {}
+        pair = None
+        if br.get("pg") is not None:
+            pair = dict(gap=br["pg"], side=br.get("ps", 5), dry=br["pd"], hum=br["ph"])
         out.append(dict(seed=s.seed, spawn=s.spawn, score=score,
                         minok=not ls.unmet_minimums(qty, mins),
                         village=v, circle=c, dry=dry, hum=hum, tf=t,
+                        dungeon=nearest_dungeon(row), pair=pair, smeltery_village=vs,
                         biome_gap=square_gap(dry, hum)))
     return {"value_table": str(value_table), "source": str(jsonl), "radius": radius,
             "dropped_no_spawn": dropped, "seeds": out}
@@ -191,17 +246,24 @@ def main():
     ap.add_argument("--radius", type=int, default=60, help="chest scope, chunks around spawn")
     ap.add_argument("--top", type=int, default=10)
     ap.add_argument("--village-within", type=float, default=200.0)
+    ap.add_argument("--village-needs-smeltery", action="store_true",
+                    help="the village criterion counts only villages whose layout contains a "
+                         "TinkerConstruct ComponentSmeltery")
     ap.add_argument("--circle-within", type=float, default=500.0)
     ap.add_argument("--biome-within", type=float, default=200.0)
     ap.add_argument("--biome-side", type=int, default=5)
     ap.add_argument("--tf-within", type=float, default=500.0)
     ap.add_argument("--tf-window", type=int, default=48)
     ap.add_argument("--tf", action="store_true",
-                    help="include the Twilight Forest shard criterion. OFF by default: the vein "
-                         "predictor is invalid on daily-707 (GT 5.09.54 moved orevein placement to a "
-                         "saved OregenPattern), measured 0%% shard precision over 64 real cells")
-    ap.add_argument("--biome-gap", type=int, default=0,
-                    help="max chunks separating the no-rain and humid squares; 0 = must touch")
+                    help="include the Twilight Forest shard criterion. OFF by default on daily-707: "
+                         "the GT 5.09.54 draw protocol is implemented and verified against the live "
+                         "mod, but the WINNING vein depends on TF terrain (gate + in-attempt redraws) "
+                         "which stage 0 cannot produce — measured 0-8%% shard precision. See "
+                         "results/2026-09-03-tf-veins-gt50954. Valid on 2.8.4 with the legacy table.")
+    ap.add_argument("--dungeon-within", type=float, default=200.0)
+    ap.add_argument("--biome-gap", type=int, default=None,
+                    help="if set, ALSO require a no-rain/humid pair at most this many chunks apart "
+                         "(0 = touching). Unset = the pair criterion is not scored at all.")
     ap.add_argument("--require-min", action="store_true",
                     help="drop seeds failing the value table's Min column")
     args = ap.parse_args()
@@ -221,15 +283,28 @@ def main():
                 dry=args.biome_within, hum=args.biome_within, tf=args.tf_within)
 
     def flags(r):
-        dry_ok = bool(r["dry"] and r["dry"][0] >= args.biome_side and r["dry"][1] <= bars["dry"])
-        hum_ok = bool(r["hum"] and r["hum"][0] >= args.biome_side and r["hum"][1] <= bars["hum"])
-        gap = r.get("biome_gap")
-        f = [bool(r["village"] and r["village"][0] <= bars["village"]),
+        dry_ed = edge_dist(r["spawn"], r["dry"])
+        hum_ed = edge_dist(r["spawn"], r["hum"])
+        dry_ok = bool(r["dry"] and r["dry"][0] >= args.biome_side and dry_ed <= bars["dry"])
+        hum_ok = bool(r["hum"] and r["hum"][0] >= args.biome_side and hum_ed <= bars["hum"])
+        vv = r.get("smeltery_village") if args.village_needs_smeltery else r["village"]
+        f = [bool(vv and vv[0] <= bars["village"]),
              bool(r["circle"] and r["circle"][0] <= bars["circle"]),
-             dry_ok, hum_ok,
-             # Steam-age to LV wants ONE base serving both, so the two regions must abut rather than
-             # merely both be near spawn.
-             bool(dry_ok and hum_ok and gap is not None and gap <= args.biome_gap)]
+             dry_ok, hum_ok]
+        if args.biome_gap is not None:
+            # Optional: one base serving both regions. Prefer the sweep-computed best PAIR (exact);
+            # fall back to the two largest squares for pre-pair summaries (conservative undercount).
+            pair = r.get("pair")
+            if pair:
+                pd = (pair["side"], 0, 0, 0, pair["dry"][0], pair["dry"][1])
+                ph = (pair["side"], 0, 0, 0, pair["hum"][0], pair["hum"][1])
+                f.append(pair["gap"] <= args.biome_gap
+                         and edge_dist(r["spawn"], pd) <= bars["dry"]
+                         and edge_dist(r["spawn"], ph) <= bars["hum"])
+            else:
+                gap = r.get("biome_gap")
+                f.append(bool(dry_ok and hum_ok and gap is not None and gap <= args.biome_gap))
+        f.append(bool(r.get("dungeon") and r["dungeon"][0] <= args.dungeon_within))
         if args.tf:
             f.append(bool(r["tf"] and r["tf"][0] <= bars["tf"]))
         return f
@@ -245,7 +320,9 @@ def main():
           f"biome {args.biome_side}x{args.biome_side} within {bars['dry']:.0f}   TF {bars['tf']:.0f}\n")
     met = Counter(r["_met"] for r in rows)
     print("criteria met:", {k: met[k] for k in sorted(met, reverse=True)})
-    labels = (["village", "circle", "no-rain", "humid", "touching"] + (["TF"] if args.tf else []))[:n]
+    labels = (["village", "circle", "no-rain", "humid"]
+              + (["touching"] if args.biome_gap is not None else [])
+              + ["dungeon"] + (["TF"] if args.tf else []))[:n]
     print("individually: " + "   ".join(
         f"{labels[i]} {sum(1 for r in rows if r['_f'][i])}" for i in range(n)))
     print(f"pass loot Min gate: {sum(1 for r in rows if r['minok'])}\n")
@@ -253,26 +330,49 @@ def main():
     pool = [r for r in rows if r["minok"]] if args.require_min else rows
     pool.sort(key=lambda r: (-r["_met"], -r["score"]))
     for rank, r in enumerate(pool[:args.top], 1):
-        tag = "".join(x for x, f in zip("VCNHAT", r["_f"]) if f)
+        letters = "VCNH" + ("A" if args.biome_gap is not None else "") + "D" + ("T" if args.tf else "")
+        tag = "".join(x for x, f in zip(letters, r["_f"]) if f)
         s = r["spawn"]
         print(f"#{rank}  seed {r['seed']}   loot {r['score']:,}   {r['_met']}/{n} [{tag}]"
               + ("" if r["minok"] else "   MIN-FAIL"))
         print(f"      spawn        /tp {s[0]} {s[1]} {s[2]}")
-        v, c, dry, hum, t = r["village"], r["circle"], r["dry"], r["hum"], r.get("tf")
-        print(f"      village      {fmt(v[0], bars['village'])}  /tp {v[1]} 64 {v[2]}" if v
-              else "      village        none")
+        v = (r.get("smeltery_village") if args.village_needs_smeltery else r["village"])
+        c, dry, hum, t = r["circle"], r["dry"], r["hum"], r.get("tf")
+        vlabel = "village+smelt" if args.village_needs_smeltery else "village      "
+        print(f"      {vlabel}{fmt(v[0], bars['village'])}  /tp {v[1]} 64 {v[2]}" if v
+              else f"      {vlabel}  none qualifying")
         print(f"      coven circle {fmt(c[0], bars['circle'])}  /tp {c[1]} 64 {c[2]}" if c
               else "      coven circle   none")
-        print(f"      no-rain {dry[0]}x{dry[0]:<3}{fmt(dry[1], bars['dry'])}  /tp {dry[2]} 64 {dry[3]}"
-              if dry else "      no-rain        none")
-        print(f"      humid {hum[0]}x{hum[0]:<5}{fmt(hum[1], bars['hum'])}  /tp {hum[2]} 64 {hum[3]}"
-              if hum else "      humid          none")
-        g = r.get("biome_gap")
-        if g is not None:
-            print(f"      biome gap    {'OK' if g <= args.biome_gap else '  '} {g:6d} chunks between "
-                  f"the two squares")
+        if dry:
+            de = edge_dist(r["spawn"], dry)
+            print(f"      no-rain {dry[0]}x{dry[0]:<3}{fmt(de, bars['dry'])} to edge  "
+                  f"(centre {dry[1]:.0f})  /tp {dry[2]} 200 {dry[3]}")
         else:
-            print("      biome gap      one of the squares is absent")
+            print("      no-rain        none")
+        if hum:
+            he = edge_dist(r["spawn"], hum)
+            print(f"      humid {hum[0]}x{hum[0]:<5}{fmt(he, bars['hum'])} to edge  "
+                  f"(centre {hum[1]:.0f})  /tp {hum[2]} 200 {hum[3]}")
+        else:
+            print("      humid          none")
+        dg = r.get("dungeon")
+        print(f"      rl dungeon   {fmt(dg[0], args.dungeon_within)}  /tp {dg[1]} 200 {dg[2]} "
+              f"(trigger chunk, +-8 blocks)" if dg else "      rl dungeon     none in window")
+        pair = r.get("pair")
+        if pair:
+            pcx = (pair["dry"][0] + pair["hum"][0] + pair["side"]) * 16 // 2
+            pcz = (pair["dry"][1] + pair["hum"][1] + pair["side"]) * 16 // 2
+            mark = ("OK" if r["_f"][4] else "  ") if args.biome_gap is not None else "--"
+            print(f"      biome pair   {mark} {pair['gap']:6d} chunk gap, "
+                  f"{pair['side']}x{pair['side']} each   /tp {pcx} 200 {pcz}   "
+                  + ("" if args.biome_gap is not None else "(not scored)"))
+        else:
+            g = r.get("biome_gap")
+            if g is not None:
+                print(f"      biome gap    {'OK' if g <= args.biome_gap else '  '} {g:6d} chunks between "
+                      f"the two largest squares (pre-pair sweep)")
+            else:
+                print("      biome gap      one of the squares is absent")
         if args.tf:
             print(f"      TF shards    {fmt(t[0], bars['tf'])}  /tp {t[1]} 40 {t[2]} (dim 7)" if t
                   else "      TF shards      not all three mixes")

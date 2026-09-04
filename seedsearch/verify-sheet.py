@@ -55,7 +55,6 @@ def main():
 
     mc = load("multi_criteria", "multi-criteria.py")
     ls = load("loot_score", "loot-score.py")
-    tf = load("tf_shard_veins", "tf-shard-veins.py")
     values, limits, mins, display, _ = ls.load_values(args.value_table, "max")
     seeds = {s.seed: s for s in ls.load_stage0(pathlib.Path(args.rows))}
 
@@ -114,21 +113,21 @@ def main():
         if hum:
             print(f"  HUMID {hum[0]}x{hum[0]}        /tp {hum[2]} {SKY_Y} {hum[3]}       {hum[1]:.0f} blocks   "
                   f"[square CENTRE, {hum[0]*16} across; Y unknown — fly down]")
-        t = mc.shard_reach(tf, s.seed, s.spawn, 48)
-        if t:
-            found = tf.shard_cells(s.seed, 7, tf.vp.TWILIGHT_FOREST, 48, sx >> 4, sz >> 4)
-            print(f"  TF SHARD VEINS   dim 7, farthest of three is {t[0]:.0f} blocks")
-            for name, cells in zip(tf.SHARD_MIXES, found):
-                best = min(cells, key=lambda cc: math.dist((sx, sz), tf.vp.cell_center_block(*cc)))
-                bx, bz = tf.vp.cell_center_block(*best)
-                geom = tf.geometry_for(s.seed, 7, [best])
-                y = geom[0].get("tMinY") if geom and isinstance(geom, list) and geom[0] else None
-                ytxt = f"y~{y}" if y is not None else "y 5-21"
-                # tMinY is the vein's own rolled base; the secondary sits -1..+2 and the primary +4..+7
-                # from it, so standing at tMinY+1 puts you in the ore rather than under it.
-                ty = (y + 1) if y is not None else 12
-                print(f"                   /tp {bx} {ty} {bz}   {name}  {ytxt}  "
-                      f"({math.dist((sx, sz), (bx, bz)):.0f} blocks)")
+        # TF shard veins are NOT printed: the predictor is invalid on daily-707 (GT 5.09.54 moved vein
+        # placement into saved OregenPattern world data; measured 0% shard precision over 64 real cells).
+        # A /tp to a confidently wrong vein is worse than no line.
+        br = row.get("biomeregion") or {}
+        if br.get("pg") is not None:
+            ps = br.get("ps", 5)
+            pdx, pdz = br["pd"]; phx, phz = br["ph"]
+            # centre of each square of the TOUCHING PAIR — the pair is what the touching criterion
+            # scores, and it is usually NOT the largest square of either kind shown above.
+            print(f"  BIOME PAIR       no-rain {ps}x{ps} centre /tp {(pdx*16 + ps*8)} {SKY_Y} {(pdz*16 + ps*8)}   "
+                  f"humid {ps}x{ps} centre /tp {(phx*16 + ps*8)} {SKY_Y} {(phz*16 + ps*8)}   gap {br['pg']} chunks")
+        d = mc.nearest_dungeon(row)
+        if d:
+            print(f"  RL DUNGEON       /tp {d[1]} {SKY_Y} {d[2]}       {d[0]:.0f} blocks   "
+                  f"[trigger chunk, +-8 blocks; entrance tower on the surface]")
         print()
         print(f"  TOP {args.chests} LOOT CHESTS")
         # score_seed yields (earned, raw, chest); rank on EARNED, which is what the chest is worth
