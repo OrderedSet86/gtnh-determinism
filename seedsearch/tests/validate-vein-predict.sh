@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 javac -d "$tmp" XSTR.java VeinSweep.java
-java -cp "$tmp" VeinSweep ../data/oremixes-gtnh-2.8.4.json > "$tmp/sweep.txt"
+java -cp "$tmp" VeinSweep ../data/oremixes-gtnh-daily707.json > "$tmp/sweep.txt"
 PYTHONPATH=.. python3 - "$tmp/sweep.txt" <<'PY'
 import sys
 import vein_predict as vp

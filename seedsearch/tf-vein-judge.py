@@ -42,9 +42,21 @@ SHARD_MIXES = ("ore.mix.aquaignis", "ore.mix.terraaer", "ore.mix.perditioordo")
 # vein places a subset, so a cell matches a mix when the materials present are a SUBSET of that mix's
 # four. Ambiguity is real and must not be resolved by guessing: coal and lignite have identical
 # material sets, and any single-material cell matches several mixes. Those land in `unidentified`.
+# materials_of returns None when the mix table lacks a meta for any slot — newer GregTech populates
+# Materials at runtime, so the extractor carries metas across by name and some are simply unknown. A
+# mix with an unknown meta cannot be identified from a census, and admitting it under a partial
+# material set would let it shadow a mix it merely overlaps with.
 BY_MATS = collections.defaultdict(list)
+_unidentifiable = 0
 for _m in vp.MIXES:
-    BY_MATS[frozenset(vp.materials_of(_m))].append(_m["name"])
+    _mats = vp.materials_of(_m)
+    if _mats is None:
+        _unidentifiable += 1
+        continue
+    BY_MATS[frozenset(_mats)].append(_m["name"])
+if _unidentifiable:
+    print(f"note: {_unidentifiable} of {len(vp.MIXES)} mixes carry no meta set and cannot be "
+          f"identified from a census; cells holding them land in `unidentified`.")
 
 
 def actual_mix(counter, floor):

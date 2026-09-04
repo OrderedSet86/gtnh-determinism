@@ -37,9 +37,18 @@ import json, os
 from uo_oil import XSTR, M64   # XSTR validated bit-exact against the JVM (20k/20k)
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-MIXES = json.load(open(os.path.join(_HERE, "data", "oremixes-gtnh-2.8.4.json")))
+# The table is PACK-SPECIFIC and is part of the algorithm, not reference data: the draw is
+# nextInt(S_WEIGHT) over every mix in every dimension, so a table from another GregTech build shifts
+# every result. Measured on GTNH daily-707 (gregtech-5.09.54.115) against the 2.8.4 table: 79 mixes
+# and sWeight 3568 against the real 122 and 4770, and three in-game Twilight Forest checks came back
+# 0/3 with two of them naming mixes that are not shard mixes at all.
+#
+# GTNH_OREMIXES overrides the file; regenerate with data/extract_oremixes_from_jar.py.
+_MIX_FILE = os.environ.get(
+    "GTNH_OREMIXES", os.path.join(_HERE, "data", "oremixes-gtnh-daily707.json"))
+MIXES = json.load(open(_MIX_FILE))
 MIXES.sort(key=lambda m: m["enumIndex"])
-S_WEIGHT = sum(m["weight"] for m in MIXES)          # 3568
+S_WEIGHT = sum(m["weight"] for m in MIXES)          # 4770 on daily-707
 OREVEIN_ATTEMPTS = 64                                # GregTech.cfg I:oreveinAttempts
 
 # The four tokens OreMixBuilder emits (OreMixBuilder.java:12-15). Note "TheEnd", not "The End" — the
@@ -216,7 +225,13 @@ def cell_center_block(cell_x, cell_z):
 
 
 def materials_of(mix):
-    return {mix["primaryMeta"], mix["secondaryMeta"], mix["betweenMeta"], mix["sporadicMeta"]}
+    # Absent metas mean the reference table did not know that material, not that the slot is empty.
+    # Returning a partial set would let a mix be identified by the subset it happens to share with
+    # another, so a mix missing any meta is excluded from identification entirely (see BY_MATS).
+    keys = ("primaryMeta", "secondaryMeta", "betweenMeta", "sporadicMeta")
+    if any(mix.get(k) is None for k in keys):
+        return None
+    return {mix[k] for k in keys}
 
 
 BY_DIM = {tok: [m for m in MIXES if tok in m["dims"]]
@@ -225,7 +240,7 @@ WEIGHT_BY_DIM = {tok: sum(m["weight"] for m in ms) for tok, ms in BY_DIM.items()
 
 OW = BY_DIM[OVERWORLD]
 TF = BY_DIM[TWILIGHT_FOREST]
-BY_MATS = {frozenset(materials_of(m)): m["name"] for m in OW}
+BY_MATS = {frozenset(ms): m["name"] for m in OW for ms in [materials_of(m)] if ms is not None}
 
 # The dims[]-membership test has to stay exactly equivalent to the old hardcoded m["overworld"] flag,
 # or every stored overworld prediction silently changes meaning.

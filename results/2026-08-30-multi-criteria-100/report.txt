@@ -1,0 +1,82 @@
+=== multi-criteria: 100 seeds, radius 60 chunks ===
+
+held back by Min requirements (75 of 100):
+  Alumite Large Plate >= 2: 75 seeds short
+
+of the 25 ranked seeds, individually clearing each bar:
+  village within 100      2
+  coven circle within 100 1
+  no-rain 5x5 within 200  4
+  humid 5x5 within 200    17
+
+#1   seed 8308683508822170135   loot 300039   criteria met 1/4
+     spawn [183, 64, -14]   /tp 183 64 -14
+     village            173 blocks   /tp 232 64 152
+     coven circle       149 blocks   /tp 39 64 23   1 container(s), 4 stacks
+     no-rain         no square >= 5
+     humid 13x13   OK     92 blocks   /tp 200 64 -104
+
+#2   seed 5726861157704492687   loot 286565   criteria met 1/4
+     spawn [-135, 64, -348]   /tp -135 64 -348
+     village            419 blocks   /tp 120 64 -680
+     coven circle       268 blocks   /tp 55 64 -537   1 container(s), 4 stacks
+     no-rain 8x8 OK    183 blocks   /tp -288 64 -448
+     humid           no square >= 5
+
+#3   seed -2775097565719244950   loot 280528   criteria met 0/4
+     spawn [124, 64, -363]   /tp 124 64 -363
+     village            369 blocks   /tp 72 64 -728
+     coven circle       186 blocks   /tp 71 64 -185   1 container(s), 4 stacks
+     no-rain         no square >= 5
+     humid           no square >= 5
+
+#4   seed -3400153883676254310   loot 257840   criteria met 1/4
+     spawn [203, 64, 30]   /tp 203 64 30
+     village            794 blocks   /tp 280 64 -760
+     coven circle       268 blocks   /tp 461 64 103   1 container(s), 5 stacks
+     no-rain         no square >= 5
+     humid 16x16   OK    131 blocks   /tp 112 64 -64
+
+#5   seed 5211795028609473266   loot 251464   criteria met 2/4
+     spawn [57, 64, 188]   /tp 57 64 188
+     village      OK     55 blocks   /tp 24 64 232
+     coven circle       504 blocks   /tp -137 64 653   1 container(s), 5 stacks
+     no-rain         no square >= 5
+     humid 19x19   OK     94 blocks   /tp -8 64 120
+
+#6   seed 7200617992321844453   loot 249092   criteria met 1/4
+     spawn [72, 64, -175]   /tp 72 64 -175
+     village            345 blocks   /tp 88 64 -520
+     coven circle       324 blocks   /tp 365 64 -313   1 container(s), 6 stacks
+     no-rain         no square >= 5
+     humid 14x14   OK    141 blocks   /tp -32 64 -80
+
+#7   seed 4911740028428814632   loot 240620   criteria met 1/4
+     spawn [-26, 64, -65]   /tp -26 64 -65
+     village            635 blocks   /tp 184 64 -664
+     coven circle       270 blocks   /tp -281 64 23   1 container(s), 5 stacks
+     no-rain         no square >= 5
+     humid 9x9   OK    155 blocks   /tp 8 64 -216
+
+#8   seed 6676977092889541756   loot 239312   criteria met 3/4
+     spawn [-25, 64, -53]   /tp -25 64 -53
+     village            571 blocks   /tp -520 64 232
+     coven circle OK     88 blocks   /tp 39 64 7   1 container(s), 5 stacks
+     no-rain 17x17 OK    116 blocks   /tp 56 64 -136
+     humid 7x7   OK    179 blocks   /tp -136 64 88
+
+#9   seed -1610235242304260878   loot 218117   criteria met 0/4
+     spawn [-163, 64, -120]   /tp -163 64 -120
+     village            409 blocks   /tp 168 64 120
+     coven circle       417 blocks   /tp -569 64 -217   1 container(s), 4 stacks
+     no-rain         no square >= 5
+     humid 8x8         219 blocks   /tp -320 64 32
+
+#10  seed -212477262922038220   loot 212243   criteria met 1/4
+     spawn [128, 64, 72]   /tp 128 64 72
+     village            122 blocks   /tp 24 64 136
+     coven circle       361 blocks   /tp -137 64 317   1 container(s), 4 stacks
+     no-rain         no square >= 5
+     humid 14x14   OK     33 blocks   /tp 96 64 64
+
+NOT evaluated: oil spouts (BuildCraft OilPopulate — no prefilter module) and Twilight Forest Thaumcraft crystal veins (prefilter is overworld-only).

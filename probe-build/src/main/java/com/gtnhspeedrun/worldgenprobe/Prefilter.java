@@ -63,6 +63,7 @@ import net.minecraft.world.storage.ISaveHandler;
  * [-Dprobe.prefilter.gate.dungeon=false (kill seeds with no dungeon trigger in range)]
  * [-Dprobe.prefilter.witchery=N (Witchery candidate-cell scan radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.stronghold=N (stronghold radius in chunks around predicted spawn; -1 off)]
+ * [-Dprobe.prefilter.oil=N (BuildCraft oil scan radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.chests=true (predict chest contents; alias -Dprobe.prefilter.villagechests)]
  * [-Dprobe.prefilter.biomeregion=N (no-rain region scan radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.biomeregion.min=5 (minimum square side, in chunks)]
@@ -280,6 +281,19 @@ public final class Prefilter {
         void beginOverlay() {
             overlay = new java.util.HashMap<>();
             overlayTe = new java.util.HashMap<>();
+        }
+
+        /** The block writes the overlay has captured so far. Read BEFORE {@link #endOverlay()}. */
+        Map<Long, int[]> overlayBlocks() {
+            return overlay == null ? java.util.Collections.emptyMap() : overlay;
+        }
+
+        /** Decodes a key from {@link #overlayBlocks()} back into world coordinates. */
+        static int[] okeyToPos(long k) {
+            final int y = (int) (k & 0xFF);
+            final int z = (int) ((k >> 8) & 0xFFFFFFFL) - 30_000_000;
+            final int x = (int) ((k >> 36) & 0xFFFFFFFL) - 30_000_000;
+            return new int[] { x, y, z };
         }
 
         /** Everything the overlay captured, then discards it. */
@@ -1762,6 +1776,53 @@ public final class Prefilter {
             } finally {
                 RoguelikePrefilter.resetSliceWindow();
             }
+        }
+
+        // --- BuildCraft oil. Runs the mod's real generator against the scratch overlay; the Random is
+        // free here because PopulateChunkEvent.Pre fires on the line after RWG reseeds it from
+        // (worldSeed, cx, cz), so nothing has to be replayed to reach it. See OilPrefilter.
+        final int oilRadius = Integer.getInteger("probe.prefilter.oil", -1);
+        if (oilRadius >= 0) {
+            final long tOil = Timing.start();
+            final String why = OilPrefilter.resolve();
+            if (why != null) {
+                sb.append(", \"oil_error\": \"")
+                    .append(WorldgenProbe.jsonEscape(why))
+                    .append("\"");
+            } else {
+                try {
+                    final List<String> sites = new ArrayList<>();
+                    for (final OilPrefilter.Site o : OilPrefilter
+                        .scan((SeedProbeWorld) world, spawnX >> 4, spawnZ >> 4, oilRadius)) {
+                        sites.add(
+                            "{\"c\": [" + o.cx
+                                + ", "
+                                + o.cz
+                                + "], \"pos\": ["
+                                + o.x
+                                + ", "
+                                + o.maxY
+                                + ", "
+                                + o.z
+                                + "], \"blocks\": "
+                                + o.blocks
+                                + ", \"h\": "
+                                + o.height()
+                                + "}");
+                    }
+                    sb.append(", \"oil\": [")
+                        .append(String.join(", ", sites))
+                        .append("]");
+                } catch (Throwable t) {
+                    WorldgenProbe.LOG.warn("[prefilter] oil eval failed for {}: {}", seed, t.toString());
+                    sb.append(", \"oil_error\": \"")
+                        .append(
+                            t.toString()
+                                .replace("\"", "'"))
+                        .append("\"");
+                }
+            }
+            Timing.add("oil", tOil);
         }
 
         // --- strongholds: 3 per world, ring positions are pure arithmetic (see strongholdStarts).
