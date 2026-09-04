@@ -54,6 +54,16 @@ for d in "$HOME"/.gradle/jdks/*21*/; do
 done
 [ -n "$GRADLE_JDK" ] || { echo "no JDK 21 under ~/.gradle/jdks — install one (gradle toolchain download)" >&2; exit 1; }
 
+# One canonical copy of the no-hooks chest table, copied into BOTH jars on every build. The fix jar decides
+# the roll count and the probe jar predicts it; if the two ever disagreed the prediction would be confidently
+# wrong, so they are never edited separately.
+SHARED_JSON="$SCRIPT_DIR/../shared/chest-nohooks.json"
+if [ -f "$SHARED_JSON" ]; then
+  for d in "$SCRIPT_DIR"/../fix-build/src/main/resources "$SCRIPT_DIR"/../probe-build/src/main/resources; do
+    mkdir -p "$d" && cp "$SHARED_JSON" "$d/chest-nohooks.json"
+  done
+fi
+
 cd "$BUILD_DIR"
 echo "building $PROJECT ($SUBDIR, clean, no configuration cache, JDK $GRADLE_JDK)…"
 ./gradlew --no-configuration-cache clean spotlessApply build -x test \

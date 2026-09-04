@@ -1,0 +1,5 @@
+
+== 24 seeds, 12 with a >=5x5 no-rain square (50.0%)
+== of those, 6 also have a >=5x5 HUMID square (25.0% of all seeds) — the discriminating variant
+== side histogram: [(0, 8), (2, 2), (3, 2), (5, 2), (7, 1), (9, 2), (10, 1), (12, 1), (13, 2), (15, 1), (16, 1), (24, 1)]
+== gap histogram (qualifying only): [(1, 8), (2, 1), (4, 1), (7, 1), (9, 1)]

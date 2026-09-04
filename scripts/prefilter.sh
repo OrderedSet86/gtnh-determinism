@@ -16,11 +16,15 @@
 #   PREFILTER_PIECES   emit full village piece layouts (default true)
 #   PREFILTER_TERRAIN  terrain digest radius in chunks around predicted spawn (-1 disables; default 4)
 #   Staged kill gates (each stage runs only for survivors of the previous one; killed seeds
-#   emit {"seed":..,"kill":"village|pieces|water"} for accounting):
+#   emit {"seed":..,"kill":"village|pieces|water|biomeregion"} for accounting):
 #   PREFILTER_GATE_VILLAGEDIST  require a village cell within N chunks of origin (chebyshev)
 #   PREFILTER_GATE_PIECES       comma list; require some village layout to contain one of these
 #                               piece classes (e.g. ComponentToolWorkshop,VillageComponentPhotoshop)
 #   PREFILTER_GATE_WATER        require >= N water columns in the terrain digest
+#   PREFILTER_GATE_BIOMEREGION  SIDE[,MAXGAP]; require a SIDE x SIDE all-no-rain chunk square near the
+#                               predicted spawn, with a high-humidity chunk within MAXGAP chunks of it.
+#                               Needs -Dprobe.prefilter.biomeregion=N via PROBE_JVMFLAGS to enable the
+#                               stage; the gate alone does nothing.
 #   PROBE_JAVA         JVM to use; auto-detects a 17-21 JDK under ~/.gradle/jdks if unset
 #   PROBE_PORT         server port (default 25597 — off the probe/farm default to avoid collisions)
 #   PROBE_JVMFLAGS     extra -D flags, appended LAST so they override the ones set above. Until
@@ -113,6 +117,7 @@ GATES=""
 [ -n "${PREFILTER_GATE_VILLAGEDIST:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.villagedist=$PREFILTER_GATE_VILLAGEDIST"
 [ -n "${PREFILTER_GATE_PIECES:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.pieces=$PREFILTER_GATE_PIECES"
 [ -n "${PREFILTER_GATE_WATER:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.water=$PREFILTER_GATE_WATER"
+[ -n "${PREFILTER_GATE_BIOMEREGION:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.biomeregion=$PREFILTER_GATE_BIOMEREGION"
 
 "$JAVA_BIN" $JAVA_ARGS \
   -Xmx6G -Xms6G \

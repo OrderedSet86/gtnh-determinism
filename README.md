@@ -157,6 +157,34 @@ and **the category labels above are for prioritising work, never for declaring s
 derived, so a seed produces a different — now canonical — world than stock (and than earlier jar
 versions). Existing saves are safe: only newly generated chunks are affected.
 
+## Seed search: what the stage-0 prefilter answers
+
+Determinism is what makes seed search cheap, so the two are worth stating together. Without generating
+a chunk, the prefilter computes chest contents exactly for:
+
+| source | how | verified |
+| --- | --- | --- |
+| Roguelike dungeon chests | the mod's own generator, run against virgin terrain | 108/108, with NBT |
+| Village piece chests | measured piece-to-site table, position-derived fork | 95/95, XZ exact, Y not predicted |
+| Stronghold chests | ring positions are pure arithmetic; piece layouts enumerated | 26/26, with NBT |
+| Witchery village chests | roll count redrawn from the chest's own position | 10/10, with NBT |
+| Witchery circles and other standalone structures | the real handler, run against a scratch overlay | 5/5, with NBT |
+
+It also answers village layouts, spawn point, terrain and Witchery structure cells. It does **not**
+cover vanilla `WorldGenDungeons` rooms, mineshafts or temples.
+
+Two limits belong with the capability:
+
+- Witchery structures generate **after** chunk decoration, and the prefilter has only virgin terrain.
+  Where decoration raised the sampled column, the predicted Y is one block low. Contents survive that;
+  the reported position does not.
+- `ComponentVillageBookShop` writes its chest slots directly instead of calling
+  `generateStructureChestContents`, so no hook sees it and neither jar can predict it.
+
+Note that **deterministic** and **stage-0 computable** are different questions, and the table in
+[seedsearch/README.md](seedsearch/README.md) separates them. Vanilla dungeon *existence* is the one
+entry in that table still held as non-deterministic, pending the GregTech ore worldgen fix.
+
 **Reporting a worldgen bug?** Please include the jar version, seed, and coordinates.
 
 ## Repo layout

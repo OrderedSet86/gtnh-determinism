@@ -1,0 +1,214 @@
+=== loot-score: 10 seeds, full-generation, radius 15 chunks ===
+
+#1   seed -6292213143640744246   score 119033   (uncapped 119033, capped away 0)
+     spawn [-7, 64, 181]      chests in scope: 202 fullgen
+     top items: Damascus Steel Ingot x28 (14000), Alumite Large Plate x1 (10000), Gold Ingot x188 (9400), Bronze Ingot x298 (8940), Redstone x758 (7580)
+     representative chests
+       [1] fullgen TileEntityChest   (69, 21, 184)   76 blocks from spawn   marginal 10345 (raw 10345)
+           /tp 69 22 184
+           Alumite Large Plate x1 (10000), Redstone x20 (200), Alumite Tough Rod x1 (100), Lapis Lazuli x9 (45)
+       [2] fullgen TileEntityChest   (106, 20, 181)   113 blocks from spawn   marginal 3810 (raw 3810)
+           /tp 106 21 181
+           Tumbaga Ingot x41 (2050), Bronze Ingot x34 (1020), Red Alloy Ingot x4 (400), Redstone x24 (240), LootBag (dreamcraft.lootbag.group.bees_basic) x1 (100)
+       [3] fullgen TileEntityChest   (81, 7, 150)   93 blocks from spawn   marginal 3750 (raw 3750)
+           /tp 81 8 150
+           Damascus Steel Ingot x5 (2500), Vanadiumsteel Ingot x5 (500), Bronze Ingot x16 (480), Steel Ingot x2 (200), Lapis Lazuli x14 (70)
+
+#2   seed -5906397841852343037   score 113029   (uncapped 118029, capped away 5000)
+     spawn [156, 64, 149]      chests in scope: 205 fullgen
+     top items: Redstone x1146 (11460), Bronze Ingot x322 (9660), Damascus Steel Ingot x18 (9000), Gold Ingot x159 (7950), Red Alloy Ingot x78 (7800)
+     representative chests
+       [1] fullgen TileEntityChest   (257, 53, 300)   182 blocks from spawn   marginal 4090 (raw 4090)
+           /tp 257 54 300
+           Division Sigil x1 (2500), Chrome Dust x3 (1500), Antimony Ingot x1 (50), Silver Ingot x2 (40)
+       [2] fullgen TileEntityChest   (213, 10, 81)   89 blocks from spawn   marginal 3485 (raw 3485)
+           /tp 213 11 81
+           Damascus Steel Ingot x5 (2500), Steel Ingot x3 (300), Vanadiumsteel Ingot x2 (200), Bronze Ingot x6 (180), Ender Pearl x3 (150), Clay x12 (60), +2 more
+       [3] fullgen TileEntityChest   (234, 33, 3)   166 blocks from spawn   marginal 605 (raw 3105)
+           /tp 234 34 3
+           Division Sigil x1 (2500), Aluminium Ingot x1 (500), Copper Ingot x4 (80), Deluxe Cheeseburger x3 (15), Neodymium Dust x1 (10)
+
+#3   seed 8714553887829585232   score 104482   (uncapped 104482, capped away 0)
+     spawn [84, 64, -60]      chests in scope: 182 fullgen
+     top items: Damascus Steel Ingot x32 (16000), Redstone x900 (9000), Gold Ingot x144 (7200), Bronze Ingot x239 (7170), Clay x1422 (7110)
+     representative chests
+       [1] fullgen TileEntityChest   (237, 30, -29)   156 blocks from spawn   marginal 3400 (raw 3400)
+           /tp 237 31 -29
+           Damascus Steel Ingot x5 (2500), Cast Iron Ingot x6 (300), Tin Ingot x11 (220), Thaumium Ingot x3 (150), Bucket x1 (100), Lead Ingot x4 (80), +1 more
+       [2] fullgen TileEntityChest   (128, 7, 98)   164 blocks from spawn   marginal 3180 (raw 3180)
+           /tp 128 8 98
+           Damascus Steel Ingot x3 (1500), Bronze Ingot x28 (840), Vanadiumsteel Ingot x6 (600), Redstone x8 (80), Clay x14 (70), Lead Ingot x3 (60), +1 more
+       [3] fullgen TileEntityChest   (178, 20, 184)   261 blocks from spawn   marginal 3045 (raw 3045)
+           /tp 178 21 184
+           Red Alloy Ingot x14 (1400), Bronze Ingot x34 (1020), Redstone x42 (420), Ender Pearl x3 (150), Clay x11 (55)
+
+#4   seed -6244135143557849758   score 103920   (uncapped 103920, capped away 0)
+     spawn [108, 64, -24]      chests in scope: 213 fullgen
+     top items: Damascus Steel Ingot x21 (10500), Gold Ingot x205 (10250), Redstone x865 (8650), Steel Ingot x61 (6100), Chrome Dust x11 (5500)
+     representative chests
+       [1] fullgen TileEntityChest   (-135, 63, -237)   323 blocks from spawn   marginal 4200 (raw 4200)
+           /tp -135 64 -237
+           Damascus Steel Ingot x6 (3000), Chrome Dust x2 (1000), Cast Iron Ingot x3 (150), Silver Ingot x2 (40), Neodymium Dust x1 (10)
+       [2] fullgen TileEntityChest   (351, 62, -159)   278 blocks from spawn   marginal 3100 (raw 3100)
+           /tp 351 63 -159
+           Stainless Steel Ingot x1 (1000), Chrome Dust x2 (1000), Damascus Steel Ingot x1 (500), Steel Ingot x4 (400), Silver Ingot x6 (120), Copper Ingot x4 (80)
+       [3] fullgen TileEntityChest   (85, 7, -197)   175 blocks from spawn   marginal 2880 (raw 2880)
+           /tp 85 8 -197
+           Damascus Steel Ingot x3 (1500), Bronze Ingot x20 (600), Redstone x39 (390), Vanadiumsteel Ingot x2 (200), Rare Treasure x1 (100), Lead Ingot x4 (80), +1 more
+
+#5   seed 495433077778118046   score 101659   (uncapped 101659, capped away 0)
+     spawn [-24, 64, 29]      chests in scope: 183 fullgen
+     top items: Bronze Ingot x340 (10200), Redstone x975 (9750), Gold Ingot x167 (8350), Red Alloy Ingot x76 (7600), Clay x1259 (6295)
+     representative chests
+       [1] fullgen TileEntityChest   (88, 20, 160)   172 blocks from spawn   marginal 3110 (raw 3110)
+           /tp 88 21 160
+           Bronze Ingot x35 (1050), Red Alloy Ingot x9 (900), Tumbaga Ingot x13 (650), Redstone x47 (470), Clay x8 (40)
+       [2] fullgen TileEntityChest   (140, 20, 194)   233 blocks from spawn   marginal 2930 (raw 2930)
+           /tp 140 21 194
+           Tumbaga Ingot x18 (900), Red Alloy Ingot x9 (900), Bronze Ingot x28 (840), Ender Pearl x4 (200), Lapis Lazuli x9 (45), Clay x7 (35), +1 more
+       [3] fullgen TileEntityChest   (53, 40, 247)   231 blocks from spawn   marginal 2920 (raw 2920)
+           /tp 53 41 247
+           Damascus Steel Ingot x4 (2000), Tin Ingot x14 (280), Steel Ingot x2 (200), Silver Ingot x9 (180), Clay x27 (135), Redstone x10 (100), +1 more
+
+#6   seed -6701391002807803687   score 100062   (uncapped 102562, capped away 2500)
+     spawn [-118, 64, 97]      chests in scope: 200 fullgen
+     top items: Damascus Steel Ingot x38 (19000), Bronze Ingot x309 (9270), Redstone x776 (7760), Gold Ingot x151 (7550), Clay x1291 (6455)
+     representative chests
+       [1] fullgen TileEntityChest   (-83, 7, 40)   67 blocks from spawn   marginal 6920 (raw 6920)
+           /tp -83 8 40
+           Damascus Steel Ingot x12 (6000), Bronze Ingot x19 (570), Vanadiumsteel Ingot x2 (200), Ender Pearl x3 (150)
+       [2] fullgen TileEntityChest   (-353, 25, 11)   250 blocks from spawn   marginal 3800 (raw 3800)
+           /tp -353 26 11
+           Division Sigil x1 (2500), Chrome Dust x1 (500), Ardite Ingot x2 (400), Dezil's Marshmallow x2 (400)
+       [3] fullgen TileEntityChest   (-85, 7, 38)   68 blocks from spawn   marginal 3785 (raw 3785)
+           /tp -85 8 38
+           Damascus Steel Ingot x5 (2500), Vanadiumsteel Ingot x5 (500), Bronze Ingot x16 (480), Redstone x21 (210), Clay x13 (65), Lapis Lazuli x6 (30)
+
+#7   seed -5407451111107001215   score 99639   (uncapped 99639, capped away 0)
+     spawn [137, 64, -31]      chests in scope: 176 fullgen
+     top items: Redstone x1056 (10560), Bronze Ingot x345 (10350), Red Alloy Ingot x69 (6900), Chrome Dust x12 (6000), Gold Ingot x111 (5550)
+     representative chests
+       [1] fullgen TileEntityChest   (318, 20, 158)   262 blocks from spawn   marginal 3475 (raw 3475)
+           /tp 318 21 158
+           Tumbaga Ingot x25 (1250), Red Alloy Ingot x10 (1000), Bronze Ingot x25 (750), Redstone x33 (330), Clay x15 (75), Lapis Lazuli x14 (70)
+       [2] fullgen TileEntityChest   (322, 20, 156)   263 blocks from spawn   marginal 3125 (raw 3125)
+           /tp 322 21 156
+           Bronze Ingot x45 (1350), Tumbaga Ingot x24 (1200), Ender Pearl x6 (300), Redstone x18 (180), Clay x13 (65), Lapis Lazuli x6 (30)
+       [3] fullgen TileEntityChest   (290, 20, 147)   235 blocks from spawn   marginal 3105 (raw 3105)
+           /tp 290 21 147
+           Bronze Ingot x36 (1080), Tumbaga Ingot x20 (1000), Redstone x55 (550), Ender Pearl x8 (400), Clay x15 (75)
+
+#8   seed -8168323205341578169   score 94207   (uncapped 94207, capped away 0)
+     spawn [49, 64, 189]      chests in scope: 158 fullgen
+     top items: Miner's Backpack x4 (10000), Alumite Large Plate x1 (10000), Bronze Ingot x250 (7500), Gold Ingot x138 (6900), Redstone x583 (5830)
+     representative chests
+       [1] fullgen TileEntityChest   (119, 20, 269)   106 blocks from spawn   marginal 10460 (raw 10460)
+           /tp 119 21 269
+           Alumite Large Plate x1 (10000), Steel Tough Binding x1 (300), Lapis Lazuli x31 (155), Flint and Steel x1 (5)
+       [2] fullgen TileEntityChest   (20, 40, 133)   63 blocks from spawn   marginal 2820 (raw 2820)
+           /tp 20 41 133
+           Chrome Dust x3 (1500), Steel Ingot x4 (400), Cast Iron Ingot x6 (300), Tin Ingot x13 (260), Nickel Ingot x5 (250), Invar Ingot x3 (90), +1 more
+       [3] fullgen TileEntityChest   (77, 31, 232)   51 blocks from spawn   marginal 2785 (raw 2785)
+           /tp 77 32 232
+           Miner's Backpack x1 (2500), Redstone x25 (250), Lapis Lazuli x7 (35)
+
+#9   seed 261155990197320239   score 88559   (uncapped 88559, capped away 0)
+     spawn [-41, 64, -50]      chests in scope: 178 fullgen
+     top items: Damascus Steel Ingot x39 (19500), Gold Ingot x192 (9600), Bronze Ingot x223 (6690), Redstone x510 (5100), Miner's Backpack x2 (5000)
+     representative chests
+       [1] fullgen TileEntityChest   (141, 7, -64)   183 blocks from spawn   marginal 6670 (raw 6670)
+           /tp 141 8 -64
+           Damascus Steel Ingot x11 (5500), Steel Ingot x5 (500), Redstone x29 (290), Bronze Ingot x9 (270), Lapis Lazuli x12 (60), Lead Ingot x2 (40), +1 more
+       [2] fullgen TileEntityChest   (135, 7, -58)   176 blocks from spawn   marginal 6281 (raw 6281)
+           /tp 135 8 -58
+           Damascus Steel Ingot x11 (5500), Bronze Ingot x9 (270), Redstone x22 (220), Vanadiumsteel Ingot x2 (200), Lead Ingot x3 (60), Lapis Lazuli x6 (30), +1 more
+       [3] fullgen TileEntityChest   (133, 7, -64)   175 blocks from spawn   marginal 4150 (raw 4150)
+           /tp 133 8 -64
+           Damascus Steel Ingot x7 (3500), Steel Ingot x3 (300), Bronze Ingot x9 (270), Redstone x5 (50), Lapis Lazuli x4 (20), Firestone Dust x1 (10)
+
+#10  seed 6448274471135530858   score 80635   (uncapped 80635, capped away 0)
+     spawn [124, 64, -363]      chests in scope: 168 fullgen
+     top items: Gold Ingot x227 (11350), Redstone x868 (8680), Damascus Steel Ingot x13 (6500), Bronze Ingot x210 (6300), Silver Ingot x264 (5280)
+     representative chests
+       [1] fullgen TileEntityChest   (347, 56, -144)   313 blocks from spawn   marginal 6450 (raw 6450)
+           /tp 347 57 -144
+           Chrome Dust x7 (3500), Damascus Steel Ingot x5 (2500), Red Alloy Ingot x3 (300), Cast Iron Ingot x3 (150)
+       [2] fullgen TileEntityChest   (292, 10, -215)   224 blocks from spawn   marginal 3025 (raw 3025)
+           /tp 292 11 -215
+           Damascus Steel Ingot x3 (1500), Bronze Ingot x23 (690), Vanadiumsteel Ingot x6 (600), Rare Treasure x1 (100), Redstone x6 (60), Lead Ingot x2 (40), +2 more
+       [3] fullgen TileEntityChest   (281, 40, -208)   221 blocks from spawn   marginal 2830 (raw 2830)
+           /tp 281 41 -208
+           Damascus Steel Ingot x4 (2000), Cast Iron Ingot x13 (650), Iron Ingot x9 (180)
+
+=== diagnostics ===
+item stacks in scope        : 28470
+  matched by the value table: 7181
+  unvalued                  : 21289
+  no display name           : 0
+seeds killed by a gate      : 0
+
+value-table entries that appeared ZERO times: 124 of 225
+    5000  Iron Capped Wooden Wand
+    2500  Solid Fueled Boiler Firebox
+    2500  Piston Boots
+    2500  Item Dislocator
+    2500  High Pressure Boiler Tank
+    2500  Hang Glider
+    2500  Enchantment Table
+    2500  Copter Pack
+    2500  Coal Jetpack
+    2000  Brewing Stand
+    1600  Cobalt Hammer Head
+    1000  Workbench Backpack
+    1000  Slimesling
+    1000  Oblivion Frame
+    1000  Hopper Cart
+    1000  Hopper
+    1000  Block of Steel
+    1000  Adventure Backpack
+     500  Worktable
+     500  Silky Jewel
+     500  Robot Arm (LV)
+     500  Prospector's Scanner (LV)
+     500  Platinum Ingot
+     500  Middle Backpack
+     500  Liquid Fueled Boiler Firebox
+     500  Lava Crystal
+     500  Item Conduit
+     500  Emitter (LV)
+     500  Elevator
+     500  Electric Pump (MV)
+  … and 94 more
+
+most frequent items carrying NO value (candidates for the table):
+    6631  Ice
+    5533  Bone
+    5130  Gravel
+    4404  Torch
+    4176  Oak Leaves
+    4098  Arrow of Weakness
+    3674  Snowball
+    2989  String
+    2101  Book
+    1969  Cobweb
+    1500  Sand
+    1388  Gunpowder
+    1384  Aurora
+    1251  Purple Drink
+    1249  Firework Rocket
+    1049  Powderbarrel
+    1002  Ztone Tile
+     996  Bitt ⓪
+     837  Arrow
+     837  Spruce Wood Planks
+     796  Glass
+     754  Woolen Clay
+     720  Arrow of Slowness
+     712  Tank ⓪
+     709  Arrow of Healing
+
+duplicate value rows (max applied):
+  ardite tough rod: kept 600 (line 33), dropped 400 (line 75)
+
+loot sources this run could NOT see:
+  none — full generation covers every chest source in the overworld window.

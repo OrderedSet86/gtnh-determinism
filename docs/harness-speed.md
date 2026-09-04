@@ -12,6 +12,13 @@ features, GT veins, **complete chest inventories out to ~15 chunks** (tier-skip 
 nearby water + clay — chest contents need real chunk generation, so per-seed full gen is
 unavoidable and biome-only prefiltering cannot answer the main question.
 
+> **SUPERSEDED 2026-08-30.** That last clause is no longer true and should not be quoted. Stage 0
+> answers chest contents exactly for **Roguelike dungeon chests** (108/108, with NBT), **village piece
+> chests** (95/95, XZ exact, Y not predicted), **strongholds** (26/26, with NBT), **Witchery village
+> pieces** (10/10) and **Witchery standalone structures including coven circles** (5/5). What it still
+> cannot do is vanilla `WorldGenDungeons` rooms, mineshafts and temples. The full capability boundary
+> is in `seedsearch/README.md` — read that before concluding a search needs full generation.
+
 Standing constraint: stock **launch-variance** tests need fresh cold JVMs (identity-hash
 state is constant within a JVM — and within a CRIU image). Warm/CRIU modes are for seed
 search and order tests **with the fix jar installed**.
@@ -207,9 +214,16 @@ Ring winners (virgin 5-column test), TC nodes/trees, decoration-level anything.
 **Witchery: SUPERSEDED 2026-08-29.** Measured route-stable with `-Dgtnhdet.witchtrace=true` (identical
 gate-cell decisions and placements across rows/spiral, 3 seeds), so no TerrainOracle redirect is
 needed. The stage-0 module ships as `-Dprobe.prefilter.witchery=N`: candidate cells 9/9, biome ids 8/8,
-gate verdicts 8/8, handler try-order 6/6, and all 6 real placements covered. It stops short of the
-winner, which needs the placing call and therefore world writes. See
-results/2026-08-29-witchery-prefilter and results/2026-08-29-witchery-placement-trace.
+gate verdicts 8/8, handler try-order 6/6, and all 6 real placements covered.
+
+**The winner is now predicted too (2026-08-30), under `-Dprobe.prefilter.witchery.replay=true`.** The
+placing call does need world writes, but only writes: `GameRegistry.generateWorld` reseeds before each
+generator, so Witchery's Random is a pure function of (seed, cx, cz) and there is no stream to replay.
+`SeedProbeWorld` gained a scoped scratch overlay that swallows the writes, and the real handler runs
+against it — 26/26 cells resolved, contents 5/5 exact. Bound: Witchery generates AFTER decoration, so
+where decoration raised the sampled column the predicted Y is one low. See
+results/2026-08-30-witchery-circles, results/2026-08-29-witchery-prefilter and
+results/2026-08-29-witchery-placement-trace.
 **Block reads are no longer the obstacle for any of these (2026-08-29).**
 `Prefilter.VirginChunkProvider` backs `SeedProbeWorld`, so `world.getBlock`/`getBlockMetadata` answer
 virgin terrain and `TerrainOracle` — which falls through to `world.getBlock` for a non-WorldServer —

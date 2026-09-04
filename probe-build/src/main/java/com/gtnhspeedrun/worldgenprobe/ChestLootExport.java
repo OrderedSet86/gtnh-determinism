@@ -58,6 +58,8 @@ public final class ChestLootExport {
 
     /** Rows accumulate here because "pre" and "post" are captured at different events but share one file. */
     private static final List<String> ROWS = new ArrayList<>();
+    /** (registry name, meta) pairs seen, tab-joined — the input to writeItemAttributes. */
+    private static final java.util.Set<String> ATTR_KEYS = new java.util.HashSet<>();
 
     /**
      * Reading order: what the chest is, then what drops and how often, then the ids needed to look an item up.
@@ -498,6 +500,139 @@ public final class ChestLootExport {
         }
     }
 
+    /**
+     * Base attack damage per (registry name, meta) for everything the tables can roll, so an offline
+     * reader can work out a weapon's hit damage. Written as its own file rather than a column on
+     * chestloot.csv: that schema already has consumers, and this is a per-item property rather than
+     * a per-table-entry one — the same sword in eight categories would repeat it eight times.
+     *
+     * <p>
+     * The number is the {@code attackDamage} attribute modifier, which is what the tooltip shows,
+     * in health points. Hearts are half that. Tinkers' tools carry their own {@code InfiTool.Attack}
+     * in NBT and do not need this.
+     */
+    public static void writeItemAttributes(File out) {
+        if (out == null) return;
+        try {
+            if (!out.exists() && !out.mkdirs()) throw new IllegalStateException("cannot create " + out);
+            final File file = new File(out, "item-attributes.csv");
+            int n = 0;
+            try (PrintWriter w = new PrintWriter(file, "UTF-8")) {
+                w.println("registry_name,meta,attack_damage,armor,armor_slot,max_damage");
+                final String attr = net.minecraft.entity.SharedMonsterAttributes.attackDamage
+                    .getAttributeUnlocalizedName();
+                for (final String key : new java.util.TreeSet<>(ATTR_KEYS)) {
+                    final int tab = key.indexOf('\t');
+                    if (tab <= 0) continue;
+                    final String reg = key.substring(0, tab);
+                    final int meta = Integer.parseInt(key.substring(tab + 1));
+                    double dmg = 0;
+                    boolean found = false; // true once either the attack or the armour lookup hits
+                    try {
+                        final ItemStack st = resolve(reg, meta);
+                        if (st != null && st.getItem() != null) {
+                            // Raw Multimap on purpose: getItemAttributeModifiers is declared raw-ish in 1.7.10
+                            // and a wildcard capture rejects get(String).
+                            @SuppressWarnings("rawtypes")
+                            final com.google.common.collect.Multimap mm = st.getItem()
+                                .getItemAttributeModifiers();
+                            if (mm != null) {
+                                for (final Object o : mm.get(attr)) {
+                                    dmg += ((net.minecraft.entity.ai.attributes.AttributeModifier) o).getAmount();
+                                    found = true;
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {
+                        // an id this build does not ship, or an item whose modifiers throw — leave it blank
+                    }
+                    // Armour points and slot come off ItemArmor directly. Forge's ISpecialArmor items
+                    // compute their protection at damage time and are NOT covered — they report their
+                    // base field, which can understate. None of daily-707's loot armour is one, but a
+                    // reader must not assume that holds for another pack.
+                    String armor = "", slot = "", maxDmg = "";
+                    try {
+                        final ItemStack st2 = resolve(reg, meta);
+                        if (st2 != null && st2.getItem() != null) {
+                            if (st2.getItem() instanceof net.minecraft.item.ItemArmor) {
+                                final net.minecraft.item.ItemArmor ia = (net.minecraft.item.ItemArmor) st2.getItem();
+                                armor = String.valueOf(ia.damageReduceAmount);
+                                slot = String.valueOf(ia.armorType);
+                                found = true;
+                            }
+                            final int md = st2.getMaxDamage();
+                            if (md > 0) maxDmg = String.valueOf(md);
+                        }
+                    } catch (Throwable ignored) {
+                        // same tolerance as the attack lookup: an unresolvable id leaves the cells blank
+                    }
+                    if (!found) continue;
+                    w.println(
+                        String.join(
+                            ",",
+                            q(reg),
+                            String.valueOf(meta),
+                            dmg == 0 ? "" : String.format("%.4f", dmg),
+                            armor,
+                            slot,
+                            maxDmg));
+                    n++;
+                }
+            }
+            LOG.info("[probe][lootcsv] wrote {} item attack values -> {}", n, file);
+        } catch (Throwable t) {
+            LOG.error("[probe][lootcsv] item attribute write failed", t);
+        }
+    }
+
+    /**
+     * Enchantment id to name, so an offline reader can turn {@code ench:[{id:34,lvl:3}]} into
+     * "Unbreaking III". Ids are assigned at registration and are pack- and version-specific — the
+     * daily-707 tables use 43 distinct ids and only about half are vanilla — so the map has to come
+     * from the running game rather than a hardcoded vanilla table.
+     */
+    public static void writeEnchantments(File out) {
+        if (out == null) return;
+        try {
+            if (!out.exists() && !out.mkdirs()) throw new IllegalStateException("cannot create " + out);
+            final File file = new File(out, "enchantments.csv");
+            int n = 0;
+            try (PrintWriter w = new PrintWriter(file, "UTF-8")) {
+                w.println("id,name,translation_key,max_level,weight,type");
+                for (final net.minecraft.enchantment.Enchantment e : net.minecraft.enchantment.Enchantment.enchantmentsList) {
+                    if (e == null) continue;
+                    String name;
+                    try {
+                        // getTranslatedName appends the level numeral; level 1 gives a trailing " I".
+                        name = e.getTranslatedName(1);
+                        if (name.endsWith(" I")) name = name.substring(0, name.length() - 2);
+                    } catch (Throwable t) {
+                        name = "<untranslated>";
+                    }
+                    String type;
+                    try {
+                        type = String.valueOf(e.type);
+                    } catch (Throwable t) {
+                        type = "";
+                    }
+                    w.println(
+                        String.join(
+                            ",",
+                            String.valueOf(e.effectId),
+                            q(name),
+                            q(e.getName()),
+                            String.valueOf(e.getMaxLevel()),
+                            String.valueOf(e.getWeight()),
+                            q(type)));
+                    n++;
+                }
+            }
+            LOG.info("[probe][lootcsv] wrote {} enchantments -> {}", n, file);
+        } catch (Throwable t) {
+            LOG.error("[probe][lootcsv] enchantment write failed", t);
+        }
+    }
+
     private static ItemStack resolve(String name, int meta) {
         try {
             final int c = name.indexOf(':');
@@ -534,6 +669,7 @@ public final class ChestLootExport {
             // consumes a roll, so it stays in the output as a blank rather than being dropped.
             disp = "<item id does not resolve in this build>";
         }
+        if (!reg.isEmpty()) ATTR_KEYS.add(reg + "\t" + meta);
         return rowRaw(
             source,
             phase,
@@ -583,6 +719,9 @@ public final class ChestLootExport {
     private static String rowRaw(String source, String phase, String table, String cat, String level, String rmin,
         String rmax, String each, String reg, int meta, String disp, String weight, String smin, String smax,
         String total, String chance, String cls, String nbt, String enchLevel) {
+        // Recorded here rather than only in row(): the Roguelike and TF captures parse names out of JSON and
+        // never build an ItemStack, so hooking the ItemStack overload alone misses every weapon they list.
+        if (reg != null && !reg.isEmpty()) ATTR_KEYS.add(reg + "\t" + meta);
         return String.join(
             ",",
             q(source),

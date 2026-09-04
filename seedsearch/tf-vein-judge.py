@@ -42,9 +42,21 @@ SHARD_MIXES = ("ore.mix.aquaignis", "ore.mix.terraaer", "ore.mix.perditioordo")
 # vein places a subset, so a cell matches a mix when the materials present are a SUBSET of that mix's
 # four. Ambiguity is real and must not be resolved by guessing: coal and lignite have identical
 # material sets, and any single-material cell matches several mixes. Those land in `unidentified`.
+# materials_of returns None when the mix table lacks a meta for any slot — newer GregTech populates
+# Materials at runtime, so the extractor carries metas across by name and some are simply unknown. A
+# mix with an unknown meta cannot be identified from a census, and admitting it under a partial
+# material set would let it shadow a mix it merely overlaps with.
 BY_MATS = collections.defaultdict(list)
+_unidentifiable = 0
 for _m in vp.MIXES:
-    BY_MATS[frozenset(vp.materials_of(_m))].append(_m["name"])
+    _mats = vp.materials_of(_m)
+    if _mats is None:
+        _unidentifiable += 1
+        continue
+    BY_MATS[frozenset(_mats)].append(_m["name"])
+if _unidentifiable:
+    print(f"note: {_unidentifiable} of {len(vp.MIXES)} mixes carry no meta set and cannot be "
+          f"identified from a census; cells holding them land in `unidentified`.")
 
 
 def actual_mix(counter, floor):
@@ -109,7 +121,7 @@ def main():
                 continue
             c["corpus_cells"] += 1
             actual, reason = actual_mix(counter, args.material_floor)
-            pred, _ = vp.predict(r.seed, cell[0], cell[1], dim=args.dim, token=token)
+            pred, att = vp.predict(r.seed, cell[0], cell[1], dim=args.dim, token=token)
             predname = pred["name"] if pred else None
             if predname is None:
                 c["no_eligible_draw"] += 1
@@ -127,9 +139,9 @@ def main():
             # tMinY, so what decides it is where this vein actually landed: ore.mix.gold has minY 30
             # but rolls tMinY up to 54, and lumping it with minY-10 mixes blurs the split that is the
             # whole finding. TF_GROUND is WorldProviderTwilightForest.getAverageGroundLevel().
-            t_min_y = vp.vein_geometry(pred, cell[0], cell[1], dim=args.dim,
-                                       world_seed=r.seed)["tMinY"]
-            b = "low" if t_min_y <= args.ground else "high"
+            geom = vp.vein_geometry(pred, cell[0], cell[1], dim=args.dim, attempt=att,
+                                    world_seed=r.seed)
+            b = ("low" if geom["tMinY"] <= args.ground else "high") if geom else "no-meta"
             hit = predname == actual
             c["matched" if hit else "identity_flip"] += 1
             band[b]["n"] += 1

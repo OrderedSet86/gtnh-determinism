@@ -25,3 +25,9 @@ docs/HANDOFF*
 scripts/__pycache__/
 seedlib/**/*.tar.gz
 **/__pycache__
+
+# Build-generated copies of shared/chest-nohooks.json. scripts/build-jar.sh writes one into each jar's
+# resources on every build; the canonical file is shared/chest-nohooks.json. Tracking the copies would
+# let them drift from it in review, which is the exact failure the single-copy arrangement prevents.
+fix-build/src/main/resources/chest-nohooks.json
+probe-build/src/main/resources/chest-nohooks.json

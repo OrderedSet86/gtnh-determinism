@@ -7,8 +7,14 @@ or results/<batch>/). Item names resolve against the report dir's gtmats.json
 are accepted too.
 
 Facts baked into the defaults (established from seedlib-0.4-60seeds):
-  - Village chests contain NO GT ingots (241 chests, 60 seeds, zero hits) — villages
-    are a spawn anchor, not an ingot source.
+  - RETRACTED 2026-08-29: "Village chests contain NO GT ingots (241 chests, 60 seeds,
+    zero hits)" is false against its own corpus. Re-checked with this file's PIECE_RE
+    over seedlib-0.4-60seeds: 244 village chests, 12 GT ingot stacks (Tin, Brass, Zinc,
+    Manganese, Nickel, Silver, Molybdenum, Magnesium, WroughtIron). No Steel and no
+    Bronze, which is the only part that held. Also: 34 of those 60 reports carry an
+    empty villages list, so the sample is 26 seeds, not 60. See seedsearch/README.md.
+    The "villages are a spawn anchor, not an ingot source" framing that followed from it
+    does not hold either: on daily-707, 2 of 3 villageBlacksmith chests carry Steel.
   - Chest steel/bronze come from Roguelike dungeons (mostly y<50) and surface ruins
     (iridium-shard loot profile, mostly y>50). --y-min 50 approximates "ruins only";
     --ruins-only classifies by loot profile instead and catches sunken ruins.

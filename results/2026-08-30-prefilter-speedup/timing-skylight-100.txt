@@ -1,0 +1,13 @@
+[prefilter][timing] 100 seeds, 156.9 s wall
+[prefilter][timing] 1569.2 ms/seed measured
+[prefilter][timing]   village.cellscan       :     157.5 ms total,    1.57 ms/seed,   0.1% of wall,       100 calls, 1574.8 us/call
+[prefilter][timing]   villageStarts          :    4438.1 ms total,   44.38 ms/seed,   2.8% of wall,       100 calls, 44381.2 us/call
+[prefilter][timing]   RwgTerrain.ctor        :     118.2 ms total,    1.18 ms/seed,   0.1% of wall,       100 calls, 1182.3 us/call
+[prefilter][timing]   skylight.ran           :       0.0 ms total,    0.00 ms/seed,   0.0% of wall,     54406 calls, 0.0 us/call
+[prefilter][timing]   skylight               :    2801.7 ms total,   28.02 ms/seed,   1.8% of wall,     54406 calls, 51.5 us/call
+[prefilter][timing]   chunkgen               :   92243.1 ms total,  922.43 ms/seed,  58.8% of wall,     54406 calls, 1695.5 us/call
+[prefilter][timing]   spawn.walk             :   10212.4 ms total,  102.12 ms/seed,   6.5% of wall,       100 calls, 102124.4 us/call
+[prefilter][timing]   terrain.digest         :   14269.9 ms total,  142.70 ms/seed,   9.1% of wall,       100 calls, 142699.0 us/call
+[prefilter][timing]   dungeon.triggers       :     191.7 ms total,    1.92 ms/seed,   0.1% of wall,       100 calls, 1916.6 us/call
+[prefilter][timing]   dungeon.generate       :  126589.9 ms total, 1265.90 ms/seed,  80.7% of wall,       549 calls, 230582.8 us/call
+[prefilter][timing]   seed.total             :  156813.7 ms total, 1568.14 ms/seed,  99.9% of wall,       100 calls, 1568137.2 us/call

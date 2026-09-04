@@ -1,0 +1,6 @@
+[prefilter][timing] 200 seeds, 23.6 s wall
+[prefilter][timing] 118.0 ms/seed measured
+[prefilter][timing]   chunkgen               :   21144.8 ms total,  105.72 ms/seed,  89.6% of wall,     11484 calls, 1841.2 us/call
+[prefilter][timing]   tier1.spawn            :   23048.5 ms total,  115.24 ms/seed,  97.6% of wall,       200 calls, 115242.4 us/call
+[prefilter][timing]   tier1.triggers         :     406.5 ms total,    2.03 ms/seed,   1.7% of wall,       200 calls, 2032.5 us/call
+[prefilter][timing]   seed.total             :   23458.5 ms total,  117.29 ms/seed,  99.4% of wall,       200 calls, 117292.3 us/call

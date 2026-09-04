@@ -13,9 +13,17 @@ probe.search=true JSONs for the same seeds, per module:
   spawn     exact XZ match expected (worldless walk vs real createSpawnPosition); any
             mismatch prints the delta - a nonzero rate means live-population flipped a
             grass check (or a mod hooks CreateSpawnPosition) and the caveat is real.
+  biomes    -Dprobe.prefilter.biomeregion output vs the corpus per-chunk biomeCounts
+            census: largest no-rain square, largest humid square, and the gap between
+            them. Exact match expected in the default confirm=-1 mode, which reads the
+            same generated biome data the corpus does. Rows marked tier "A" or "Ab" were
+            answered wholly or partly from the lattice screen and are reported separately,
+            because that screen is NOT an upper bound and drops qualifying seeds.
+            Needs a corpus at report format 7 or later and a biomes.json sidecar.
 
 Usage:
   prefilter-judge.py <prefilter.jsonl> <corpus-dir> [--match-dist 100]
+                     [--min-side 5] [--biome-radius 15] [--humidity 14]
 """
 import argparse
 import json
@@ -56,6 +64,9 @@ def main():
     ap.add_argument("jsonl")
     ap.add_argument("corpus_dir")
     ap.add_argument("--match-dist", type=float, default=100.0)
+    ap.add_argument("--min-side", type=int, default=5)
+    ap.add_argument("--biome-radius", type=int, default=15)
+    ap.add_argument("--humidity", type=int, default=14)
     args = ap.parse_args()
 
     pre = {}
@@ -79,6 +90,8 @@ def main():
     spawn_exact = 0
     spawn_deltas = []
     spawn_missing = 0
+    b_total = b_side = b_hside = b_gap = b_verdict = 0
+    b_missing = b_degraded = 0
 
     for seed in common:
         p, c = pre[seed], corpus[seed]
@@ -138,6 +151,35 @@ def main():
         else:
             spawn_missing += 1
 
+        # --- biomes. Compared field by field rather than as a single verdict: the gate decision can
+        # agree while the underlying squares disagree, and reporting only the verdict would hide that.
+        pb = p.get("biomeregion")
+        if pb is None:
+            b_missing += 1
+        else:
+            cb = c.biome_regions(args.min_side, args.biome_radius, args.humidity)
+            if cb is None:
+                b_missing += 1
+            else:
+                b_total += 1
+                if pb.get("t") != "B":
+                    b_degraded += 1
+                se = pb["n"] == cb["side"]
+                he = pb["hn"] == cb["humidSide"]
+                ge = pb["d"] == cb["gap"]
+                b_side += se
+                b_hside += he
+                b_gap += ge
+                b_verdict += (pb["n"] >= args.min_side) == (cb["side"] >= args.min_side)
+                if not (se and he and ge):
+                    lines.append(
+                        f"  BIOME tier={pb.get('t')} cg={pb.get('cg')}  "
+                        f"side {pb['n']}/{cb['side']}  humidSide {pb['hn']}/{cb['humidSide']}  "
+                        f"gap {pb['d']}/{cb['gap']}   (prefilter/corpus)")
+                if cb["columns"] != "all":
+                    lines.append("  BIOME corpus lacks per-column biomeCounts; comparison is against "
+                                 "the chunk-centre proxy, not ground truth")
+
         if lines:
             print(f"seed {seed}:")
             print("\n".join(lines))
@@ -157,6 +199,24 @@ def main():
               f"{len(spawn_deltas)} mismatches, median delta {med:.0f} blocks")
     if spawn_missing:
         print(f"spawn:    {spawn_missing} seeds lacked spawn on one side")
+    if b_total:
+        # Absolute mismatch counts, not rates alone: the target is zero, and a percentage
+        # rounds a surviving residual out of sight.
+        print(f"biomes:   {b_total} seeds compared (min-side {args.min_side}, radius "
+              f"{args.biome_radius}, humidity {args.humidity})")
+        print(f"          no-rain square side {b_side}/{b_total} exact, "
+              f"{b_total - b_side} mismatched")
+        print(f"          humid square side   {b_hside}/{b_total} exact, "
+              f"{b_total - b_hside} mismatched")
+        print(f"          gap                 {b_gap}/{b_total} exact, "
+              f"{b_total - b_gap} mismatched")
+        print(f"          >={args.min_side}x{args.min_side} verdict     {b_verdict}/{b_total} agree, "
+              f"{b_total - b_verdict} disagreed")
+        if b_degraded:
+            print(f"          WARNING: {b_degraded} rows were tier A/Ab (lattice screen, not "
+                  f"confirmed) - those are not measurements of the generator")
+    if b_missing:
+        print(f"biomes:   {b_missing} seeds had no biomeregion output or no biomes.json sidecar")
 
 
 if __name__ == "__main__":

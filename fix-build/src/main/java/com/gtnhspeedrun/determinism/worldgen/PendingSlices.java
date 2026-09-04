@@ -234,17 +234,6 @@ public final class PendingSlices {
         return wr;
     }
 
-    /** Latest buffered write at a position (overlay reads must see buffered state), or null. */
-    public static synchronized Write lookup(World w, int x, int y, int z) {
-        final List<Write> list = pending(w).get(chunkKey(x >> 4, z >> 4));
-        if (list == null) return null;
-        for (int i = list.size() - 1; i >= 0; i--) {
-            final Write wr = list.get(i);
-            if (wr.x == x && wr.y == y && wr.z == z) return wr;
-        }
-        return null;
-    }
-
     /**
      * Detached tile entity for a buffered container write: created by the block itself, coords stamped so
      * position-keyed logic (TreasureChest posKey, spawner forks) sees the real location. Generation code

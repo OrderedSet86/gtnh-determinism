@@ -1,0 +1,20 @@
+=== prefilter-judge-chests: 10 seeds, radius 15 chunks around spawn ===
+predicted chest positions      : 19
+  present in the corpus        : 19
+  predicted but ABSENT         : 0
+  dropped, outside the window  : 20
+contents identical at matched  : 19 of 19
+NBT identical at those         : 19 of 19
+corpus chests in window (all sources, not only villages): 1799
+
+per seed: seed, predicted, matched, contents-ok, nbt-ok, predicted-absent
+  -8168323205341578169, 4, 4, 4, 4, 0
+  -6701391002807803687, 5, 5, 5, 5, 0
+  -6292213143640744246, 4, 4, 4, 4, 0
+  -6244135143557849758, 6, 6, 6, 6, 0
+  -5906397841852343037, 0, 0, 0, 0, 0
+  -5407451111107001215, 0, 0, 0, 0, 0
+  261155990197320239, 0, 0, 0, 0, 0
+  495433077778118046, 0, 0, 0, 0, 0
+  6448274471135530858, 0, 0, 0, 0, 0
+  8714553887829585232, 0, 0, 0, 0, 0

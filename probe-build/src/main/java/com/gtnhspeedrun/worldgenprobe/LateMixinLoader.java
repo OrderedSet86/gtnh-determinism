@@ -37,6 +37,11 @@ public class LateMixinLoader implements ILateMixinLoader {
     @Override
     public List<String> getMixins(Set<String> loadedMods) {
         final List<String> mixins = new ArrayList<>();
+        // Targets vanilla Chunk and only acts on SeedProbeWorld, so it needs neither RWG nor the 1.5.0
+        // version gate below. Timing-only unless probe.prefilter.skipskylight is set.
+        if (Boolean.getBoolean("probe.prefilter.timing") || Boolean.getBoolean("probe.prefilter.skipskylight")) {
+            mixins.add("SkylightMixin");
+        }
         final boolean wantParallel = Boolean.getBoolean("probe.parallelnoise");
         final boolean wantFast = Boolean.getBoolean("probe.fastnoise");
         if (!wantParallel && !wantFast) return mixins;

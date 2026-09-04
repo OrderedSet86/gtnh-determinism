@@ -1,0 +1,35 @@
+seed -9206352871132476065:
+  MISS corpus village at ~(201,208), 34 pieces - no prefilter match
+seed -8754235096474540153:
+  MISS corpus village at ~(229,71), 32 pieces - no prefilter match
+seed -7745234545667762699:
+  MISS corpus village at ~(-609,273), 17 pieces - no prefilter match
+  MISS corpus village at ~(79,293), 63 pieces - no prefilter match
+  MISS corpus village at ~(338,-471), 95 pieces - no prefilter match
+seed -7713629421317685501:
+  MISS corpus village at ~(206,109), 78 pieces - no prefilter match
+seed 590749103374828709:
+  MISS corpus village at ~(129,126), 47 pieces - no prefilter match
+  MISS corpus village at ~(163,-529), 85 pieces - no prefilter match
+seed 1419488460957070082:
+  MISS corpus village at ~(45,342), 92 pieces - no prefilter match
+seed 2528934611105101794:
+  MISS corpus village at ~(797,237), 49 pieces - no prefilter match
+seed 6930038841624260126:
+  MISS corpus village at ~(290,54), 79 pieces - no prefilter match
+seed 7312478273775840697:
+  MISS corpus village at ~(176,114), 95 pieces - no prefilter match
+seed 8236969246616475863:
+  MISS corpus village at ~(210,265), 35 pieces - no prefilter match
+seed 8439098050868270728:
+  MISS corpus village at ~(99,168), 75 pieces - no prefilter match
+
+=== prefilter-judge: 24 seeds ===
+villages: 6/20 corpus villages matched (30.0% recall)
+pieces:   6/6 matched villages with corpus subset of prefilter pieces (0 of those had extra prefilter-only pieces = window clipping / ground prunes, expected)
+spawn:    24/24 exact (100.0%); 0 mismatches, median delta 0 blocks
+biomes:   24 seeds compared (min-side 5, radius 8, humidity 14)
+          no-rain square side 24/24 exact, 0 mismatched
+          humid square side   24/24 exact, 0 mismatched
+          gap                 24/24 exact, 0 mismatched
+          >=5x5 verdict     24/24 agree, 0 disagreed

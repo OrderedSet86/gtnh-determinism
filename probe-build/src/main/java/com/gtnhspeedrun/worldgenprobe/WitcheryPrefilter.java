@@ -49,6 +49,9 @@ import net.minecraft.world.World;
  */
 final class WitcheryPrefilter {
 
+    /** -Dprobe.prefilter.witchery.replay=true: run the real handlers to get the winner and its loot. */
+    static final boolean REPLAY = Boolean.getBoolean("probe.prefilter.witchery.replay");
+
     /** Vanilla scattered-feature salt, read off nonInRange's bytecode. */
     private static final int SALT = 10387312;
 
@@ -152,6 +155,10 @@ final class WitcheryPrefilter {
         int biome;
         boolean allowed;
         List<String> order;
+        /** Which handler actually placed, or null when none did / the replay was off. */
+        String winner;
+        /** Container contents the placement produced, as JSON objects. */
+        List<String> chests = new ArrayList<>();
     }
 
     static List<Cell> candidates(World world, int cx0, int cz0, int radius) throws Exception {
@@ -187,11 +194,113 @@ final class WitcheryPrefilter {
                     cell.chunkSeed = RoguelikePrefilter.chunkSeed(world.getSeed(), cx, cz);
                     Collections.shuffle(names, new Random(cell.chunkSeed));
                     for (final String n : names) out(cell.order, n);
+                    if (REPLAY && world instanceof Prefilter.SeedProbeWorld) {
+                        try {
+                            replay((Prefilter.SeedProbeWorld) world, cell, cx, cz);
+                        } catch (Throwable t) {
+                            WorldgenProbe.LOG.warn("[prefilter] witchery replay failed at {},{}: {}", cx, cz, t);
+                            cell.winner = "ERROR";
+                        }
+                    }
                 }
                 out.add(cell);
             }
         }
         return out;
+    }
+
+    private static java.lang.reflect.Method nonInRange;
+    private static java.lang.reflect.Method handlerGenerate;
+    private static java.lang.reflect.Method handlerGetRange;
+
+    /**
+     * Runs the real handler loop for one cell and returns what it built.
+     *
+     * <p>
+     * The winner was previously left unpredicted on the grounds that choosing it means calling
+     * {@code IWorldGenHandler.generate}, which writes blocks. That reason was half right: the writes are real, but
+     * the RANDOM is not a problem at all. FML reseeds its per-chunk Random before <em>every</em> IWorldGenerator
+     * ({@code fmlRandom.setSeed(chunkSeed)} inside {@code GameRegistry.generateWorld}), so the Random arriving at
+     * Witchery is a pure function of {@code (worldSeed, cx, cz)} and owes nothing to any other mod's draws. There
+     * is no stream to replay.
+     *
+     * <p>
+     * So the writes are simply diverted: {@link Prefilter.SeedProbeWorld#beginOverlay()} makes them land in a
+     * discardable map that reads fall through, leaving the virgin-terrain oracle untouched. The real
+     * {@code generate} then runs against a coherent world and its containers are read straight out of the
+     * overlay — no reimplementation of the placement rules, the terrain gate or the loot.
+     *
+     * <p>
+     * Known fidelity gap, inherited from the mixin's own recorded residual: {@code nonInRange} consults
+     * {@code structuresList}, which accumulates as a real run places structures and is empty here. On a seed dense
+     * enough for two placements to fall within each other's range, this cell's verdict can differ.
+     */
+    private static void replay(Prefilter.SeedProbeWorld world, Cell cell, int cx, int cz) throws Exception {
+        final List<?> handlers = (List<?>) fGenerators.get(generator);
+        if (nonInRange == null) {
+            nonInRange = generator.getClass()
+                .getDeclaredMethod("nonInRange", World.class, int.class, int.class, int.class);
+            nonInRange.setAccessible(true);
+        }
+        // ONE Random for the whole cell: the shuffle is its first draw and the handlers continue from where the
+        // shuffle left it, exactly as generateOverworld does. A fresh Random per handler would desynchronise
+        // every draw after the first.
+        final Random rand = new Random(cell.chunkSeed);
+        final List<Object> order = new ArrayList<>(handlers);
+        order.sort(
+            Comparator.comparing(
+                g -> g.getClass()
+                    .getName()));
+        Collections.shuffle(order, rand);
+
+        world.beginOverlay();
+        try {
+            for (final Object h : order) {
+                if (handlerGenerate == null) {
+                    // Both resolved on the INTERFACE, not on the first handler's class: Method.invoke rejects a
+                    // receiver that is not an instance of the declaring class, so a handle taken from whichever
+                    // handler happened to sort first throws on every other one.
+                    final Class<?> iface = Class.forName("com.emoniph.witchery.worldgen.IWorldGenHandler");
+                    handlerGetRange = iface.getMethod("getRange");
+                    handlerGenerate = iface.getMethod("generate", World.class, Random.class, int.class, int.class);
+                }
+                final int range = (Integer) handlerGetRange.invoke(h);
+                final boolean inRange = (Boolean) nonInRange.invoke(generator, world, cell.x, cell.z, range);
+                if (!inRange) continue;
+                if (!(Boolean) handlerGenerate.invoke(h, world, rand, cell.x, cell.z)) continue;
+                cell.winner = shortName(
+                    h.getClass()
+                        .getName());
+                break;
+            }
+        } finally {
+            for (final net.minecraft.tileentity.TileEntity te : world.endOverlay()
+                .values()) {
+                if (!(te instanceof net.minecraft.inventory.IInventory)) continue;
+                final net.minecraft.inventory.IInventory inv = (net.minecraft.inventory.IInventory) te;
+                boolean any = false;
+                for (int i = 0; i < inv.getSizeInventory(); i++) {
+                    if (inv.getStackInSlot(i) != null) {
+                        any = true;
+                        break;
+                    }
+                }
+                if (!any) continue;
+                cell.chests.add(
+                    WorldgenProbe.dumpInventory(
+                        inv,
+                        te.xCoord,
+                        te.yCoord,
+                        te.zCoord,
+                        te.getClass()
+                            .getSimpleName()));
+            }
+        }
+    }
+
+    private static String shortName(String className) {
+        final int dot = className.lastIndexOf('.');
+        return dot < 0 ? className : className.substring(dot + 1);
     }
 
     /** Short names, matching what the witchtrace prints, so a comparison needs no name mangling on either side. */

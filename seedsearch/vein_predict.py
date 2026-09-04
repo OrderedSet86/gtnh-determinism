@@ -37,9 +37,27 @@ import json, os
 from uo_oil import XSTR, M64   # XSTR validated bit-exact against the JVM (20k/20k)
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-MIXES = json.load(open(os.path.join(_HERE, "data", "oremixes-gtnh-2.8.4.json")))
+# The table is PACK-SPECIFIC and is part of the algorithm, not reference data: the draw is
+# nextInt(S_WEIGHT) over every mix in every dimension, so a table from another GregTech build shifts
+# every result. Measured on GTNH daily-707 (gregtech-5.09.54.115) against the 2.8.4 table: 79 mixes
+# and sWeight 3568 against the real 122 and 4770, and three in-game Twilight Forest checks came back
+# 0/3 with two of them naming mixes that are not shard mixes at all.
+#
+# GTNH_OREMIXES overrides the file; regenerate with data/extract_oremixes_from_jar.py.
+_MIX_FILE = os.environ.get(
+    "GTNH_OREMIXES", os.path.join(_HERE, "data", "oremixes-gtnh-daily707.json"))
+MIXES = json.load(open(_MIX_FILE))
+
+# The DRAW PROTOCOL is version-specific, independently of the table. GT 5.09.51 (GTNH 2.8.4) draws
+# nextInt(sWeight) over ALL mixes and rejects wrong-dimension picks after the fact; GT 5.09.54
+# (daily) reseeds per attempt with FNV-1a-64 and draws over the DIMENSION-FILTERED list only
+# (WorldGenContainer.run -> WorldgenQuery.inDimension(dim).findRandom). Using either protocol
+# against the other version predicts confident nonsense, which is how a correct 122-mix table still
+# scored 0/64 against a real daily-707 world. Sniffed from the table filename; override with
+# GTNH_VEIN_ALGO=legacy|fnv.
+ALGO = os.environ.get("GTNH_VEIN_ALGO") or ("legacy" if "2.8.4" in _MIX_FILE else "fnv")
 MIXES.sort(key=lambda m: m["enumIndex"])
-S_WEIGHT = sum(m["weight"] for m in MIXES)          # 3568
+S_WEIGHT = sum(m["weight"] for m in MIXES)          # 4770 on daily-707
 OREVEIN_ATTEMPTS = 64                                # GregTech.cfg I:oreveinAttempts
 
 # The four tokens OreMixBuilder emits (OreMixBuilder.java:12-15). Note "TheEnd", not "The End" — the
@@ -92,6 +110,74 @@ def _pick(r):
     return MIXES[-1]
 
 
+_FNV_PRIME = 0x100000001B3
+_FNV_BASIS = 0xCBF29CE484222325
+
+
+def _fnv_byte(h, b):
+    """One FNV-1a-64 step. gtnhlib's hashStep(long, byte) SIGN-EXTENDS the byte before the XOR
+    (bytecode: i2b then i2l), so bytes >= 0x80 xor as negative longs — flipping the high 56 bits.
+    Dropping that detail changes every hash that contains such a byte."""
+    v = b & 0xFF
+    if v >= 0x80:
+        v -= 0x100
+    return ((h ^ (v & M64)) * _FNV_PRIME) & M64
+
+
+def _fnv_int(h, x):
+    for shift in (24, 16, 8, 0):
+        h = _fnv_byte(h, (x >> shift) & 0xFF)
+    return h
+
+
+def _fnv_long(h, x):
+    for shift in (56, 48, 40, 32, 24, 16, 8, 0):
+        h = _fnv_byte(h, (x >> shift) & 0xFF)
+    return h
+
+
+_ELIGIBLE = {}
+
+
+def _eligible(token):
+    """Dimension-filtered mix list in enum order, with the summed weight — WorldgenQuery's filtered
+    list. Cached: it is a pure function of the token and the table."""
+    got = _ELIGIBLE.get(token)
+    if got is None:
+        mixes = [m for m in MIXES if token in m["dims"] and m.get("enabledByDefault", True)]
+        got = _ELIGIBLE[token] = (mixes, sum(m["weight"] for m in mixes))
+    return got
+
+
+def _attempt_hash(world_seed, oreseed_x, oreseed_z, dim, attempt):
+    """FNV-1a-64 over (oreveinSeed, attemptIndex) — the per-attempt XSTR seed in GT 5.09.54."""
+    h = _fnv_long(_FNV_BASIS, orevein_seed(world_seed, oreseed_x, oreseed_z, dim) & M64)
+    return _fnv_int(h, attempt)
+
+
+def _predict_all_fnv(world_seed, oreseed_x, oreseed_z, dim, token):
+    """GT 5.09.54: every attempt draws from the dimension-filtered list with a fresh FNV-seeded XSTR.
+
+    Unlike the legacy walk there is no wrong-dimension rejection — every attempt yields an eligible
+    mix — so "attempt depth" here counts terrain-gate fall-throughs only. The chance roll
+    (nextInt(100) vs oreveinPercentage=100) always passes and burns nothing from the per-attempt
+    streams, which are independently seeded.
+    """
+    mixes, total = _eligible(token)
+    if not mixes:
+        return []
+    out = []
+    for i in range(OREVEIN_ATTEMPTS):
+        rng = XSTR(_attempt_hash(world_seed, oreseed_x, oreseed_z, dim, i))
+        r = rng.next_int(total)
+        for m in mixes:
+            r -= m["weight"]
+            if r < 0:
+                out.append((m, i))
+                break
+    return out
+
+
 def predict_all(world_seed, oreseed_x, oreseed_z, dim=0, token=None):
     """-> [(mix, attempt_index), ...] for EVERY dimension-eligible draw across the 64 attempts.
 
@@ -102,6 +188,8 @@ def predict_all(world_seed, oreseed_x, oreseed_z, dim=0, token=None):
     """
     if token is None:
         token = dim_token(dim)
+    if ALGO == "fnv":
+        return _predict_all_fnv(world_seed, oreseed_x, oreseed_z, dim, token)
     rng = XSTR(orevein_seed(world_seed, oreseed_x, oreseed_z, dim))
     rng.next_int(100)                                # oreveinPercentageRoll, always passes at 100
     out = []
@@ -120,6 +208,9 @@ def predict(world_seed, oreseed_x, oreseed_z, dim=0, token=None):
     """
     if token is None:
         token = dim_token(dim)
+    if ALGO == "fnv":
+        hits = _predict_all_fnv(world_seed, oreseed_x, oreseed_z, dim, token)
+        return hits[0] if hits else (None, None)
     rng = XSTR(orevein_seed(world_seed, oreseed_x, oreseed_z, dim))
     rng.next_int(100)
     for i in range(OREVEIN_ATTEMPTS):
@@ -129,7 +220,7 @@ def predict(world_seed, oreseed_x, oreseed_z, dim=0, token=None):
     return None, None
 
 
-def vein_geometry(mix, oreseed_x, oreseed_z, dim=0, world_seed=None):
+def vein_geometry(mix, oreseed_x, oreseed_z, dim=0, world_seed=None, attempt=0):
     """Y band and XZ bounding box of the vein, from the per-vein RNG stream.
 
     GTWorldgenerator.java:355 seeds a SEPARATE stream per attempt, `new XSTR(oreveinSeed ^ mPrimaryMeta)`,
@@ -155,7 +246,18 @@ def vein_geometry(mix, oreseed_x, oreseed_z, dim=0, world_seed=None):
     """
     if world_seed is None:
         raise TypeError("vein_geometry needs world_seed")
-    rng = XSTR(_s64(orevein_seed(world_seed, oreseed_x, oreseed_z, dim) ^ mix["primaryMeta"]))
+    if mix.get("primaryMeta") is None:
+        # Newer GT registers Materials at runtime, so some carried-across tables lack metas; the
+        # placement stream is seeded from the primary's id, so without it there is no honest geometry.
+        return None
+    if ALGO == "fnv":
+        # GT 5.09.54: the placement stream is XSTR(FNV(FNV(basis, oreveinSeed), attempt) folded with
+        # the primary id) — the ATTEMPT that placed the vein is part of the seed, unlike the legacy
+        # (oreveinSeed ^ primaryMeta) stream, which is attempt-independent. Same draw order after.
+        h = _attempt_hash(world_seed, oreseed_x, oreseed_z, dim, attempt)
+        rng = XSTR(_fnv_int(h, mix["primaryMeta"]))
+    else:
+        rng = XSTR(_s64(orevein_seed(world_seed, oreseed_x, oreseed_z, dim) ^ mix["primaryMeta"]))
     span = mix["maxY"] - mix["minY"] - 5
     t_min_y = mix["minY"] + rng.next_int(span)
     seed_x, seed_z = oreseed_x * 16, oreseed_z * 16
@@ -216,7 +318,13 @@ def cell_center_block(cell_x, cell_z):
 
 
 def materials_of(mix):
-    return {mix["primaryMeta"], mix["secondaryMeta"], mix["betweenMeta"], mix["sporadicMeta"]}
+    # Absent metas mean the reference table did not know that material, not that the slot is empty.
+    # Returning a partial set would let a mix be identified by the subset it happens to share with
+    # another, so a mix missing any meta is excluded from identification entirely (see BY_MATS).
+    keys = ("primaryMeta", "secondaryMeta", "betweenMeta", "sporadicMeta")
+    if any(mix.get(k) is None for k in keys):
+        return None
+    return {mix[k] for k in keys}
 
 
 BY_DIM = {tok: [m for m in MIXES if tok in m["dims"]]
@@ -225,7 +333,7 @@ WEIGHT_BY_DIM = {tok: sum(m["weight"] for m in ms) for tok, ms in BY_DIM.items()
 
 OW = BY_DIM[OVERWORLD]
 TF = BY_DIM[TWILIGHT_FOREST]
-BY_MATS = {frozenset(materials_of(m)): m["name"] for m in OW}
+BY_MATS = {frozenset(ms): m["name"] for m in OW for ms in [materials_of(m)] if ms is not None}
 
 # The dims[]-membership test has to stay exactly equivalent to the old hardcoded m["overworld"] flag,
 # or every stored overworld prediction silently changes meaning.

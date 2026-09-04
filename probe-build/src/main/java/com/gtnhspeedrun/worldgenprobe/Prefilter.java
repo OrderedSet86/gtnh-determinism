@@ -62,6 +62,14 @@ import net.minecraft.world.storage.ISaveHandler;
  * [-Dprobe.prefilter.dungeon=N (Roguelike trigger scan radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.gate.dungeon=false (kill seeds with no dungeon trigger in range)]
  * [-Dprobe.prefilter.witchery=N (Witchery candidate-cell scan radius in chunks around predicted spawn; -1 off)]
+ * [-Dprobe.prefilter.stronghold=N (stronghold radius in chunks around predicted spawn; -1 off)]
+ * [-Dprobe.prefilter.oil=N (BuildCraft oil scan radius in chunks around predicted spawn; -1 off)]
+ * [-Dprobe.prefilter.chests=true (predict chest contents; alias -Dprobe.prefilter.villagechests)]
+ * [-Dprobe.prefilter.biomeregion=N (no-rain region scan radius in chunks around predicted spawn; -1 off)]
+ * [-Dprobe.prefilter.biomeregion.min=5 (minimum square side, in chunks)]
+ * [-Dprobe.prefilter.biomeregion.humidity=14 (crop humidity bonus a chunk needs to count as humid)]
+ * [-Dprobe.prefilter.biomeregion.confirm=-1 (Tier B chunk budget per seed; -1 = whole window/exact, 0 = off)]
+ * [-Dprobe.prefilter.gate.biomeregion=SIDE[,MAXGAP] (kill seeds without such a region)]
  *
  * Block reads (2026-08-29): {@link VirginChunkProvider} backs the world, so {@code world.getBlock} and
  * {@code getBlockMetadata} answer virgin terrain. That is what {@code TerrainOracle} falls through to for a
@@ -72,7 +80,83 @@ import net.minecraft.world.storage.ISaveHandler;
 public final class Prefilter {
 
     /** Minimal seed-bearing World: enough construction to satisfy RWG's chunk manager and world type wiring. */
-    static final class SeedProbeWorld extends World {
+    /**
+     * Per-stage wall-clock accumulators, enabled with {@code -Dprobe.prefilter.timing=true}.
+     *
+     * <p>
+     * There was no per-stage timing anywhere before this: the only clock reads were the batch start and end, and
+     * the {@code seeds/s} line truncates to an int, so it prints "0 seeds/s" for any run slower than 1 s/seed.
+     * Every cost attribution in the docs was therefore inferred by differencing whole runs, which is how the
+     * claim "dungeons generate no extra chunks" survived — {@code chunks_generated} is emitted before the dungeon
+     * stage, so differencing two runs on it silently compares the wrong thing.
+     *
+     * <p>
+     * Off by default and branch-only when off, so a normal sweep pays a predictable-branch per call.
+     */
+    /** Skip the skylight pass on prefilter chunks. Off by default — see SkylightMixin for why. */
+    public static final boolean SKIP_SKYLIGHT = Boolean.getBoolean("probe.prefilter.skipskylight");
+
+    public static final class Timing {
+
+        public static final boolean ON = Boolean.getBoolean("probe.prefilter.timing");
+        private static final Map<String, long[]> BUCKETS = new java.util.LinkedHashMap<>();
+
+        private Timing() {}
+
+        public static long start() {
+            return ON ? System.nanoTime() : 0L;
+        }
+
+        /** Accumulate nanos since {@code t} and count one call. */
+        public static synchronized void add(String name, long t) {
+            if (!ON) return;
+            final long[] b = BUCKETS.computeIfAbsent(name, k -> new long[2]);
+            b[0] += System.nanoTime() - t;
+            b[1]++;
+        }
+
+        /** Add a precomputed duration (for attributing nested time to an outer stage). */
+        public static synchronized void addRaw(String name, long nanos) {
+            if (!ON) return;
+            final long[] b = BUCKETS.computeIfAbsent(name, k -> new long[2]);
+            b[0] += nanos;
+            b[1]++;
+        }
+
+        /** Count an event with no duration (cache hits, iteration counts). */
+        public static synchronized void hit(String name) {
+            if (!ON) return;
+            BUCKETS.computeIfAbsent(name, k -> new long[2])[1]++;
+        }
+
+        /** Nanos accumulated in a bucket so far — lets a stage attribute nested time to itself. */
+        public static synchronized long nanos(String name) {
+            final long[] b = BUCKETS.get(name);
+            return b == null ? 0L : b[0];
+        }
+
+        static synchronized void report(int seeds, double totalSecs) {
+            if (!ON || BUCKETS.isEmpty()) return;
+            WorldgenProbe.LOG.info("[prefilter][timing] {} seeds, {} s wall", seeds, String.format("%.1f", totalSecs));
+            final double perSeedMs = totalSecs * 1000.0 / Math.max(seeds, 1);
+            WorldgenProbe.LOG.info("[prefilter][timing] {} ms/seed measured", String.format("%.1f", perSeedMs));
+            for (final Map.Entry<String, long[]> e : BUCKETS.entrySet()) {
+                final long nanos = e.getValue()[0];
+                final long calls = e.getValue()[1];
+                final double ms = nanos / 1e6;
+                WorldgenProbe.LOG.info(
+                    "[prefilter][timing]   {} : {} ms total, {} ms/seed, {}% of wall, {} calls, {} us/call",
+                    String.format("%-22s", e.getKey()),
+                    String.format("%9.1f", ms),
+                    String.format("%7.2f", ms / Math.max(seeds, 1)),
+                    String.format("%5.1f", 100.0 * ms / Math.max(totalSecs * 1000.0, 1e-9)),
+                    String.format("%9d", calls),
+                    calls == 0 ? "-" : String.format("%.1f", nanos / 1000.0 / calls));
+            }
+        }
+    }
+
+    public static final class SeedProbeWorld extends World {
 
         private VirginChunkProvider virgin;
 
@@ -127,17 +211,137 @@ public final class Prefilter {
 
         @Override
         public boolean setBlock(int x, int y, int z, net.minecraft.block.Block block, int meta, int flags) {
-            return refuseWrite("setBlock", x, y, z);
+            if (overlay == null) return refuseWrite("setBlock", x, y, z);
+            final long k = okey(x, y, z);
+            overlay.put(k, new int[] { net.minecraft.block.Block.getIdFromBlock(block), meta });
+            // The real World builds the tile entity as part of the write; generation code then asks for it back
+            // and fills it (this is how a dispenser gets its loot), so an overlay that skipped this would hand
+            // back null and the structure would silently place an empty container.
+            if (block != null && block.hasTileEntity(meta)) {
+                final net.minecraft.tileentity.TileEntity te = block.createTileEntity(this, meta);
+                if (te != null) {
+                    te.setWorldObj(this);
+                    te.xCoord = x;
+                    te.yCoord = y;
+                    te.zCoord = z;
+                    te.blockType = block;
+                    te.blockMetadata = meta;
+                    overlayTe.put(k, te);
+                }
+            } else {
+                overlayTe.remove(k);
+            }
+            return true;
         }
 
         @Override
         public boolean setBlockMetadataWithNotify(int x, int y, int z, int meta, int flags) {
-            return refuseWrite("setBlockMetadataWithNotify", x, y, z);
+            if (overlay == null) return refuseWrite("setBlockMetadataWithNotify", x, y, z);
+            final int[] w = overlay.get(okey(x, y, z));
+            if (w == null) return false;
+            w[1] = meta;
+            return true;
         }
 
         @Override
         public void setTileEntity(int x, int y, int z, net.minecraft.tileentity.TileEntity te) {
-            refuseWrite("setTileEntity", x, y, z);
+            if (overlay == null) {
+                refuseWrite("setTileEntity", x, y, z);
+                return;
+            }
+            if (te != null) {
+                te.setWorldObj(this);
+                te.xCoord = x;
+                te.yCoord = y;
+                te.zCoord = z;
+            }
+            overlayTe.put(okey(x, y, z), te);
+        }
+
+        // ------------------------------------------------------------------ scratch overlay
+        //
+        // Witchery's surface structures decide whether they place by CALLING generate(), which reads terrain and
+        // then writes blocks. The read half is exactly what this world already answers; only the write half is
+        // forbidden, because the cached chunks ARE the virgin-terrain oracle.
+        //
+        // So writes are diverted into a discardable overlay instead of being refused: reads answer own-writes
+        // first and virgin terrain everywhere else, which is the same overlay semantics WorldEditorMixin gives
+        // Roguelike (F5). The oracle is never touched, and the structure sees a coherent world.
+        //
+        // Scoped, not global: outside beginOverlay()/endOverlay() every write is refused exactly as before, so
+        // no other consumer of this world can be affected by code that never runs for it.
+
+        private Map<Long, int[]> overlay;
+        private Map<Long, net.minecraft.tileentity.TileEntity> overlayTe;
+
+        private static long okey(int x, int y, int z) {
+            return ((long) (x + 30_000_000) << 36) | ((long) (z + 30_000_000) << 8) | (y & 0xFF);
+        }
+
+        void beginOverlay() {
+            overlay = new java.util.HashMap<>();
+            overlayTe = new java.util.HashMap<>();
+        }
+
+        /** The block writes the overlay has captured so far. Read BEFORE {@link #endOverlay()}. */
+        Map<Long, int[]> overlayBlocks() {
+            return overlay == null ? java.util.Collections.emptyMap() : overlay;
+        }
+
+        /** Decodes a key from {@link #overlayBlocks()} back into world coordinates. */
+        static int[] okeyToPos(long k) {
+            final int y = (int) (k & 0xFF);
+            final int z = (int) ((k >> 8) & 0xFFFFFFFL) - 30_000_000;
+            final int x = (int) ((k >> 36) & 0xFFFFFFFL) - 30_000_000;
+            return new int[] { x, y, z };
+        }
+
+        /** Everything the overlay captured, then discards it. */
+        Map<Long, net.minecraft.tileentity.TileEntity> endOverlay() {
+            final Map<Long, net.minecraft.tileentity.TileEntity> te = overlayTe;
+            overlay = null;
+            overlayTe = null;
+            return te == null ? java.util.Collections.emptyMap() : te;
+        }
+
+        @Override
+        public net.minecraft.block.Block getBlock(int x, int y, int z) {
+            if (overlay != null) {
+                final int[] w = overlay.get(okey(x, y, z));
+                if (w != null) return net.minecraft.block.Block.getBlockById(w[0]);
+            }
+            return super.getBlock(x, y, z);
+        }
+
+        @Override
+        public int getBlockMetadata(int x, int y, int z) {
+            if (overlay != null) {
+                final int[] w = overlay.get(okey(x, y, z));
+                if (w != null) return w[1];
+            }
+            return super.getBlockMetadata(x, y, z);
+        }
+
+        @Override
+        public net.minecraft.tileentity.TileEntity getTileEntity(int x, int y, int z) {
+            if (overlay != null) return overlayTe.get(okey(x, y, z));
+            return super.getTileEntity(x, y, z);
+        }
+
+        @Override
+        public void removeTileEntity(int x, int y, int z) {
+            if (overlay != null) {
+                overlayTe.remove(okey(x, y, z));
+                return;
+            }
+            super.removeTileEntity(x, y, z);
+        }
+
+        @Override
+        public boolean spawnEntityInWorld(Entity e) {
+            // Coven circles spawn witches. Nothing here consumes entities, and adding them would need the entity
+            // lists a worldless World does not maintain.
+            return overlay != null || super.spawnEntityInWorld(e);
         }
 
         private boolean refuseWrite(String what, int x, int y, int z) {
@@ -227,7 +431,8 @@ public final class Prefilter {
             return ((long) cx << 32) ^ (cz & 0xffffffffL);
         }
 
-        private IChunkProvider generator() {
+        /** Package-private: {@link BiomeRegionPrefilter} calls getNewNoise on this same instance. */
+        IChunkProvider generator() {
             if (gen == null) {
                 try {
                     gen = (IChunkProvider) Class.forName("rwg.world.ChunkGeneratorRealistic")
@@ -253,6 +458,7 @@ public final class Prefilter {
                         + " — a generator read the world "
                         + "for the chunk it is building");
             }
+            final long t = Timing.start();
             try {
                 final Chunk c = generator().provideChunk(cx, cz);
                 cache.put(k, c);
@@ -261,6 +467,7 @@ public final class Prefilter {
                 return c;
             } finally {
                 generating.remove(k);
+                Timing.add("chunkgen", t);
             }
         }
 
@@ -673,7 +880,8 @@ public final class Prefilter {
             .contains(world.getBiomeGenForCoords(x, z));
     }
 
-    private static java.lang.reflect.Method findMethod(Class<?> cls, String[] names, Class<?>... params)
+    /** Package-private: {@link BiomeRegionPrefilter} reaches RWG's noise methods through it. */
+    static java.lang.reflect.Method findMethod(Class<?> cls, String[] names, Class<?>... params)
         throws NoSuchMethodException {
         for (final String name : names) {
             for (Class<?> c = cls; c != null; c = c.getSuperclass()) {
@@ -868,8 +1076,46 @@ public final class Prefilter {
         return -1;
     }
 
-    /** -Dprobe.prefilter.villagechests=true: predict each village piece's chest contents (Stage 4). */
-    private static final boolean CHESTS_ENABLED = Boolean.getBoolean("probe.prefilter.villagechests");
+    /**
+     * Master switch for chest-contents prediction (Stage 4). It drives every structure that predicts through
+     * {@link VillageChestPrefilter} — villages and strongholds — so the original village-specific name is kept
+     * only as an alias for existing scripts.
+     */
+    private static final boolean CHESTS_ENABLED = Boolean.getBoolean("probe.prefilter.chests")
+        || Boolean.getBoolean("probe.prefilter.villagechests");
+
+    /**
+     * One chest as JSON. A refused chest carries {@code "reason"} and no {@code "chest"} payload, so a consumer
+     * that only reads {@code "chest"} cannot mistake a known position for known contents.
+     */
+    private static String chestJson(VillageChestPrefilter.Predicted p) {
+        final StringBuilder b = new StringBuilder();
+        b.append("{\"piece\": \"")
+            .append(p.piece)
+            .append("\", ");
+        // A null category means the site's recorded table is not trustworthy, not that none was recorded.
+        if (p.category != null) {
+            b.append("\"category\": \"")
+                .append(p.category)
+                .append("\", ");
+        }
+        if (p.reason == null) {
+            b.append("\"chest\": ")
+                .append(p.itemsJson);
+        } else {
+            b.append("\"pos\": [")
+                .append(p.x)
+                .append(", ")
+                .append(p.y)
+                .append(", ")
+                .append(p.z)
+                .append("], \"reason\": \"")
+                .append(WorldgenProbe.jsonEscape(p.reason))
+                .append("\"");
+        }
+        return b.append("}")
+            .toString();
+    }
 
     private static List<String> villageStarts(Object gen, World world, List<int[]> cells) throws Exception {
         final Map<?, ?> structureMap = (Map<?, ?>) STRUCTURE_MAP.get(gen);
@@ -906,6 +1152,7 @@ public final class Prefilter {
                 // Chest contents per piece. Uses exactly the inputs already gathered above — class, box and
                 // orientation — because F10's fork uses no terrain term.
                 final List<String> chests = new ArrayList<>();
+                final List<String> chestsUnpredicted = new ArrayList<>();
                 if (CHESTS_ENABLED) {
                     for (final Object comp : comps) {
                         final net.minecraft.world.gen.structure.StructureBoundingBox cbb = bboxField(comp);
@@ -917,13 +1164,7 @@ public final class Prefilter {
                             coordBaseMode(comp),
                             cbb,
                             cbb.minY)) {
-                            chests.add(
-                                "{\"piece\": \"" + p.piece
-                                    + "\", \"category\": \""
-                                    + p.category
-                                    + "\", \"chest\": "
-                                    + p.itemsJson
-                                    + "}");
+                            (p.reason == null ? chests : chestsUnpredicted).add(chestJson(p));
                         }
                     }
                     java.util.Collections.sort(chests);
@@ -945,6 +1186,8 @@ public final class Prefilter {
                 if (CHESTS_ENABLED) {
                     sb.append(", \"chests\": [")
                         .append(String.join(", ", chests))
+                        .append("], \"chests_unpredicted\": [")
+                        .append(String.join(", ", chestsUnpredicted))
                         .append("]");
                 }
                 sb.append("}");
@@ -961,6 +1204,44 @@ public final class Prefilter {
             }
         }
         return out;
+    }
+
+    private static boolean biomeRegionCostWarned;
+
+    /**
+     * Say out loud when the biome region stage is about to pay for chunks twice.
+     *
+     * <p>
+     * The stage reads generated chunks, so its cost is entirely whether those chunks are already in
+     * {@link VirginChunkProvider}'s LRU. Measured on 24 seeds: with the window inside the terrain radius and
+     * the cache big enough to hold it, the stage costs 4 ms/seed and regenerates nothing. Widen the window
+     * past the terrain radius, or leave the cache smaller than the window, and the same configuration costs
+     * 1.6 s/seed — a 400x swing with no error and no warning, which is exactly the kind of silent cost this
+     * has to announce rather than absorb.
+     */
+    private static void warnBiomeRegionCost(int biomeRadius) {
+        if (biomeRegionCostWarned) return;
+        biomeRegionCostWarned = true;
+        final int terrainRadius = Integer.getInteger("probe.prefilter.terrain", 4);
+        final int cache = Integer.getInteger("probe.prefilter.chunkcache", 256);
+        final int window = (2 * biomeRadius + 1) * (2 * biomeRadius + 1);
+        if (window > cache) {
+            WorldgenProbe.LOG.warn(
+                "[biomeregion] radius {} needs {} chunks but probe.prefilter.chunkcache is {} — the window will "
+                    + "thrash the LRU and regenerate chunks. Raise -Dprobe.prefilter.chunkcache to >= {}.",
+                biomeRadius,
+                window,
+                cache,
+                window);
+        }
+        if (terrainRadius >= 0 && biomeRadius > terrainRadius) {
+            WorldgenProbe.LOG.warn(
+                "[biomeregion] radius {} is wider than the terrain radius {}, so {} chunks are generated for this "
+                    + "stage alone (~2 ms each). Keeping it <= the terrain radius makes the stage almost free.",
+                biomeRadius,
+                terrainRadius,
+                window - (2 * terrainRadius + 1) * (2 * terrainRadius + 1));
+        }
     }
 
     public static void run(String spec, String outPath) throws Exception {
@@ -988,10 +1269,20 @@ public final class Prefilter {
         final long t0 = System.nanoTime();
         int done = 0;
         try (FileWriter w = new FileWriter(outPath)) {
+            final int tier1 = Integer.getInteger("probe.prefilter.tier1", -1);
+            if (tier1 >= 0) {
+                WorldgenProbe.LOG.info(
+                    "[prefilter] TIER 1: Roguelike trigger count only, {} chunks around the ORIGIN, "
+                        + "no chunk generation",
+                    tier1);
+            }
             for (final long seed : seeds) {
                 final SeedProbeWorld world = new SeedProbeWorld(seed, rwg);
-                BiomeTable.dumpOnce(tableDir, world.getWorldChunkManager());
-                w.write(evaluate(world, seed, radiusChunks));
+                if (tier1 < 0) BiomeTable.dumpOnce(tableDir, world.getWorldChunkManager());
+                if (tier1 < 0) OreVeinTableDump.dumpOnce(tableDir, seed);
+                final long tSeed = Timing.start();
+                w.write(tier1 >= 0 ? evaluateTier1(world, seed, tier1) : evaluate(world, seed, radiusChunks));
+                Timing.add("seed.total", tSeed);
                 w.write("\n");
                 done++;
                 if (done % 500 == 0) {
@@ -1025,6 +1316,7 @@ public final class Prefilter {
             }
         }
         final double secs = (System.nanoTime() - t0) / 1e9;
+        Timing.report(done, secs);
         WorldgenProbe.LOG.info(
             "[prefilter] done: {} seeds in {} s ({} seeds/s)",
             done,
@@ -1066,6 +1358,7 @@ public final class Prefilter {
                         vp.generatedCount());
                 }
             }
+            final long tCells = Timing.start();
             for (int cx2 = -radiusChunks; cx2 <= radiusChunks; cx2++) {
                 for (int cz2 = -radiusChunks; cz2 <= radiusChunks; cz2++) {
                     if ((Boolean) CAN_SPAWN.invoke(gen, cx2, cz2)) {
@@ -1073,6 +1366,7 @@ public final class Prefilter {
                     }
                 }
             }
+            Timing.add("village.cellscan", tCells);
             if (gateVillageDist >= 0) {
                 boolean ok = false;
                 for (final int[] v : villages) {
@@ -1084,7 +1378,9 @@ public final class Prefilter {
                 if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"village\"}";
             }
             if (pieces && !villages.isEmpty()) {
+                final long tStarts = Timing.start();
                 starts.addAll(villageStarts(gen, world, villages));
+                Timing.add("villageStarts", tStarts);
             }
             if (gatePieces != null) {
                 boolean ok = false;
@@ -1149,7 +1445,9 @@ public final class Prefilter {
         int spawnX = 0, spawnZ = 0;
         if (terrainRadius >= 0) {
             try {
+                final long tTerra = Timing.start();
                 final RwgTerrain terra = new RwgTerrain(world);
+                Timing.add("RwgTerrain.ctor", tTerra);
                 // vanilla WorldServer.createSpawnPosition replica (see RwgTerrain javadoc). The
                 // findBiomePosition call is the REAL one for draw-parity insurance — RWG returns null
                 // without consuming the rand, but if that ever changes the golden test stays honest.
@@ -1173,11 +1471,13 @@ public final class Prefilter {
                 // its extra "water nearby" loop re-reads the same top block 45 times, i.e. a no-op given the
                 // top-block climb can only end on a non-air block. Hence: beach/desert/bare-rock spawns.
                 int iters = 0;
+                final long tSpawn = Timing.start();
                 while (!bopCanSpawn(world, terra, sx, sz)) {
                     sx += spawnRand.nextInt(64) - spawnRand.nextInt(64);
                     sz += spawnRand.nextInt(64) - spawnRand.nextInt(64);
                     if (++iters == 1000) break;
                 }
+                Timing.add("spawn.walk", tSpawn);
                 spawnX = sx;
                 spawnZ = sz;
                 sb.append(", \"spawn\": [")
@@ -1189,8 +1489,42 @@ public final class Prefilter {
                 // per-chunk digest around spawn: water columns at y62 (DecoClay only fires under water →
                 // shallow-water columns are the clay candidates) + top-solid min/avg (burial/flatness)
                 final int scx = sx >> 4, scz = sz >> 4;
+                final int gateWaterCols = Integer.getInteger("probe.prefilter.gate.water", -1);
+
+                // Route-local water gate, evaluated BEFORE the wide digest.
+                //
+                // The water gate counts columns over the whole terrain window, so its meaning changes with
+                // the radius: 32 columns inside 81 chunks is "water at spawn", 32 inside 961 is "water
+                // somewhere within 240 blocks", which almost every seed satisfies. At terrain radius 15 the
+                // gate therefore stops killing anything and every village survivor pays all 961 chunks.
+                //
+                // Setting gate.waterradius pins the gate to a route-local window while the digest still
+                // covers the full radius for ranking. Seeds that fail it are killed after generating
+                // (2r+1)^2 chunks instead of (2R+1)^2. Because the inner window is a subset of the outer
+                // one, local >= threshold implies total >= threshold, so the wide gate below can never fire
+                // on a seed this one passed — the two are consistent, not competing.
+                //
+                // Default is terrainRadius, which is exactly the previous behaviour.
+                final int gateRadius = Math
+                    .min(terrainRadius, Integer.getInteger("probe.prefilter.gate.waterradius", terrainRadius));
+                if (gateWaterCols >= 0 && gateRadius < terrainRadius) {
+                    int localWater = 0;
+                    for (int cx2 = scx - gateRadius; cx2 <= scx + gateRadius; cx2++) {
+                        for (int cz2 = scz - gateRadius; cz2 <= scz + gateRadius; cz2++) {
+                            final RwgTerrain.Cols c = terra.columns(cx2, cz2);
+                            for (int col = 0; col < 256; col++) {
+                                if (c.water[col]) localWater++;
+                            }
+                        }
+                    }
+                    if (localWater < gateWaterCols) {
+                        return "{\"seed\": " + seed + ", \"kill\": \"water\"}";
+                    }
+                }
+
                 final List<String> digest = new ArrayList<>();
                 int waterTotal = 0;
+                final long tDigest = Timing.start();
                 for (int cx2 = scx - terrainRadius; cx2 <= scx + terrainRadius; cx2++) {
                     for (int cz2 = scz - terrainRadius; cz2 <= scz + terrainRadius; cz2++) {
                         final RwgTerrain.Cols c = terra.columns(cx2, cz2);
@@ -1243,8 +1577,8 @@ public final class Prefilter {
                                 + "]");
                     }
                 }
-                final int gateWater2 = Integer.getInteger("probe.prefilter.gate.water", -1);
-                if (gateWater2 >= 0 && waterTotal < gateWater2) {
+                Timing.add("terrain.digest", tDigest);
+                if (gateWaterCols >= 0 && waterTotal < gateWaterCols) {
                     return "{\"seed\": " + seed + ", \"kill\": \"water\"}";
                 }
                 sb.append(", \"terrain\": [")
@@ -1308,10 +1642,47 @@ public final class Prefilter {
             }
         }
 
+        // --- No-rain region + humid neighbour. Sits here, after terrain, for three reasons: it is centred on
+        // the PREDICTED SPAWN (origin is not a proxy — spawn lands a median 8 and up to 73 chunks away); its
+        // Tier B generates chunks, and generating before the village pass would register village starts into
+        // the shared structure map that the pass never asked for (see the generatedCount guard above); and a
+        // wide lattice scan run first would clear ChunkManagerRealistic's biomeDataMap, which the terrain
+        // digest relies on for a high hit rate.
+        final int biomeRadius = Integer.getInteger("probe.prefilter.biomeregion", -1);
+        if (biomeRadius >= 0) {
+            final long tBiome = Timing.start();
+            final int minSide = Integer.getInteger("probe.prefilter.biomeregion.min", 5);
+            final int humidity = Integer.getInteger("probe.prefilter.biomeregion.humidity", 14);
+            // Default -1 = confirm the whole window. Correctness first: this stage runs last, so it only ever
+            // pays on seeds the cheap gates already kept, and a wrong biome verdict is not worth the seconds
+            // it would save. A positive budget trades exactness for speed and marks the rows it degraded.
+            final int confirm = Integer.getInteger("probe.prefilter.biomeregion.confirm", -1);
+            warnBiomeRegionCost(biomeRadius);
+            final BiomeRegionPrefilter.Result br = BiomeRegionPrefilter
+                .evaluate(world, spawnX >> 4, spawnZ >> 4, biomeRadius, minSide, humidity, confirm);
+            sb.append(", \"biomeregion\": ")
+                .append(br.toJson());
+            // Recorded BEFORE the kill gate: a gated run returns out of this block for killed seeds, and their
+            // evaluate() cost is exactly the number this timer exists to expose.
+            Timing.add("biomeregion", tBiome);
+            // Gate: SIDE[,MAXGAP]. A seed is killed when it has no square of at least SIDE, or when the
+            // nearest humid chunk is farther than MAXGAP. Reported as its own kill label so a sweep run with
+            // this gate is never pooled with one run without it.
+            final String gate = System.getProperty("probe.prefilter.gate.biomeregion");
+            if (gate != null && !gate.isEmpty() && !"false".equals(gate)) {
+                final String[] parts = gate.split(",");
+                final int wantSide = Integer.parseInt(parts[0].trim());
+                final int maxGap = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : -1;
+                final boolean ok = br.side >= wantSide && br.gap >= 0 && (maxGap < 0 || br.gap <= maxGap);
+                if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"biomeregion\"}";
+            }
+        }
+
         // --- Witchery candidate cells. Pure arithmetic plus a biome lookup: the region formula reads no blocks
         // and the handler shuffle is a function of the FML chunk seed, so this costs nothing terrain-wise.
         final int witcheryRadius = Integer.getInteger("probe.prefilter.witchery", -1);
         if (witcheryRadius >= 0) {
+            final long tWitch = Timing.start();
             final String why = WitcheryPrefilter.resolve();
             if (why != null) {
                 sb.append(", \"witchery_error\": \"")
@@ -1334,7 +1705,13 @@ public final class Prefilter {
                                 + c.allowed
                                 + ", \"order\": [\""
                                 + String.join("\", \"", c.order)
-                                + "\"]}");
+                                + "\"]"
+                                + (c.winner == null ? ""
+                                    : ", \"winner\": \"" + c.winner
+                                        + "\", \"chests\": ["
+                                        + String.join(", ", c.chests)
+                                        + "]")
+                                + "}");
                     }
                     sb.append(", \"witchery_cells\": [")
                         .append(String.join(", ", cells))
@@ -1348,6 +1725,7 @@ public final class Prefilter {
                         .append("\"");
                 }
             }
+            Timing.add("witchery", tWitch);
         }
 
         // --- Roguelike dungeons: trigger scan is free arithmetic and acts as its own kill gate; construction is
@@ -1357,7 +1735,9 @@ public final class Prefilter {
         if (dungeonRadius >= 0 && RoguelikePrefilter.available()) {
             try {
                 final int scx = spawnX >> 4, scz = spawnZ >> 4;
+                final long tTrig = Timing.start();
                 final List<int[]> triggers = RoguelikePrefilter.triggers(world, scx, scz, dungeonRadius);
+                Timing.add("dungeon.triggers", tTrig);
                 sb.append(", \"dungeon_triggers\": ")
                     .append(triggers.size());
                 if (triggers.isEmpty() && Boolean.getBoolean("probe.prefilter.gate.dungeon")) {
@@ -1365,7 +1745,15 @@ public final class Prefilter {
                 }
                 final List<String> dungeons = new ArrayList<>();
                 for (final int[] t : triggers) {
+                    // Attribute the chunk generation that happens INSIDE dungeon construction to the
+                    // dungeon stage. Without this the split between "generating terrain the dungeon reads"
+                    // and "the dungeon's own write path" can only be inferred by subtracting other stages'
+                    // chunk counts — an inference this session optimised against and got a null result from.
+                    final long tGen = Timing.start();
+                    final long cg0 = Timing.nanos("chunkgen");
                     final RoguelikePrefilter.Result r = RoguelikePrefilter.generate(world, seed, t[0], t[1]);
+                    Timing.add("dungeon.generate", tGen);
+                    if (Timing.ON) Timing.addRaw("dungeon.chunkgen", Timing.nanos("chunkgen") - cg0);
                     final StringBuilder d = new StringBuilder(128);
                     d.append("{\"trigger\": [")
                         .append(r.triggerX)
@@ -1397,8 +1785,307 @@ public final class Prefilter {
             }
         }
 
+        // --- BuildCraft oil. Runs the mod's real generator against the scratch overlay; the Random is
+        // free here because PopulateChunkEvent.Pre fires on the line after RWG reseeds it from
+        // (worldSeed, cx, cz), so nothing has to be replayed to reach it. See OilPrefilter.
+        final int oilRadius = Integer.getInteger("probe.prefilter.oil", -1);
+        if (oilRadius >= 0) {
+            final long tOil = Timing.start();
+            final String why = OilPrefilter.resolve();
+            if (why != null) {
+                sb.append(", \"oil_error\": \"")
+                    .append(WorldgenProbe.jsonEscape(why))
+                    .append("\"");
+            } else {
+                try {
+                    final List<String> sites = new ArrayList<>();
+                    for (final OilPrefilter.Site o : OilPrefilter
+                        .scan((SeedProbeWorld) world, spawnX >> 4, spawnZ >> 4, oilRadius)) {
+                        sites.add(
+                            "{\"c\": [" + o.cx
+                                + ", "
+                                + o.cz
+                                + "], \"pos\": ["
+                                + o.x
+                                + ", "
+                                + o.maxY
+                                + ", "
+                                + o.z
+                                + "], \"blocks\": "
+                                + o.blocks
+                                + ", \"h\": "
+                                + o.height()
+                                + "}");
+                    }
+                    sb.append(", \"oil\": [")
+                        .append(String.join(", ", sites))
+                        .append("]");
+                } catch (Throwable t) {
+                    WorldgenProbe.LOG.warn("[prefilter] oil eval failed for {}: {}", seed, t.toString());
+                    sb.append(", \"oil_error\": \"")
+                        .append(
+                            t.toString()
+                                .replace("\"", "'"))
+                        .append("\"");
+                }
+            }
+            Timing.add("oil", tOil);
+        }
+
+        // --- strongholds: 3 per world, ring positions are pure arithmetic (see strongholdStarts).
+        // -Dprobe.prefilter.stronghold=N enables it, N = radius in chunks around the predicted spawn.
+        final int shRadius = Integer.getInteger("probe.prefilter.stronghold", -1);
+        if (shRadius >= 0) {
+            final long tSh = Timing.start();
+            try {
+                final List<String> sh = strongholdStarts(world, spawnX >> 4, spawnZ >> 4, shRadius);
+                sb.append(", \"strongholds\": [")
+                    .append(String.join(", ", sh))
+                    .append("]");
+            } catch (Throwable t) {
+                WorldgenProbe.LOG.warn("[prefilter] stronghold eval failed for {}: {}", seed, t.toString());
+                sb.append(", \"stronghold_error\": \"")
+                    .append(
+                        t.toString()
+                            .replace("\"", "'"))
+                    .append("\"");
+            }
+            Timing.add("stronghold", tSh);
+        }
+
         sb.append("}");
         return sb.toString();
+    }
+
+    /**
+     * Tier 1: Roguelike trigger count and nothing else, as a ranking proxy for the full loot score.
+     *
+     * <p>
+     * Generates <b>zero chunks</b>. {@code Dungeon.canSpawnInChunk} is pure arithmetic —
+     * {@code editor.getSeededRandom(cx, cz, salt)} seeds the world's {@code Random} and takes two draws — so a
+     * whole seed costs world construction plus the scan. Measured against the full pipeline's 1466 ms/seed, of
+     * which 904 ms is chunk generation, this is the "or not generate them at all" branch rather than an attempt
+     * to make a chunk cheaper.
+     *
+     * <p>
+     * The scan is centred on the <b>origin</b>, not on the predicted spawn, because computing spawn costs
+     * ~107 ms/seed: {@code createSpawnPosition} probes candidates until BOP's accept test passes and each probe
+     * materialises a whole chunk to read one column's top block. Spawn is median ~104 blocks from the origin
+     * (p90 478, max 1926), so an origin-centred scan at {@code radius + slack} is a superset of the
+     * spawn-centred one for all but the most displaced spawns. That makes this a <i>different</i> proxy from the
+     * tier-2 trigger count, not an approximation of it — its recall against true score is measured, not assumed,
+     * and tier 2 recomputes everything exactly for the survivors.
+     */
+    private static String evaluateTier1(World world, long seed, int radiusChunks) {
+        final StringBuilder sb = new StringBuilder(64);
+        sb.append("{\"seed\": ")
+            .append(seed);
+        try {
+            // Spawn is NOT skippable, though it is 96% of this tier's cost. Measured on 5000 seeds: an
+            // origin-centred trigger count correlates 0.375 with true score at its best radius and retains
+            // 3 of the true top 10; the spawn-centred count correlates 0.70 and retains 10 of 10. The scoring
+            // window is centred on spawn, so dungeons are only worth counting relative to it.
+            final long tSpawn = Timing.start();
+            final RwgTerrain terra = new RwgTerrain(world);
+            final Random spawnRand = new Random(seed);
+            final net.minecraft.world.ChunkPosition cp = world.getWorldChunkManager()
+                .findBiomePosition(
+                    0,
+                    0,
+                    256,
+                    world.getWorldChunkManager()
+                        .getBiomesToSpawnIn(),
+                    spawnRand);
+            int sx = cp != null ? cp.chunkPosX : 0, sz = cp != null ? cp.chunkPosZ : 0;
+            int iters = 0;
+            while (!bopCanSpawn(world, terra, sx, sz)) {
+                sx += spawnRand.nextInt(64) - spawnRand.nextInt(64);
+                sz += spawnRand.nextInt(64) - spawnRand.nextInt(64);
+                if (++iters == 1000) break;
+            }
+            Timing.add("tier1.spawn", tSpawn);
+            sb.append(", \"spawn\": [")
+                .append(sx)
+                .append(", 64, ")
+                .append(sz)
+                .append("], \"spawn_iters\": ")
+                .append(iters);
+            final long t = Timing.start();
+            final List<int[]> triggers = RoguelikePrefilter.triggers(world, sx >> 4, sz >> 4, radiusChunks);
+            Timing.add("tier1.triggers", t);
+            // Ring counts by chebyshev distance from spawn. These answered "which radius carries the
+            // signal", and the answer is in: r60. Kept because they are free from the same scan and because
+            // the negative results are worth being able to re-derive, not because a caller needs them —
+            // t60 equals `triggers` at the production radius. Measured over 5000 seeds against exact scores:
+            // spawn-centred r60 correlates 0.707; the same scan centred on the ORIGIN manages only 0.375 at
+            // its best radius and 0.064 at r90, where every seed has 9-16 triggers and the signal is gone.
+            // Distance weighting does not help either — raw t60 (0.711) beats every weighted combination and
+            // the inner rings are NEGATIVELY correlated (t45 -0.049, t30 -0.043). Count within the scoring
+            // radius is the signal; position inside it carries none.
+            final int[] rings = { 15, 30, 45, 60 };
+            final int[] counts = new int[rings.length];
+            for (final int[] c : triggers) {
+                final int d = Math.max(Math.abs(c[0] - (sx >> 4)), Math.abs(c[1] - (sz >> 4)));
+                for (int i = 0; i < rings.length; i++) {
+                    if (d <= rings[i]) counts[i]++;
+                }
+            }
+            sb.append(", \"triggers\": ")
+                .append(triggers.size());
+            for (int i = 0; i < rings.length; i++) {
+                sb.append(", \"t")
+                    .append(rings[i])
+                    .append("\": ")
+                    .append(counts[i]);
+            }
+        } catch (Throwable t) {
+            sb.append(", \"error\": \"")
+                .append(
+                    t.toString()
+                        .replace("\"", "'"))
+                .append("\"");
+        }
+        return sb.append("}")
+            .toString();
+    }
+
+    // ------------------------------------------------------------------ strongholds
+
+    private static Object STRONGHOLD_GEN;
+    private static Field SH_WORLD_OBJ;
+    private static Field SH_STRUCTURE_MAP;
+    private static Field SH_STRUCTURE_DATA;
+    private static Field SH_RAN_BIOME_CHECK; // field_75056_f — computed ONCE per generator, see below
+    private static Field SH_COORDS; // the 3 precomputed ring positions
+    // CAN_SPAWN and GENERATE are bound to the VILLAGE generator's class, and Method.invoke rejects a receiver
+    // that is not an instance of the declaring class. Resolve both again against this one.
+    private static java.lang.reflect.Method SH_CAN_SPAWN;
+    private static java.lang.reflect.Method SH_GENERATE;
+
+    /**
+     * The pack's own stronghold generator, built exactly as {@code ChunkGeneratorRealistic} builds it so any
+     * mod replacement applies. Dispatch, don't reimplement.
+     */
+    private static synchronized Object strongholdGenerator() throws Exception {
+        if (STRONGHOLD_GEN == null) {
+            final Object gen = net.minecraftforge.event.terraingen.TerrainGen.getModdedMapGen(
+                new net.minecraft.world.gen.structure.MapGenStronghold(),
+                net.minecraftforge.event.terraingen.InitMapGenEvent.EventType.STRONGHOLD);
+            SH_WORLD_OBJ = findField(gen.getClass(), "field_75039_c", "worldObj");
+            SH_STRUCTURE_MAP = findField(gen.getClass(), "field_75053_d", "structureMap");
+            SH_STRUCTURE_DATA = findField(gen.getClass(), "field_143029_e");
+            SH_RAN_BIOME_CHECK = findField(gen.getClass(), "field_75056_f", "ranBiomeCheck");
+            SH_COORDS = findField(gen.getClass(), "field_75057_g", "structureCoords");
+            SH_CAN_SPAWN = findMethod(
+                gen.getClass(),
+                new String[] { "func_75047_a", "canSpawnStructureAtCoords" },
+                int.class,
+                int.class);
+            SH_GENERATE = findMethod(
+                gen.getClass(),
+                new String[] { "func_151539_a", "generate" },
+                net.minecraft.world.chunk.IChunkProvider.class,
+                World.class,
+                int.class,
+                int.class,
+                net.minecraft.block.Block[].class);
+            STRONGHOLD_GEN = gen;
+            WorldgenProbe.LOG.info(
+                "[prefilter] stronghold generator class: {}",
+                gen.getClass()
+                    .getName());
+        }
+        return STRONGHOLD_GEN;
+    }
+
+    /**
+     * Stronghold starts within {@code radiusChunks} of (scx, scz), with their piece layout.
+     *
+     * <p>
+     * Cheap and exact: {@code MapGenStronghold.canSpawnStructureAtCoords} derives all three ring positions from
+     * {@code new Random(worldSeed)} alone, and RWG's {@code ChunkManagerRealistic.findBiomePosition} returns
+     * null, so the biome-viability relocation never runs and the raw arithmetic positions stand. No terrain is
+     * read and no chunk is generated — the positions are read straight out of {@code structureCoords}, so there
+     * is no cell scan either.
+     *
+     * <p>
+     * <b>{@code ranBiomeCheck} must be reset per seed.</b> It is an instance flag latched the first time the
+     * ring positions are computed; a generator reused across seeds would hand every later seed the FIRST
+     * seed's stronghold positions, silently and with no error — the same shape as the village generator's
+     * {@code structureMap}/{@code field_143029_e} carry-over that {@link #villageStarts} resets.
+     */
+    private static List<String> strongholdStarts(World world, int scx, int scz, int radiusChunks) throws Exception {
+        final Object gen = strongholdGenerator();
+        SH_WORLD_OBJ.set(gen, world);
+        SH_RAN_BIOME_CHECK.setBoolean(gen, false);
+        ((Map<?, ?>) SH_STRUCTURE_MAP.get(gen)).clear();
+        SH_STRUCTURE_DATA.set(gen, null);
+
+        // Triggering the gate at any coordinate populates structureCoords for the whole world.
+        SH_CAN_SPAWN.invoke(gen, scx, scz);
+        final Object[] coords = (Object[]) SH_COORDS.get(gen);
+
+        final List<String> out = new ArrayList<>();
+        for (final Object cc : coords) {
+            if (cc == null) continue;
+            final net.minecraft.world.ChunkCoordIntPair p = (net.minecraft.world.ChunkCoordIntPair) cc;
+            final int d = Math.max(Math.abs(p.chunkXPos - scx), Math.abs(p.chunkZPos - scz));
+            if (d > radiusChunks) continue;
+            SH_GENERATE.invoke(gen, null, world, p.chunkXPos, p.chunkZPos, null);
+        }
+        for (final Map.Entry<?, ?> e : ((Map<?, ?>) SH_STRUCTURE_MAP.get(gen)).entrySet()) {
+            final Object start = e.getValue();
+            if (START_COMPONENTS == null) {
+                START_COMPONENTS = findField(start.getClass(), "field_75075_a", "components");
+            }
+            final List<?> comps = (List<?>) START_COMPONENTS.get(start);
+            final List<String> parts = new ArrayList<>();
+            for (final Object comp : comps) {
+                parts.add(
+                    comp.getClass()
+                        .getSimpleName() + "@"
+                        + WorldgenProbe.bboxOf(comp));
+            }
+            java.util.Collections.sort(parts);
+            // Chest contents, through the same table and the same fork the village module uses. The stronghold
+            // rows in chest-sites.json were measured by a -Dgtnhdet.chesttrace run centred on a stronghold this
+            // enumeration located, which is how the coverage gap was closed: the earlier trace corpus ran at
+            // radius 8-15 around spawn and the nearest ring sits 640-1150 blocks out, so it never saw one.
+            final List<String> chests = new ArrayList<>();
+            final List<String> chestsUnpredicted = new ArrayList<>();
+            if (CHESTS_ENABLED) {
+                for (final Object comp : comps) {
+                    final net.minecraft.world.gen.structure.StructureBoundingBox cbb = bboxField(comp);
+                    if (cbb == null) continue;
+                    for (final VillageChestPrefilter.Predicted pr : VillageChestPrefilter.predict(
+                        world.getSeed(),
+                        comp.getClass()
+                            .getName(),
+                        coordBaseMode(comp),
+                        cbb,
+                        cbb.minY,
+                        comp)) {
+                        (pr.reason == null ? chests : chestsUnpredicted).add(chestJson(pr));
+                    }
+                }
+            }
+            final long key = ((Number) e.getKey()).longValue();
+            final int cx = (int) key, cz = (int) (key >> 32);
+            out.add(
+                "{\"c\": [" + cx
+                    + ", "
+                    + cz
+                    + "], \"chests\": ["
+                    + String.join(", ", chests)
+                    + "], \"chests_unpredicted\": ["
+                    + String.join(", ", chestsUnpredicted)
+                    + "], \"pieces\": \""
+                    + WorldgenProbe.jsonEscape(String.join("; ", parts))
+                    + "\", \"n\": "
+                    + comps.size()
+                    + "}");
+        }
+        return out;
     }
 
     private static WorldType findWorldType(String name) {
