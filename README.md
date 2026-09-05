@@ -7,7 +7,7 @@ Discord: https://discord.gg/PbMWTcnZgC
 
 ## The fix jar
 
-**Grab `gtnhdeterminism-0.5.jar` (or latest) from [Releases](../../releases) and drop it into `mods/` of a stock
+**Grab the latest `gtnhdeterminism` jar from [Releases](../../releases) and drop it into `mods/` of a stock
 GTNH instance.** One jar covers the whole supported range: it picks its GregTech fix by which
 version is installed, and every other fix targets code that is unchanged across the range.
 
@@ -27,8 +27,8 @@ version is installed, and every other fix targets code that is unchanged across 
 | Witchery (village walls) | Walls were built by a hidden tile entity 40+ ticks after generation, probing whatever terrain existed at that moment — shape depended on route and timing, and idle worlds could skip walls entirely | Walls build during generation from virgin-terrain heights, sliced per chunk: shape, gates, and guard posts seed-stable |
 | Thaumcraft | Terrain-gated draw skew, `world.rand` barrow loot, first-chunk-wins bonus nodes, maze gen on a racing thread | Nodes, totems, barrows + loot seed-stable |
 | Thaumcraft (eldritch rings) | Obelisk presence was a population-order lottery — earlier rings suppressed up to 25 later candidates per window | One seed-pure site per 25×25-chunk region at stock density; spawner/banners deterministic |
-| Thaumcraft (loot amulet) | `Config.initLoot()` seeds a `Random` from the wall clock at mod init and bakes the roll into the loot Vis Amulet's NBT, then copies that one stack into the chest and loot-bag tables — so every launch dealt a different charge, and every amulet within a session dealt the *same* one. It runs *before* the load-complete snapshot above, so that fix preserved the randomness rather than catching it | Charge derived from world seed + chest position + slot, so it is seed-stable and route-stable while differing from chest to chest. Per-aspect distribution is stock's `nextInt(5)`; only the correlation between amulets changes, from identical to independent. The init-time roll is pinned too, so an amulet pulled from a Thaumcraft loot bag carries a fixed charge rather than a per-launch one — but **which** item a bag gives you is rolled from `world.rand` when the player opens it, and stays gameplay-time random |
-| GregTech (ore veins) | Vein identity was decided from whichever of the surrounding 5x5 chunks the player's route populated FIRST: that chunk's coordinates set the clipping window, the local density AND the probe column, and a rejected candidate rolls a *different* mix. Answering the probe from virgin terrain closed only one of those three channels, which is why two earlier attempts each moved single digits | The identity decision is pinned to the vein's own oreseed chunk, and the reads it still makes answer from virgin terrain — a function of (seed, dim, oreseed, mix). Rows-vs-spiral on `-1636594104014467454` r60: overworld **140/1760 -> 0/1764**, Twilight Forest **225/1702 -> 0/1728**, against a 0/1762 same-order floor. Whitelisted to those two dimensions (`gtnhdet.orepin.dims`, default `0,7`) because they are the only two measured; the Nether is 21.9% and stays on stock. `-Dgtnhdet.orepin=false` restores stock bit-for-bit. The reroll is relocated, not disabled |
+| Thaumcraft (loot amulet) | `Config.initLoot()` seeds a `Random` from the wall clock at mod init and bakes the roll into the loot Vis Amulet's NBT, then copies that one stack into the chest and loot-bag tables — so every launch dealt a different charge, and every amulet within a session dealt the *same* one | Charge derived from world seed + chest position + slot, so it is seed-stable and route-stable while differing from chest to chest. Per-aspect distribution is stock's `nextInt(5)`; only the correlation between amulets changes, from identical to independent. The init-time roll is pinned too, so an amulet pulled from a Thaumcraft loot bag carries a fixed charge rather than a per-launch one — but **which** item a bag gives you is rolled from `world.rand` when the player opens it, and stays gameplay-time random |
+| GregTech (ore veins) | Vein identity was decided from whichever of the surrounding 5x5 chunks the player's route populated FIRST: that chunk's coordinates set the clipping window, the local density AND the probe column, and a rejected candidate rolls a *different* mix | The identity decision is pinned to the vein's own oreseed chunk, and the reads it still makes answer from virgin terrain — a function of (seed, dim, oreseed, mix). Rows-vs-spiral on `-1636594104014467454` r60: overworld **140/1760 -> 0/1764**, Twilight Forest **225/1702 -> 0/1728**, against a 0/1762 same-order floor. Whitelisted to those two dimensions (`gtnhdet.orepin.dims`, default `0,7`) because they are the only two measured; the Nether is 21.9% and stays on stock. `-Dgtnhdet.orepin=false` restores stock bit-for-bit. The reroll is relocated, not disabled |
 | Et Futurum Requiem | `doDeepslateGen` gated the 4-block deepslate transition band with `chunk.worldObj.rand.nextInt(4)` per block — clock-seeded `World.rand`, so the y16-31 band was redrawn every launch. Cave-vine tile entities jittered their length the same way | Band derived from world seed + position; vine length seed-stable. Largest single source on the 2.9/daily line: 192,495 route-differing blocks before, 4,847 after |
 | Roguelike Dungeons | Position probed live neighbor terrain; placement decisions read live world state; MST-floor decoration iterated an identity-hashed `HashSet`; three rooms placed fireplaces/chests with clock-seeded `Collections.shuffle`; loot pipeline shifted with chest membership; dungeons wrote far outside their trigger chunk, racing each neighbor chunk's own lakes/decoration by approach order (a deep chest could exist or not per route) | Dungeon position, layout, every floor's decoration, and every chest's contents are a pure function of the seed; writes are sliced per chunk and applied after that chunk's own decoration, so the dungeon-vs-lake contest resolves identically on every route |
 | LootGames | Puzzle-room cracked-wall/broken-lamp variants rolled off a static clock-seeded `Random` | Room cosmetics seed-stable (minigame rewards are gameplay-time and untouched) |
@@ -41,11 +41,10 @@ version is installed, and every other fix targets code that is unchanged across 
 | Minecraft (passive mobs) | `SpawnerAnimals.performWorldGenSpawning` picks the *species* off `world.rand` while every other draw in the method uses the populate-seeded `Random` — the same shadowing shape as the TiC slime bug. Which animals a seed starts with, and therefore the first leather, wool and food on the route, was clock-random | Species drawn from the populate Random. Sheep fleece colour and ocelot kittens, which are rolled later off `worldObj.rand`, derive from world seed + spawn position |
 | Minecraft (horses) | `EntityHorse` rolls type, coat variant, max health, jump strength and movement speed off the clock-seeded `Entity.rand`. Speed spans 0.1125–0.3375, so the same seed gave a horse up to **three times faster** depending on the launch, and donkey-versus-horse — portable storage or not — was a coin flip | All five derived from world seed + spawn position. Variation is preserved, not flattened: 87 distinct speeds and 87 distinct jump strengths across 95 horses on one seed. Horse *breeding* keeps the stock RNG — the fork is armed only while `onSpawnWithEgg` runs |
 
-Scope, counted from the source rather than tallied by hand: **46 mixin classes** rewiring **73 target
+Scope, counted from source: **46 mixin classes** rewiring **73 target
 classes** across **12 mods, Forge/FML and vanilla Minecraft**, plus two reflection patches that are not
 mixins. Re-derive with `grep -rl '@Mixin' fix-build/src/main/java | wc -l` (subtract the diagnostics
-below) and by counting distinct `@Mixin` targets — a hand-maintained "number of fixes" was dropped
-because nothing defined what counted as one, so it drifted and could not be checked.
+below) and by counting distinct `@Mixin` targets.
 
 Some fixes need more than one mixin. GregTech carries four: two are alternatives with exactly one
 binding per GT version (the vein-reroll probe moved class between 5.09.51 and 5.09.54), and two more
@@ -81,9 +80,9 @@ contents, and — from probe format 5 — the entity list):
   small ores, village pieces, and witchery counts statistically equivalent (±10% bounds); a
   500k-draw Monte-Carlo over the shipped loot tables certifies rare chest items.
 - **Daily build** — on `daily-2026-08-28+707` a rows-vs-spiral route test drops from 371,406 to
-  70,348 differing blocks (−81%), and vein identity is 99.0% route-stable (37 of 3,627 ore-involved
-  blocks change material). **70,348 is not a good number — the target is zero**, and the reduction
-  should not be quoted without it. A full inventory of the residual, every differing block assigned
+  66,034 differing blocks, and vein identity is route-stable exactly: 0 differing regions, not a
+  percentage. **66,034 is not a good number — the target is zero**, and the reduction should not be
+  quoted without it. A full inventory of the residual, every differing block assigned
   to a category summing to 100%, is in
   [results/2026-08-28-daily-2.9-compatibility](results/2026-08-28-daily-2.9-compatibility/README.md).
 
@@ -94,16 +93,17 @@ build, seed `-777`, radius 6, rows vs spiral, with the jar installed — 70,348 
 across 169 chunks:
 
 > **Re-measured on 0.8** (same seed, radius and walk pair): **66,034** differing blocks, down 4,314.
-> Every category is at or below the figure below, and GT ore drops 36% — that is the vein-identity fix:
-> identity no longer flips, so whole-footprint replacements are gone and only host-stone variation on
-> agreed veins remains. 0.8 values: decoration 38,082 / deep dirt-gravel-stone 7,459 / GT stone blobs
-> 7,044 / sand-gravel-clay-fluid 5,976 / deepslate 4,863 / **GT ore 2,385**.
+> GT ore drops 36% — that is the vein-identity fix: identity no longer flips, so whole-footprint
+> replacements are gone and only host-stone variation on agreed veins remains. Every other category is
+> within noise of its 0.7 figure; deepslate is 16 blocks HIGHER. 0.8 values: decoration 38,082 / deep
+> dirt-gravel-stone 7,459 / GT stone blobs 7,044 / sand-gravel-clay-fluid 5,976 / deepslate 4,863 /
+> **GT ore 2,385**. These sum to 65,809, 225 short of the 66,034 total — the 0.7 categories summed
+> exactly, so one figure is misattributed or a seventh bucket appeared. Re-measure before quoting the
+> per-category 0.8 numbers.
 >
-> Counting note, because it cost a false alarm: these are block-**ID** differences.
-> `scripts/diff-region-blocks.py` reports `id:meta` transitions and counts a change when EITHER moves,
-> which on this world reads 157,325 — mostly GT ore blocks whose meta encodes material *and* host stone,
-> i.e. double-counting the thing being measured. Metadata-only differences are just 1,370. Compare like
-> with like or the table looks like it doubled.
+> Counting note: these are block-**ID** differences. `scripts/diff-region-blocks.py` reports `id:meta`
+> transitions and counts a change when EITHER moves, which on this world reads 157,325 — GT ore meta
+> encodes material *and* host stone. Metadata-only differences are 1,370.
 
 | source | blocks | note |
 |---|---|---|
@@ -117,12 +117,8 @@ across 169 chunks:
 Chest loot is fully launch-deterministic, measured two ways: 131/131 chests identical across two cold
 launches of one seed with **zero tile-entity differences of any kind**, and 536 chests / 3,929 item
 stacks across **10 seeds** identical between two separate JVMs — existence, item lists and NBT all
-counted separately. That multi-seed check was re-run after the structure-chest fix changed three times
-on 2026-08-29, so it reflects the jar as it stands rather than an earlier build
-([results/2026-08-29-chest-reverification](results/2026-08-29-chest-reverification/README.md)). That needed one more fix: `Thaumcraft.Config.initLoot()` seeds a `Random` from
-`System.currentTimeMillis()` and bakes the roll into the loot Vis Amulet's NBT, so the charge changed
-every launch. It runs before the load-complete loot snapshot, so the existing table-restore fix
-preserved it rather than catching it.
+counted separately, against the jar as it stands
+([results/2026-08-29-chest-reverification](results/2026-08-29-chest-reverification/README.md)).
 
 Structure chest contents are also route-independent as of the position-derived fix: on seed `-777` at
 radius 8, 124 chests are identical across `rows`, `cols` and `spiral` and across two separate JVMs —
@@ -140,8 +136,7 @@ one seed: most village pieces in this pack — VillageNames' biome structures, T
 Railcraft, Witchery — fill their chests without calling the vanilla method the hook watched, and were
 falling back to absolute position. Deterministic, but not terrain-stable. Wrapping
 `StructureStart.generateStructure`, the single call site that builds every structure piece, raises
-that to 24 of 71; the rest are `WorldGenDungeons` rooms, which genuinely have no piece. Measured, and
-including the correction to a first version of the fix that did not actually work:
+that to 24 of 71; the rest are `WorldGenDungeons` rooms, which genuinely have no piece:
 [results/2026-08-29-chest-site-coverage](results/2026-08-29-chest-site-coverage/README.md).
 
 Naming the piece exposed a second defect. A village piece that writes into an unpopulated chunk
@@ -166,9 +161,9 @@ worldgen spawner. What remains:
 | Witchery wolf/goblin conversion | A compensating `Wolf −4` / `goblin +4` on a launch pair, suggesting an event handler converting wolves off `world.rand` |
 | co-located spawns | Two mobs on the same block share a position-derived roll where stock rolls independently — 5 of 95 horses on the measured seed |
 
-Two rules this project has had to learn the hard way: **"only NBT differs"
-never closes an investigation** — NBT is where chest contents, spawner types and charge levels live —
-and **the category labels above are for prioritising work, never for declaring something benign.**
+Two rules for reading this list: **"only NBT differs" never closes an investigation** — NBT is where
+chest contents, spawner types and charge levels live — and **the category labels above are for
+prioritising work, never for declaring something benign.**
 
 **Adopting the jar re-rolls seeds once per jar version.** The fixes change how randomness is
 derived, so a seed produces a different — now canonical — world than stock (and than earlier jar
