@@ -1,14 +1,12 @@
 package com.gtnhspeedrun.determinism.mixins.worldgen;
 
-import net.minecraft.block.Block;
-import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import com.gtnhspeedrun.determinism.worldgen.TerrainOracle;
+import com.gtnhspeedrun.determinism.worldgen.VirginStoneType;
 
 import gregtech.api.enums.StoneType;
 
@@ -48,15 +46,6 @@ public class WorldgenGTOreLayerStoneTypeMixin {
             target = "Lgregtech/api/enums/StoneType;findStoneType(Lnet/minecraft/world/World;III)Lgregtech/api/enums/StoneType;"),
         require = 2)
     private static StoneType gtnhdet$virginStoneType(World world, int x, int y, int z) {
-        final Block virgin = TerrainOracle.block(world, x, y, z);
-        if (virgin == Blocks.air) return null;
-        final int meta = TerrainOracle.meta(world, x, y, z);
-        for (int i = 0, n = StoneType.STONE_TYPES.size(); i < n; i++) {
-            final StoneType stoneType = StoneType.STONE_TYPES.get(i);
-            if (stoneType.isEnabled() && stoneType.canGenerateInWorld(world) && stoneType.contains(virgin, meta)) {
-                return stoneType;
-            }
-        }
-        return null;
+        return VirginStoneType.at(world, x, y, z);
     }
 }

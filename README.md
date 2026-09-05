@@ -28,7 +28,7 @@ version is installed, and every other fix targets code that is unchanged across 
 | Thaumcraft | Terrain-gated draw skew, `world.rand` barrow loot, first-chunk-wins bonus nodes, maze gen on a racing thread | Nodes, totems, barrows + loot seed-stable |
 | Thaumcraft (eldritch rings) | Obelisk presence was a population-order lottery — earlier rings suppressed up to 25 later candidates per window | One seed-pure site per 25×25-chunk region at stock density; spawner/banners deterministic |
 | Thaumcraft (loot amulet) | `Config.initLoot()` seeds a `Random` from the wall clock at mod init and bakes the roll into the loot Vis Amulet's NBT, then copies that one stack into the chest and loot-bag tables — so every launch dealt a different charge, and every amulet within a session dealt the *same* one. It runs *before* the load-complete snapshot above, so that fix preserved the randomness rather than catching it | Charge derived from world seed + chest position + slot, so it is seed-stable and route-stable while differing from chest to chest. Per-aspect distribution is stock's `nextInt(5)`; only the correlation between amulets changes, from identical to independent. The init-time roll is pinned too, so an amulet pulled from a Thaumcraft loot bag carries a fixed charge rather than a per-launch one — but **which** item a bag gives you is rolled from `world.rand` when the player opens it, and stays gameplay-time random |
-| GregTech | Vein retry probed *live* terrain — population noise flipped vein identity by approach route | The same retry logic answers from regenerated virgin terrain: vein identity/height seed-pure, reroll design preserved. Two mixins, one per GT line — 5.09.54.x moved the probe from `Block.isReplaceableOreGen` to `StoneType.findStoneType`, and the jar picks by which is installed |
+| GregTech (ore veins) | Vein identity was decided from whichever of the surrounding 5x5 chunks the player's route populated FIRST: that chunk's coordinates set the clipping window, the local density AND the probe column, and a rejected candidate rolls a *different* mix. Answering the probe from virgin terrain closed only one of those three channels, which is why two earlier attempts each moved single digits | The identity decision is pinned to the vein's own oreseed chunk, and the reads it still makes answer from virgin terrain — a function of (seed, dim, oreseed, mix). Rows-vs-spiral on `-1636594104014467454` r60: overworld **140/1760 -> 0/1764**, Twilight Forest **225/1702 -> 0/1728**, against a 0/1762 same-order floor. Whitelisted to those two dimensions (`gtnhdet.orepin.dims`, default `0,7`) because they are the only two measured; the Nether is 21.9% and stays on stock. `-Dgtnhdet.orepin=false` restores stock bit-for-bit. The reroll is relocated, not disabled |
 | Et Futurum Requiem | `doDeepslateGen` gated the 4-block deepslate transition band with `chunk.worldObj.rand.nextInt(4)` per block — clock-seeded `World.rand`, so the y16-31 band was redrawn every launch. Cave-vine tile entities jittered their length the same way | Band derived from world seed + position; vine length seed-stable. Largest single source on the 2.9/daily line: 192,495 route-differing blocks before, 4,847 after |
 | Roguelike Dungeons | Position probed live neighbor terrain; placement decisions read live world state; MST-floor decoration iterated an identity-hashed `HashSet`; three rooms placed fireplaces/chests with clock-seeded `Collections.shuffle`; loot pipeline shifted with chest membership; dungeons wrote far outside their trigger chunk, racing each neighbor chunk's own lakes/decoration by approach order (a deep chest could exist or not per route) | Dungeon position, layout, every floor's decoration, and every chest's contents are a pure function of the seed; writes are sliced per chunk and applied after that chunk's own decoration, so the dungeon-vs-lake contest resolves identically on every route |
 | LootGames | Puzzle-room cracked-wall/broken-lamp variants rolled off a static clock-seeded `Random` | Room cosmetics seed-stable (minigame rewards are gameplay-time and untouched) |
@@ -41,18 +41,23 @@ version is installed, and every other fix targets code that is unchanged across 
 | Minecraft (passive mobs) | `SpawnerAnimals.performWorldGenSpawning` picks the *species* off `world.rand` while every other draw in the method uses the populate-seeded `Random` — the same shadowing shape as the TiC slime bug. Which animals a seed starts with, and therefore the first leather, wool and food on the route, was clock-random | Species drawn from the populate Random. Sheep fleece colour and ocelot kittens, which are rolled later off `worldObj.rand`, derive from world seed + spawn position |
 | Minecraft (horses) | `EntityHorse` rolls type, coat variant, max health, jump strength and movement speed off the clock-seeded `Entity.rand`. Speed spans 0.1125–0.3375, so the same seed gave a horse up to **three times faster** depending on the launch, and donkey-versus-horse — portable storage or not — was a coin flip | All five derived from world seed + spawn position. Variation is preserved, not flattened: 87 distinct speeds and 87 distinct jump strengths across 95 horses on one seed. Horse *breeding* keeps the stock RNG — the fork is armed only while `onSpawnWithEgg` runs |
 
-Running tally: **37 fixes** — 35 mixin-based plus 2 reflection patches — carried by **44 mixin
-classes** across **12 mods, Forge/FML and vanilla Minecraft**, rewiring **71 worldgen classes**.
-Five fixes take more than one mixin: the GregTech pair are alternatives, exactly one binding per GT
-version; the Vis Amulet needs both an init-time pin and a per-chest derivation; the passive-mob spawn
-fix carries one mixin each for the shared spawner, sheep, ocelots and horses; the spawn-preload split
-needs one mixin to apply TooMuchLoot early and one to suppress its own later run; and structure chest
-contents need five — capture the table, capture the piece two ways, fence off chunk population, refill
-the chest. Three further
-diagnostic mixins ship inert behind `-Dgtnhdet.traceseg` and are not counted here.
+Scope, counted from the source rather than tallied by hand: **46 mixin classes** rewiring **73 target
+classes** across **12 mods, Forge/FML and vanilla Minecraft**, plus two reflection patches that are not
+mixins. Re-derive with `grep -rl '@Mixin' fix-build/src/main/java | wc -l` (subtract the diagnostics
+below) and by counting distinct `@Mixin` targets — a hand-maintained "number of fixes" was dropped
+because nothing defined what counted as one, so it drifted and could not be checked.
 
-Nine mixins patch Minecraft or Forge itself rather than a mod — eight vanilla classes plus Forge's
-`ChestGenHooks`. They use default `remap` and are registered in the early mixin config rather than
+Some fixes need more than one mixin. GregTech carries four: two are alternatives with exactly one
+binding per GT version (the vein-reroll probe moved class between 5.09.51 and 5.09.54), and two more
+pin the vein-identity decision to the oreseed and virginise the reads it still makes — those two always
+bind. The Vis Amulet needs an init-time pin and a per-chest derivation; the passive-mob spawn fix takes
+one mixin each for the shared spawner, sheep, ocelots and horses; the spawn-preload split needs one to
+apply TooMuchLoot early and one to suppress its own later run; and structure chest contents need five —
+capture the table, capture the piece two ways, fence off chunk population, refill the chest.
+Three further diagnostic mixins ship inert behind `-Dgtnhdet.traceseg` and are not counted here.
+
+Eleven mixins patch Minecraft or Forge itself rather than a mod — nine vanilla classes plus Forge's
+`ChestGenHooks`. Most use default `remap` and are registered in the early mixin config rather than
 through the late loader, because their targets load before the late loader runs.
 
 ## Verification
@@ -88,6 +93,18 @@ contents, and — from probe format 5 — the entity list):
 build, seed `-777`, radius 6, rows vs spiral, with the jar installed — 70,348 differing blocks
 across 169 chunks:
 
+> **Re-measured on 0.8** (same seed, radius and walk pair): **66,034** differing blocks, down 4,314.
+> Every category is at or below the figure below, and GT ore drops 36% — that is the vein-identity fix:
+> identity no longer flips, so whole-footprint replacements are gone and only host-stone variation on
+> agreed veins remains. 0.8 values: decoration 38,082 / deep dirt-gravel-stone 7,459 / GT stone blobs
+> 7,044 / sand-gravel-clay-fluid 5,976 / deepslate 4,863 / **GT ore 2,385**.
+>
+> Counting note, because it cost a false alarm: these are block-**ID** differences.
+> `scripts/diff-region-blocks.py` reports `id:meta` transitions and counts a change when EITHER moves,
+> which on this world reads 157,325 — mostly GT ore blocks whose meta encodes material *and* host stone,
+> i.e. double-counting the thing being measured. Metadata-only differences are just 1,370. Compare like
+> with like or the table looks like it doubled.
+
 | source | blocks | note |
 |---|---|---|
 | decoration (grass/flowers/trees/hives) | 39,425 | endemic 1.7.10 decorator ordering; no per-mod fix known |
@@ -95,7 +112,7 @@ across 169 chunks:
 | GT stone-layer blobs (granite/stone) | 7,451 | the one category the jar does not move at all (−3% vs stock) |
 | sand/gravel/clay/fluid settling | 6,389 | tick-timing; clay inherits it, since clay replaces sand/gravel |
 | EtFuturum deepslate band | 4,847 | was 192,495 before the deepslate fix |
-| GT / mod ore placement | 3,741 | vein *identity* is 99.0% stable; this is per-block placement |
+| GT / mod ore placement | 3,741 → **2,385** on 0.8 | per-BLOCK placement only. Vein *identity* is now exact: 0 differing regions rows-vs-spiral on this seed (106 regions), and on `-1636594104014467454` at r60 in both the overworld (0/1764) and Twilight Forest (0/1728). What remains is `OreManager.setOreForWorldGen` reading the live world at every write — mostly the same material in a different host stone — deliberately un-redirected |
 
 Chest loot is fully launch-deterministic, measured two ways: 131/131 chests identical across two cold
 launches of one seed with **zero tile-entity differences of any kind**, and 536 chests / 3,929 item
@@ -183,7 +200,7 @@ Two limits belong with the capability:
 
 Note that **deterministic** and **stage-0 computable** are different questions, and the table in
 [seedsearch/README.md](seedsearch/README.md) separates them. Vanilla dungeon *existence* is the one
-entry in that table still held as non-deterministic, pending the GregTech ore worldgen fix.
+entry in that table still held as non-deterministic. The GregTech ore-vein identity fix has since landed (see the fix table above); per-block ore placement remains.
 
 **Reporting a worldgen bug?** Please include the jar version, seed, and coordinates.
 

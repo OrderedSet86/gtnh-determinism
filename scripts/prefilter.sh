@@ -118,6 +118,15 @@ GATES=""
 [ -n "${PREFILTER_GATE_PIECES:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.pieces=$PREFILTER_GATE_PIECES"
 [ -n "${PREFILTER_GATE_WATER:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.water=$PREFILTER_GATE_WATER"
 [ -n "${PREFILTER_GATE_BIOMEREGION:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.biomeregion=$PREFILTER_GATE_BIOMEREGION"
+#   PREFILTER_GATE_VILLAGEPIECE  PIECE,DIST: kill unless a village whose layout contains PIECE starts
+#                                within DIST blocks of spawn (e.g. ComponentSmeltery,300)
+#   PREFILTER_GATE_WITCHCIRCLE   DIST: kill unless a coven circle lands within DIST blocks of spawn.
+#                                Needs -Dprobe.prefilter.witchery.replay=true or the gate skips itself.
+#   PREFILTER_GATE_ENCHANT       DIST: kill unless a Roguelike enchant table generates within DIST
+#                                blocks of spawn. Near dungeons generate first so the kill is cheap.
+[ -n "${PREFILTER_GATE_VILLAGEPIECE:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.villagepiece=$PREFILTER_GATE_VILLAGEPIECE"
+[ -n "${PREFILTER_GATE_WITCHCIRCLE:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.witcherycircle=$PREFILTER_GATE_WITCHCIRCLE"
+[ -n "${PREFILTER_GATE_ENCHANT:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.enchant=$PREFILTER_GATE_ENCHANT"
 
 "$JAVA_BIN" $JAVA_ARGS \
   -Xmx6G -Xms6G \

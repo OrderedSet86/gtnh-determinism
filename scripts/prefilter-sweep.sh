@@ -161,8 +161,16 @@ run_shards() {                      # run_shards <n> <phase> <flags> <heap>
   for ((i = 0; i < n; i++)); do
     clone_shard "$i"; sync_jars "$i"
     mkdir -p "$OUT/$phase/s$i"
+    # Gates are forwarded explicitly rather than relied on to be exported: a caller writing
+    # `PREFILTER_GATE_ENCHANT=300 prefilter-sweep.sh …` sets a shell var this subshell would not inherit,
+    # and a silently-missing gate does not fail — it just runs the slow path and returns MORE rows, which
+    # reads as success.
     ( PREFILTER_SERVER="$SHARDROOT/s$i" PROBE_PORT=$((25700 + i)) \
       PREFILTER_RADIUS=${PF_RADIUS:-0} PREFILTER_TERRAIN=${PF_TERRAIN:--1} \
+      PREFILTER_GATE_VILLAGEPIECE="${PREFILTER_GATE_VILLAGEPIECE:-}" \
+      PREFILTER_GATE_WITCHCIRCLE="${PREFILTER_GATE_WITCHCIRCLE:-}" \
+      PREFILTER_GATE_ENCHANT="${PREFILTER_GATE_ENCHANT:-}" \
+      PREFILTER_GATE_VILLAGEDIST="${PREFILTER_GATE_VILLAGEDIST:-}" \
       PROBE_JVMFLAGS="$flags -Xmx$heap -Xms$heap" \
       "$REPO/scripts/prefilter.sh" "@$OUT/$phase/shard-$i.txt" "$OUT/$phase/s$i/out.jsonl" \
       > "$OUT/$phase/s$i/log" 2>&1 ) &
@@ -190,6 +198,15 @@ print(f"{len(seeds)} seeds over {n} shards", file=sys.stderr)
 PY
 }
 
+if [ -n "${SWEEP_SINGLE_TIER:-}" ]; then
+  # The in-pass kill funnel (probe.prefilter.gate.*) supersedes tier 1: it cuts on the criteria actually
+  # being searched instead of on trigger count as a proxy, and it cuts BEFORE the expensive stages instead
+  # of after a whole extra pass. Measured at the 300-block bars, 5131 -> 493 ms/seed, because biomeregion
+  # then runs for survivors only (1 seed in 40, not 40 in 40). Tier 1's recall table above does not apply
+  # and neither does CUT: nothing is dropped by a proxy ranking, only by the real criteria.
+  cp "$SEEDS" "$OUT/tier2-seeds.txt"
+  echo "=== single tier: $T2N shards, full pipeline + kill funnel ===" >&2
+else
 echo "=== tier 1: $T1N shards, trigger count only ===" >&2
 split_seeds "$SEEDS" "$T1N" tier1
 PF_RADIUS=0 PF_TERRAIN=-1 \
@@ -209,9 +226,15 @@ print(f"tier1 scored {len(rows)} seeds; tier2 will run {k}", file=sys.stderr)
 PY
 
 echo "=== tier 2: $T2N shards, full pipeline (byte-identical rows) ===" >&2
+fi
 split_seeds "$OUT/tier2-seeds.txt" "$T2N" tier2
-PF_RADIUS=$((RADIUS + 10)) PF_TERRAIN=4 \
+PF_RADIUS=${PF2_RADIUS:-$((RADIUS + 10))} PF_TERRAIN=4 \
   run_shards "$T2N" tier2 \
-    "-Dprobe.prefilter.dungeon=$RADIUS -Dprobe.prefilter.villagechests=true -Dprobe.prefilter.chunkcache=2048" 6G
+    "${SWEEP_T2_FLAGS:--Dprobe.prefilter.dungeon=$RADIUS -Dprobe.prefilter.villagechests=true -Dprobe.prefilter.chunkcache=2048}" \
+    "${SWEEP_T2_HEAP:-6G}"
 
-echo "done: $OUT/tier1.jsonl ($(wc -l < "$OUT/tier1.jsonl") seeds), $OUT/tier2.jsonl ($(wc -l < "$OUT/tier2.jsonl") seeds)" >&2
+if [ -n "${SWEEP_SINGLE_TIER:-}" ]; then
+  echo "done: $OUT/tier2.jsonl ($(wc -l < "$OUT/tier2.jsonl") rows, incl. funnel kills)" >&2
+else
+  echo "done: $OUT/tier1.jsonl ($(wc -l < "$OUT/tier1.jsonl") seeds), $OUT/tier2.jsonl ($(wc -l < "$OUT/tier2.jsonl") seeds)" >&2
+fi

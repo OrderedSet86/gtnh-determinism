@@ -38,6 +38,10 @@ from collections import Counter
 
 HERE = pathlib.Path(__file__).resolve().parent
 
+# Above any terrain in the pack, below the build limit. Printed wherever stage 0 has no real height, so
+# the coordinate reads as "teleport here and descend" instead of as a predicted Y. Matches verify-sheet.py.
+SKY_Y = 200
+
 
 def load(name, filename):
     """These modules carry hyphens, so they cannot be imported by name."""
@@ -81,13 +85,35 @@ def nearest_circle(row):
         chests = c.get("chests") or []
         # The container's own position beats the cell origin: cells are 16-block aligned and the
         # structure lands somewhere inside, so the origin can be tens of blocks out.
+        # Carry the container's Y too. It is a real predicted height (the replay produced the structure),
+        # and dropping it forced the report to invent one — it printed a hardcoded 64, which is
+        # underground at most of these coordinates and reads as a prediction rather than a placeholder.
         if chests and chests[0].get("pos"):
-            bx, _by, bz = chests[0]["pos"]
+            bx, by, bz = chests[0]["pos"]
         else:
             bx, bz = c["cell"]
+            by = None
         d = dist(sx, sz, bx, bz)
         if best is None or d < best[0]:
-            best = (d, bx, bz, len(chests))
+            best = (d, bx, bz, len(chests), by)
+    return best
+
+
+def nearest_enchant_dungeon(row):
+    """Closest Roguelike dungeon whose generated layout contains an enchantment table, with the table's
+    exact position. Requires rows from a sweep new enough to emit enchant_tables (probe >= 555df65b);
+    older rows yield None everywhere, which reads as "no data", not "no dungeon"."""
+    sx, _, sz = row["spawn"]
+    best = None
+    for d in row.get("dungeons") or []:
+        for p in d.get("enchant_tables") or []:
+            # Distance to the TABLE BLOCK, not to its dungeon's trigger chunk. A dungeon sprawls, so the
+            # two differ by up to ~70 blocks: one seed reported "350 blocks" beside a tp for a table that
+            # is actually 279 away. The prefilter's own enchant gate measures table position, so ranking
+            # on the trigger also disagreed with which seeds the sweep had kept.
+            dd = dist(sx, sz, p[0], p[2])
+            if best is None or dd < best[0]:
+                best = (dd, p[0], p[1], p[2], d.get("tower"))
     return best
 
 
@@ -229,6 +255,7 @@ def extract(value_table, jsonl, radius, tf_window, want_tf):
                         minok=not ls.unmet_minimums(qty, mins),
                         village=v, circle=c, dry=dry, hum=hum, tf=t,
                         dungeon=nearest_dungeon(row), pair=pair, smeltery_village=vs,
+                        ench=nearest_enchant_dungeon(row),
                         biome_gap=square_gap(dry, hum)))
     return {"value_table": str(value_table), "source": str(jsonl), "radius": radius,
             "dropped_no_spawn": dropped, "seeds": out}
@@ -304,7 +331,10 @@ def main():
             else:
                 gap = r.get("biome_gap")
                 f.append(bool(dry_ok and hum_ok and gap is not None and gap <= args.biome_gap))
-        f.append(bool(r.get("dungeon") and r["dungeon"][0] <= args.dungeon_within))
+        # The dungeon criterion is the ENCHANT-TABLE dungeon, not the nearest dungeon of any kind. The
+        # nearest dungeon is almost always a closer one with no table, so scoring it marked seeds 5/5
+        # whose actual enchant table was out of range.
+        f.append(bool(r.get("ench") and r["ench"][0] <= args.dungeon_within))
         if args.tf:
             f.append(bool(r["tf"] and r["tf"][0] <= bars["tf"]))
         return f
@@ -335,14 +365,27 @@ def main():
         s = r["spawn"]
         print(f"#{rank}  seed {r['seed']}   loot {r['score']:,}   {r['_met']}/{n} [{tag}]"
               + ("" if r["minok"] else "   MIN-FAIL"))
-        print(f"      spawn        /tp {s[0]} {s[1]} {s[2]}")
+        # SKY_Y, not 64. Stage 0 never computes a height for spawn, villages or biome squares — the probe
+        # emits a literal 64 for spawn (Prefilter.java:1517) — and 64 is underground at most of these
+        # coordinates while looking exactly like a prediction. 200 is above any terrain in the pack and
+        # is labelled, so it reads as "descend from here" rather than as an answer.
+        sy = s[1] if r.get("spawn_y_real") else SKY_Y
+        ynote = "" if r.get("spawn_y_real") else "   [Y unknown — fly down]"
+        print(f"      spawn        /tp {s[0]} {sy} {s[2]}{ynote}")
         v = (r.get("smeltery_village") if args.village_needs_smeltery else r["village"])
         c, dry, hum, t = r["circle"], r["dry"], r["hum"], r.get("tf")
         vlabel = "village+smelt" if args.village_needs_smeltery else "village      "
-        print(f"      {vlabel}{fmt(v[0], bars['village'])}  /tp {v[1]} 64 {v[2]}" if v
-              else f"      {vlabel}  none qualifying")
-        print(f"      coven circle {fmt(c[0], bars['circle'])}  /tp {c[1]} 64 {c[2]}" if c
-              else "      coven circle   none")
+        print(f"      {vlabel}{fmt(v[0], bars['village'])}  /tp {v[1]} {SKY_Y} {v[2]}  [Y unknown — fly down]"
+              if v else f"      {vlabel}  none qualifying")
+        if c:
+            # Index 4 is the container Y when the witchery replay produced one; the cell origin has none.
+            cy = c[4] if len(c) > 4 and c[4] is not None else None
+            print(f"      coven circle {fmt(c[0], bars['circle'])}  /tp {c[1]} {cy} {c[2]}"
+                  "   [Y predicted, may be 1 low]" if cy is not None
+                  else f"      coven circle {fmt(c[0], bars['circle'])}  /tp {c[1]} {SKY_Y} {c[2]}"
+                       "   [Y unknown — fly down]")
+        else:
+            print("      coven circle   none")
         if dry:
             de = edge_dist(r["spawn"], dry)
             print(f"      no-rain {dry[0]}x{dry[0]:<3}{fmt(de, bars['dry'])} to edge  "
@@ -358,6 +401,15 @@ def main():
         dg = r.get("dungeon")
         print(f"      rl dungeon   {fmt(dg[0], args.dungeon_within)}  /tp {dg[1]} 200 {dg[2]} "
               f"(trigger chunk, +-8 blocks)" if dg else "      rl dungeon     none in window")
+        # The enchant dungeon is a hard criterion, so it gets its own tp: the nearest dungeon above is
+        # often a DIFFERENT, closer one without a table, and teleporting to that proves nothing. The
+        # table coordinate is exact (read from the generated layout), not a trigger-chunk centre.
+        en = r.get("ench")
+        if en:
+            print(f"      enchant tbl  {fmt(en[0], args.dungeon_within)}  /tp {en[1]} {en[2]} {en[3]}"
+                  f"   ({en[4] or 'unknown'} tower, table Y is exact)")
+        else:
+            print("      enchant tbl    none in window")
         pair = r.get("pair")
         if pair:
             pcx = (pair["dry"][0] + pair["hum"][0] + pair["side"]) * 16 // 2

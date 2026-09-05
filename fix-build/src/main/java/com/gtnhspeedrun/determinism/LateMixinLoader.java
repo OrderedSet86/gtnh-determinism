@@ -9,6 +9,7 @@ import org.apache.logging.log4j.Logger;
 
 import com.gtnewhorizon.gtnhmixins.ILateMixinLoader;
 import com.gtnewhorizon.gtnhmixins.LateMixin;
+import com.gtnhspeedrun.determinism.worldgen.GtOrePin;
 
 @LateMixin
 public class LateMixinLoader implements ILateMixinLoader {
@@ -60,6 +61,17 @@ public class LateMixinLoader implements ILateMixinLoader {
         }
         if (loadedMods.contains("gregtech")) {
             mixins.add(gtOreMixin());
+            // F4d: vein IDENTITY is chosen by whichever chunk triggers the region first. These pin the decision
+            // to the oreseed chunk and virginise the reads it still makes. Registered UNCONDITIONALLY and at
+            // require = 1 so a binding failure is loud in BOTH arms of an A/B — the behaviour is switched by
+            // gtnhdet.orepin inside the handlers, not by which mixins load, so that "off" is bit-identical to
+            // stock and the two arms are the same jar. Gated only on the 5.09.54+ class shape, same reasoning
+            // as gtOreMixin(): OreManager does not exist before then and a mixin that cannot bind must not be
+            // offered at all.
+            if (ClassShape.hasClass("gregtech.common.ores.OreManager")) {
+                mixins.add("worldgen.GTWorldGenContainerOrePinMixin");
+                mixins.add("worldgen.OreManagerVirginDryRunMixin");
+            }
         }
         if (loadedMods.contains("BiomesOPlenty")) {
             mixins.add("worldgen.BiomeFeaturesMixin");
@@ -109,6 +121,7 @@ public class LateMixinLoader implements ILateMixinLoader {
         // The determinism guarantee is only as wide as the set of mixins that actually loaded, so say what that set
         // is. Every mixin here binds with require >= 1, so anything listed either applied or brought the game down.
         LOG.info("{} worldgen mixins selected for this pack: {}", mixins.size(), mixins);
+        GtOrePin.logState();
         return mixins;
     }
 }

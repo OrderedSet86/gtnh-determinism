@@ -124,11 +124,36 @@ def main():
             # scores, and it is usually NOT the largest square of either kind shown above.
             print(f"  BIOME PAIR       no-rain {ps}x{ps} centre /tp {(pdx*16 + ps*8)} {SKY_Y} {(pdz*16 + ps*8)}   "
                   f"humid {ps}x{ps} centre /tp {(phx*16 + ps*8)} {SKY_Y} {(phz*16 + ps*8)}   gap {br['pg']} chunks")
+        e = mc.nearest_enchant_dungeon(row)
+        if e:
+            print(f"  ENCHANT TABLE    /tp {e[1]} {e[2]} {e[3]}       {e[0]:.0f} blocks   "
+                  f"[table block EXACT; {e[4]} dungeon]")
         d = mc.nearest_dungeon(row)
         if d:
             print(f"  RL DUNGEON       /tp {d[1]} {SKY_Y} {d[2]}       {d[0]:.0f} blocks   "
                   f"[trigger chunk, +-8 blocks; entrance tower on the surface]")
         print()
+        # Every chest holding a Min-column item, regardless of score rank. The Min gate is a REQUIREMENT
+        # (the seed is disqualified without these), so their locations are verification targets in their
+        # own right — and the top-N list routinely hides them: a 10k chest shows its first five slots
+        # while the qualifying plate sits in slot 14.
+        real_mins = {k: v for k, v in mins.items() if v}
+        if real_mins:
+            print("  MIN-GATE ITEMS")
+            for key, need in real_mins.items():
+                total = 0
+                holders = []
+                for ch in scoped:
+                    n = sum(i["n"] for i in ch.items if "name" in i and ls.norm(i["name"]) == key)
+                    if n:
+                        total += n
+                        holders.append((ch, n))
+                name = display.get(key, key)
+                print(f"    {name}: need >= {need}, have {total}")
+                for ch, n in holders:
+                    ynote = "Y nominal" if getattr(ch, "y_nominal", False) else "Y exact"
+                    print(f"      /tp {ch.pos[0]} {ch.pos[1] + 1} {ch.pos[2]}   x{n}   {ch.source:10s} [{ynote}]")
+            print()
         print(f"  TOP {args.chests} LOOT CHESTS")
         # score_seed yields (earned, raw, chest); rank on EARNED, which is what the chest is worth
         # after the seed-level Limit cap, not on its raw value.
@@ -136,9 +161,22 @@ def main():
         for marg, _raw, ch in top:
             src = ch.source
             ynote = "Y nominal" if getattr(ch, "y_nominal", False) else "Y exact"
-            items = ", ".join(f"{i.get('name', i['id'])} x{i['n']}" for i in ch.items[:5])
             print(f"    /tp {ch.pos[0]} {ch.pos[1] + 1} {ch.pos[2]}   {src:10s} {marg:>7,} pts   [{ynote}]")
-            print(f"       {items}")
+            # Sorted by what the stack is WORTH, not by slot. Slot order buried a 20k Alumite plate at
+            # slot 14 behind four stacks of gravel. Items with no row in the value table print as "-"
+            # rather than 0: unscored is not worthless, and collapsing the two hides table gaps.
+            scored, unscored = [], []
+            for i in ch.items:
+                nm = i.get("name", str(i["id"]))
+                unit = values.get(ls.norm(nm)) if "name" in i else None
+                if unit:
+                    scored.append((unit * i["n"], nm, i["n"], unit))
+                else:
+                    unscored.append((nm, i["n"]))
+            for pts, nm, n, unit in sorted(scored, reverse=True):
+                print(f"       {pts:>8,}  {nm} x{n}  ({unit:,}/ea)")
+            if unscored:
+                print(f"              -  {', '.join(f'{nm} x{n}' for nm, n in unscored)}")
         print()
     return 0
 

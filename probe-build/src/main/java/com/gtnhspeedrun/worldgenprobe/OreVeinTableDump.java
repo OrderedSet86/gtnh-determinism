@@ -195,6 +195,56 @@ final class OreVeinTableDump {
      * bytecode interpretation, and an EMPTY map after a generation walk is itself the answer that
      * {@code generateVein} never ran.
      */
+    /**
+     * Invoke a no-arg method, forcing access.
+     *
+     * <p>
+     * {@code getMethod} finds public methods, but invoking one declared on a NON-public class throws
+     * IllegalAccessException even though the method itself is public — which is exactly how
+     * {@code WorldgenGTOreLayer$VeinPlacement.veinMinY()} failed and cost a full radius-60 walk. Always
+     * setAccessible when reflecting into another mod's nested types.
+     */
+    private static Object call(Object target, String name) {
+        try {
+            final java.lang.reflect.Method m = target.getClass()
+                .getMethod(name);
+            m.setAccessible(true);
+            return m.invoke(target);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Every no-arg public accessor returning a primitive or String, as a JSON object. */
+    private static String describe(Object o) {
+        final StringBuilder sb = new StringBuilder(128);
+        sb.append("{");
+        boolean first = true;
+        for (final java.lang.reflect.Method m : o.getClass()
+            .getMethods()) {
+            if (m.getParameterCount() != 0) continue;
+            final Class<?> rt = m.getReturnType();
+            final String n = m.getName();
+            if ("hashCode".equals(n) || "toString".equals(n) || "getClass".equals(n)) continue;
+            if (!(rt.isPrimitive() || rt == String.class)) continue;
+            m.setAccessible(true);
+            final Object v;
+            try {
+                v = m.invoke(o);
+            } catch (Throwable t) {
+                continue;
+            }
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append("\"")
+                .append(n)
+                .append("\": ")
+                .append(v instanceof String ? "\"" + v + "\"" : String.valueOf(v));
+        }
+        return sb.append("}")
+            .toString();
+    }
+
     static void dumpVeinCache(File out) {
         try {
             final Class<?> gtw = Class.forName("gregtech.common.GTWorldgenerator");
@@ -207,6 +257,7 @@ final class OreVeinTableDump {
                 final Object cached = e.getValue();
                 String layer = null;
                 Integer minY = null;
+                String extra = null;
                 boolean isNull = cached == null;
                 if (!isNull) {
                     // Two shapes seen in the wild, so probe rather than assume: the map value is either the
@@ -218,16 +269,16 @@ final class OreVeinTableDump {
                         cached.getClass()
                             .getField("mWorldGenName");
                     } catch (NoSuchFieldException notALayer) {
-                        lv = cached.getClass()
-                            .getMethod("layer")
-                            .invoke(cached);
-                        final Object pv = cached.getClass()
-                            .getMethod("placement")
-                            .invoke(cached);
+                        lv = call(cached, "layer");
+                        final Object pv = call(cached, "placement");
                         if (pv != null) {
-                            minY = (Integer) pv.getClass()
-                                .getMethod("veinMinY")
-                                .invoke(pv);
+                            final Object my = call(pv, "veinMinY");
+                            if (my instanceof Integer) minY = (Integer) my;
+                            // Whatever else the placement carries (coordinates, size, dimension) is
+                            // emitted verbatim rather than guessed at. Assuming this type's shape has
+                            // already cost two runs: first field-scanning a record whose accessors are
+                            // the API, then assuming the map value WAS the layer when it wraps one.
+                            extra = describe(pv);
                         }
                     }
                     if (lv != null) {
@@ -247,6 +298,7 @@ final class OreVeinTableDump {
                     .append(layer == null ? "null" : "\"" + layer + "\"")
                     .append(", \"minY\": ")
                     .append(minY)
+                    .append(extra == null ? "" : ", \"placement\": " + extra)
                     .append("}");
             }
             sb.append("\n]\n");
