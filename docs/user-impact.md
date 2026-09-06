@@ -12,6 +12,23 @@ same seed → same world, every launch, every machine, every route.
 Existing saves are safe: worldgen fixes only affect **newly generated chunks**. Nothing regenerates or corrupts in
 areas you've already explored.
 
+**Singleplayer worlds made before 2026-09-05 reset a second time, and not just the loot.** The fix that unifies the
+spawn-region chest table (F9) hooks `MinecraftServer.loadAllWorlds`, but singleplayer runs an `IntegratedServer`,
+which overrides that method — so on a client the fix silently never ran, and the ~400x400-block area around spawn
+kept stock's separate, richer loot table. Dedicated servers were always correct.
+
+The catch: filling a chest consumes randomness from the shared chunk stream, and how much it consumes depends on
+which loot table is live. So changing the table inside the spawn region also shifts what is generated after a chest
+in those chunks. Measured on one seed, over the 625 chunks around spawn: **28,083 blocks differ across 53 chunks**,
+against a 63-block noise floor. Most of it is cosmetic-to-routing — dirt/gravel/stone patches, the deepslate band,
+trees and grass — but 474 GT ore blocks appear or vanish, and 3 chests exist in one version and not the other.
+Cave layout is not affected. **Re-scout the area within ~200 blocks of spawn; outside it nothing changes.**
+
+**The bonus chest is not nerfed and never should have been.** If you tick "bonus chest" at world creation, its
+contents come from the pre-TooMuchLoot table, exactly as on stock — that chest is filled before TooMuchLoot applies,
+so it was never part of the spawn-region split. An earlier build of F9 handed it TooMuchLoot's reduced table by
+accident (16 entries down to 13, losing the Botania and TiC starter items); that is fixed.
+
 ## What becomes reliable
 
 | Area | Stock behavior | With fixes |

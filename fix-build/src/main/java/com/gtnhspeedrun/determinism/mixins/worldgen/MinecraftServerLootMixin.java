@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import com.gtnhspeedrun.determinism.worldgen.EarlyLootTables;
 
 /**
- * F9 entry point: the last instruction before any world exists.
+ * F9 entry point for a dedicated server: the last instruction before any world exists.
  *
  * <p>
  * {@code loadAllWorlds} constructs the {@code WorldServer}, which searches for a spawn point and therefore
@@ -18,6 +18,11 @@ import com.gtnhspeedrun.determinism.worldgen.EarlyLootTables;
  * {@code FMLServerStartingEvent}, so both roll pre-rewrite loot tables. Hooking the head of this method — rather
  * than an {@code FMLServerAboutToStartEvent} handler, which carries no priority and could be overtaken by another
  * mod's handler — puts the rewrite ahead of every chunk this server will ever generate.
+ *
+ * <p>
+ * This covers the dedicated path only. {@code IntegratedServer} overrides {@code loadAllWorlds} without calling
+ * {@code super}, and Mixin does not propagate an {@code @Inject} into a subclass override, so singleplayer needs
+ * its own copy of this injector — see {@link IntegratedServerLootMixin}. Do not merge the two.
  *
  * <p>
  * See {@link EarlyLootTables} for what is applied and why suppressing TooMuchLoot's own later run is required.

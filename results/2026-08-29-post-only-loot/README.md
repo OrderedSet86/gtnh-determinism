@@ -105,3 +105,17 @@ category whose roll count moves (pre 3-9, post 4-11), so a restore produced a ta
 anywhere: the pristine item pool with the mutated roll count. The extra `generateChestContents`
 iterations then shifted every later draw in that chunk. Both now snapshot and restore all three
 fields.
+
+## Superseded in two places — see `results/2026-09-05-f9-singleplayer-bonuschest/`
+
+**This measurement only ever covered a dedicated server.** `IntegratedServer` overrides
+`loadAllWorlds` without calling `super`, so the injector measured here never fired in singleplayer at
+all, and every harness script in this repo boots `nogui`. The numbers above are correct for what they
+measured; they say nothing about a client. Fixed by a second injector against `IntegratedServer`.
+
+**`bonusChest` should not have been in the list of ten.** It is filled during `WorldServer`
+construction (`WorldServer.java:811 createBonusChest`), which precedes `FMLServerStartingEvent` on
+stock — so it was never part of the preload split, and closing it was a balance change, not a
+determinism fix: 16 entries down to 13, losing Lexica Botania, Codex, Black Lotus and the plain
+Broadsword. It is now exempt and rolls the pre-rewrite table, with TooMuchLoot's version installed at
+stock's timing.

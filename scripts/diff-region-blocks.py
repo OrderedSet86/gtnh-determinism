@@ -116,6 +116,9 @@ def world_chunks(world, window):
     return chunks
 
 
+ZERO_SECTION = [0] * 4096
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     a_dir, b_dir = args[0], args[1]
@@ -151,10 +154,14 @@ def main():
                 if ids is not None:
                     missing_sections += 1
                     continue
-                chunk_counts[(cx, cz)] += 4096
-                total += 4096
-                continue
-            (ia, ma), (ib, mb) = sa[y_sec], sb[y_sec]
+                # Anvil omits a section that is entirely air, so "absent" means "4096 air blocks", not
+                # "4096 differences". Charging a flat 4096 here overstated every diff that grew or lost
+                # a tree: chunk -1,2 in the F9 A/B reported 8390 differing blocks where 198 actually
+                # differed, the other 8192 being two one-sided sections of air-vs-air. Compare against
+                # air instead, so only the genuinely occupied positions count.
+                missing_sections += 1
+            (ia, ma) = sa.get(y_sec, (ZERO_SECTION, ZERO_SECTION))
+            (ib, mb) = sb.get(y_sec, (ZERO_SECTION, ZERO_SECTION))
             if ia == ib and ma == mb:
                 continue
             for i in range(4096):
@@ -171,6 +178,9 @@ def main():
                         y = y_sec * 16 + (i >> 8)
                         samples[key].append((x, y, z))
     print(f"differing blocks: {total} across {len(chunk_counts)} chunks")
+    if missing_sections:
+        note = "excluded from the count" if ids is not None else "compared against air"
+        print(f"  ({missing_sections} y-sections present on one side only, {note})")
     print("\ntop transitions (idA:metaA -> idB:metaB, count, sample xyz):")
     for key, n in pair_counts.most_common(40):
         print(f"  {key[0]:>10} -> {key[1]:<10} {n:6d}   {samples[key]}")
