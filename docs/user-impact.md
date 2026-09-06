@@ -18,10 +18,11 @@ which overrides that method — so on a client the fix silently never ran, and t
 kept stock's separate, richer loot table. Dedicated servers were always correct.
 
 The catch: filling a chest consumes randomness from the shared chunk stream, and how much it consumes depends on
-which loot table is live. So changing the table inside the spawn region also shifts everything generated after a
-chest in those chunks — ores, caves, lakes, and in a few cases whether a chest exists at all. Measured on one seed:
-about 76 of ~1000 chunks differ, against a 5-chunk noise floor, with ore-depth changes at y0-47. **Re-scout the area
-within ~200 blocks of spawn; outside it nothing changes.**
+which loot table is live. So changing the table inside the spawn region also shifts what is generated after a chest
+in those chunks. Measured on one seed, over the 625 chunks around spawn: **28,083 blocks differ across 53 chunks**,
+against a 63-block noise floor. Most of it is cosmetic-to-routing — dirt/gravel/stone patches, the deepslate band,
+trees and grass — but 474 GT ore blocks appear or vanish, and 3 chests exist in one version and not the other.
+Cave layout is not affected. **Re-scout the area within ~200 blocks of spawn; outside it nothing changes.**
 
 **The bonus chest is not nerfed and never should have been.** If you tick "bonus chest" at world creation, its
 contents come from the pre-TooMuchLoot table, exactly as on stock — that chest is filled before TooMuchLoot applies,

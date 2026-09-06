@@ -54,8 +54,8 @@ y  96-111  ##############  14
 y 112-127  ###  3
 ```
 
-Ores and caves at y0-47 move. That is the populate stream shifting, not chest contents being
-relabelled.
+That is the populate stream shifting, not chest contents being relabelled. What actually moves is
+named below — do not read the y0-47 rows as "ores", most of it is dirt/gravel/stone.
 
 Where they are, against the preload (spawn chunk ±12 = chunks -3..21 on both axes):
 
@@ -67,6 +67,74 @@ Where they are, against the preload (spawn chunk ±12 = chunks -3..21 on both ax
 The 17 outside are all at `x ∈ [-5,-4]` or `z ∈ [-5,-4]` — one to two chunks past the preload
 boundary, which is population spillover: a chunk's populate writes into its `+1` neighbourhood.
 Nothing differs far from the preload, which is exactly the predicted shape.
+
+## Persisted blocks — what actually moves, by name
+
+Chunk hashes say *that* a chunk changed, never *what*. Three more cold runs with the walk pinned to
+spawn (`PROBE_CX=9 PROBE_CZ=9`, radius 12, so the hashed window is exactly the 625 preload chunks),
+saving `World` after each, then `diff-region-blocks.py` over chunks -3..21:
+
+| comparison | differing blocks | chunks |
+| --- | ---: | ---: |
+| noise floor — F9-on vs F9-on | **63** | 5 |
+| effect — F9-on vs F9-off | **28,083** | 53 |
+
+Block ids resolved from the world's own FML registry (`level.dat` → `FML` → `ItemData`, block
+entries are the ones prefixed `\x01`), and cross-checked against `PROBE_DUMP` name dumps of two
+chunks — the two methods agree exactly on chunk `-1,2` (241 differing positions each).
+
+Top transitions, F9-on → F9-off:
+
+| count | from | to |
+| ---: | --- | --- |
+| 4692 | `minecraft:stone` | `minecraft:dirt` |
+| 4056 | `minecraft:dirt` | `minecraft:stone` |
+| 2211 | `minecraft:stone` | `minecraft:gravel` |
+| 1927 | air | `BiomesOPlenty:colorizedLeaves1:3` |
+| 1871 | `minecraft:gravel` | `minecraft:stone` |
+| 1216 | `BiomesOPlenty:colorizedLeaves1:3` | air |
+| 1154 | `minecraft:gravel` | `etfuturum:deepslate` |
+| 1012 | `etfuturum:deepslate` | `minecraft:gravel` |
+
+67 distinct block ids are involved. By volume this is **dirt/gravel/stone discs relocating**
+(ids 1/3/13 touch 30,659 positions between them), the **EtFuturum deepslate/tuff band** shifting
+(`2526`/`2530`), and **trees, foliage and tallgrass** (`954` BoP colorizedLeaves1, `913` BoP logs3,
+`892` BoP foliage, `18` leaves, `31` tallgrass). `3023` is `gregtech:gt.blockstones` — a stone
+variant, not an ore.
+
+### Ore blocks specifically
+
+The seven `gregtech:gt.blockores*` ids (3024, 3034-3039), classified per differing position:
+
+| | ore appeared | ore vanished | ore rehosted (ore both sides, different block/meta) |
+| --- | ---: | ---: | ---: |
+| noise floor | 0 | 0 | 5 |
+| effect | **169** | **305** | 21 |
+
+So ore blocks do move — 474 positions appear or vanish against a floor of zero — but that is **1.7%
+of the 28,083**, not the bulk of it, and the net is 136 fewer ore blocks in the F9-on arm over this
+window. "Rehosted" is the ore surviving in place while its host stone changes, which is what the
+noise floor's 5 are.
+
+**Not established: caves.** Cave carving happens during chunk generation, not population, so it
+should be immune to a populate-stream shift; nothing here demonstrates otherwise, and the air-side
+transitions are accounted for by vegetation and discs. Earlier drafts of this writeup said "ores and
+caves move" — the caves half was inference from the y-histogram, and is withdrawn.
+
+### A bug in `diff-region-blocks.py`, found and fixed here
+
+The script charged a flat 4096 differing blocks whenever a 16-block y-section existed on one side and
+not the other. Anvil omits a section that is entirely air, so "absent" means 4096 air blocks, not 4096
+differences — a chunk that merely grew or lost a tall tree was scored as wholly different. Chunk
+`-1,2` reported **8390** where **241** actually differ, the other 8192 being two one-sided sections of
+air-vs-air; the full window reported **56,460** where **28,083** differ. Absent sections are now
+compared against air, and the one-sided count is printed rather than silently folded in.
+
+Any earlier conclusion drawn from this script's totals may be inflated by 4096 per one-sided section
+and is worth re-deriving — `results/2026-08-28-dirt-gravel-and-the-block-metric/`,
+`results/2026-08-28-etfuturum-deepslate-band/`, `results/2026-08-29-witchery-route-stability/` and
+`results/2026-09-01-gtnh-oil-route-stability/` all cite it. The inflation is not a clean multiple in
+the reported total, so it cannot be spotted by inspection.
 
 ## Mechanism
 
