@@ -21,7 +21,7 @@ version is installed, and every other fix targets code that is unchanged across 
 |---|---|---|
 | Forge/FML | Village building handlers iterate in per-launch HashMap order | Village layouts (smeltery/blacksmith presence) identical per seed |
 | Forge/FML (chest loot) | Loot tables are static and get rewritten once the first world starts — only the **first world created per client session** rolled spawn-region loot from pristine tables; every later world rolled different chests from the same seed. The reset itself restored only a category's item list and left its roll COUNT at the mutated value, so `villageBlacksmith` drew 4-11 stacks from the 3-9 table — a table that never existed anywhere | Tables reset before every world start, all three fields (items, min, max), so each world rolls like the first of a session |
-| Forge/FML (spawn-preload split) | A cold boot generates its spawn region inside `loadAllWorlds`, before `FMLServerStartingEvent` where TooMuchLoot replaces whole categories. A chest is filled when it is placed, so the 25×25-chunk preload kept the pre-rewrite table forever and everything outside it used the post-rewrite one. Ten categories differed; `villageBlacksmith` went 60 entries rolling 3-9 to 118 rolling 4-11 | TooMuchLoot applied before the first chunk exists and its own later run suppressed — one table for the whole world. **Balance note: HungerOverhaul's food injection only ever reached chests through the pre table, so the 1-32 marshmallow stacks are gone; the post table gives 1-2.** Kept as a fix rather than preserved for routing, so a future upstream fix cannot break routing silently |
+| Forge/FML (spawn-preload split) | A cold boot generates its spawn region inside `loadAllWorlds`, before `FMLServerStartingEvent` where TooMuchLoot replaces whole categories. A chest is filled when it is placed, so the 25×25-chunk preload kept the pre-rewrite table forever and everything outside it used the post-rewrite one. Ten categories differed; `villageBlacksmith` went 60 entries rolling 3-9 to 118 rolling 4-11 | TooMuchLoot applied before the first chunk exists and its own later run suppressed — one table for the whole world, on a dedicated server and in singleplayer alike. **Balance note: HungerOverhaul's food injection only ever reached chests through the pre table, so the 1-32 marshmallow stacks are gone; the post table gives 1-2.** `bonusChest` is exempt and still rolls the pre-rewrite table: stock fills the bonus chest inside the `WorldServer` constructor, which precedes TooMuchLoot on both sides, so it was never part of the split and nerfing a one-shot world-creation gift is a balance change this fix has no business making. Kept as a fix rather than preserved for routing, so a future upstream fix cannot break routing silently |
 | Minecraft (structure chests) | Village, mineshaft, stronghold, pyramid, vanilla-dungeon and Witchery chests draw every item from the chunk's shared populate `Random`, so contents depend on everything that consumed draws earlier in that chunk — mod `PopulateChunkEvent.Pre` handlers, an intersecting mineshaft, whichever village pieces were built first — and each of those is only as stable as the terrain reads behind it | Contents derived from the structure piece and the chest's position within it. The stock body still runs first, so every draw it would have made is still made and **zero blocks move** — measured: the block-differing chunk set is identical to the two-run noise floor. Pool, weights and roll range unchanged; only the RNG source moves |
 | Witchery | Clock-seeded `world.rand`; structure *type* picked by shuffling a shared list in place per chunk; wicker-man spawner rolled off `world.rand` | Covens, wicker men, shacks, goblin huts — position, type, and spawner seed-stable |
 | Witchery (village walls) | Walls were built by a hidden tile entity 40+ ticks after generation, probing whatever terrain existed at that moment — shape depended on route and timing, and idle worlds could skip walls entirely | Walls build during generation from virgin-terrain heights, sliced per chunk: shape, gates, and guard posts seed-stable |
@@ -41,7 +41,7 @@ version is installed, and every other fix targets code that is unchanged across 
 | Minecraft (passive mobs) | `SpawnerAnimals.performWorldGenSpawning` picks the *species* off `world.rand` while every other draw in the method uses the populate-seeded `Random` — the same shadowing shape as the TiC slime bug. Which animals a seed starts with, and therefore the first leather, wool and food on the route, was clock-random | Species drawn from the populate Random. Sheep fleece colour and ocelot kittens, which are rolled later off `worldObj.rand`, derive from world seed + spawn position |
 | Minecraft (horses) | `EntityHorse` rolls type, coat variant, max health, jump strength and movement speed off the clock-seeded `Entity.rand`. Speed spans 0.1125–0.3375, so the same seed gave a horse up to **three times faster** depending on the launch, and donkey-versus-horse — portable storage or not — was a coin flip | All five derived from world seed + spawn position. Variation is preserved, not flattened: 87 distinct speeds and 87 distinct jump strengths across 95 horses on one seed. Horse *breeding* keeps the stock RNG — the fork is armed only while `onSpawnWithEgg` runs |
 
-Scope, counted from source: **46 mixin classes** rewiring **73 target
+Scope, counted from source: **47 mixin classes** rewiring **74 target
 classes** across **12 mods, Forge/FML and vanilla Minecraft**, plus two reflection patches that are not
 mixins. Re-derive with `grep -rl '@Mixin' fix-build/src/main/java | wc -l` (subtract the diagnostics
 below) and by counting distinct `@Mixin` targets.
@@ -50,12 +50,15 @@ Some fixes need more than one mixin. GregTech carries four: two are alternatives
 binding per GT version (the vein-reroll probe moved class between 5.09.51 and 5.09.54), and two more
 pin the vein-identity decision to the oreseed and virginise the reads it still makes — those two always
 bind. The Vis Amulet needs an init-time pin and a per-chest derivation; the passive-mob spawn fix takes
-one mixin each for the shared spawner, sheep, ocelots and horses; the spawn-preload split needs one to
-apply TooMuchLoot early and one to suppress its own later run; and structure chest contents need five —
-capture the table, capture the piece two ways, fence off chunk population, refill the chest.
+one mixin each for the shared spawner, sheep, ocelots and horses; the spawn-preload split needs three —
+one to apply TooMuchLoot early on a dedicated server, a second doing the same for singleplayer because
+`IntegratedServer` overrides `loadAllWorlds` without calling `super` and Mixin does not follow an
+`@Inject` into an override, and a third to suppress TooMuchLoot's own later run; and structure chest
+contents need five — capture the table, capture the piece two ways, fence off chunk population, refill
+the chest.
 Three further diagnostic mixins ship inert behind `-Dgtnhdet.traceseg` and are not counted here.
 
-Eleven mixins patch Minecraft or Forge itself rather than a mod — nine vanilla classes plus Forge's
+Twelve mixins patch Minecraft or Forge itself rather than a mod — ten vanilla classes plus Forge's
 `ChestGenHooks`. Most use default `remap` and are registered in the early mixin config rather than
 through the late loader, because their targets load before the late loader runs.
 

@@ -18,6 +18,8 @@
     "worldgen.EntityOcelotMixin",
     "worldgen.EntityHorseMixin"
   ],
-  "client": [],
+  "client": [
+    "worldgen.IntegratedServerLootMixin"
+  ],
   "server": []
 }

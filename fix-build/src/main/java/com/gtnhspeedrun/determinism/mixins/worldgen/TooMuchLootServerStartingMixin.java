@@ -26,6 +26,12 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
  * of {@code serverStarting} that {@link EarlyLootTables} cannot do. If the early application did not happen — no
  * TooMuchLoot, a first-run empty loot folder, or any reflective failure — {@code consumeApplied()} is false and
  * the stock handler runs untouched.
+ *
+ * <p>
+ * This is also where the deferred {@code bonusChest} changes over. {@link EarlyLootTables} holds TooMuchLoot's
+ * version back so the bonus chest — filled inside the {@code WorldServer} constructor, which stock reaches before
+ * this event — rolls the pre-rewrite table it has always rolled. Installing it here rather than never means the
+ * category is exactly as stock leaves it from this moment on.
  */
 @Mixin(targets = "dmillerw.tml.TooMuchLoot", remap = false)
 public class TooMuchLootServerStartingMixin {
@@ -33,6 +39,7 @@ public class TooMuchLootServerStartingMixin {
     @Inject(method = "serverStarting", at = @At("HEAD"), cancellable = true, require = 1)
     private void gtnhdet$skipDuplicateApply(FMLServerStartingEvent event, CallbackInfo ci) {
         if (!EarlyLootTables.consumeApplied()) return;
+        EarlyLootTables.installDeferredBonusChest();
         try {
             event.registerServerCommand(
                 (net.minecraft.command.ICommand) Class.forName("dmillerw.tml.command.CommandChestLoot")
