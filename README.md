@@ -1,6 +1,6 @@
 # gtnh-determinism
 
-Speedrun mod for GT: New Horizons 2.7.4 through daily-2026-08-28+707. Makes worldgen fully
+Speedrun mod for GT: New Horizons 2.7.4 through 2.9.0-beta-3. Makes worldgen fully
 deterministic based on seed.
 
 Discord: https://discord.gg/PbMWTcnZgC
@@ -16,6 +16,7 @@ version is installed, and every other fix targets code that is unchanged across 
 | 2.7.4 | Tested. Launch pair byte-identical |
 | 2.8.0 – 2.8.4 | Expected to work; last tested at 2.8.4 |
 | 2.9.0-nightly / daily | Tested at `daily-2026-08-28+707` |
+| 2.9.0-beta-3 | Tested. Same veins as daily-707 from the same seed, and the loot tables are unchanged |
 
 | Target | What was wrong | What the jar fixes |
 |---|---|---|

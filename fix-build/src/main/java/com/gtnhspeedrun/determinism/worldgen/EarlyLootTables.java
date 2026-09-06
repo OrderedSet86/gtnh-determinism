@@ -58,6 +58,13 @@ public final class EarlyLootTables {
     /** Set by {@link #apply()}, consumed by the mixin on TooMuchLoot's own handler. Reset per server start. */
     private static boolean applied;
 
+    /**
+     * The same outcome as {@link #applied}, but latched rather than consumed — see {@link #isActive()}. Null until
+     * {@link #apply()} has run at least once, which is the difference that matters: "not yet decided" and "decided
+     * no" must not read alike to a caller choosing a loot table.
+     */
+    private static Boolean activeLatch;
+
     /** TooMuchLoot's {@code bonusChest}, held back until its own handler would have installed it. */
     private static ChestGenHooks deferredBonusChest;
 
@@ -71,6 +78,33 @@ public final class EarlyLootTables {
         final boolean was = applied;
         applied = false;
         return was;
+    }
+
+    /**
+     * Whether the spawn-preload split is actually closed, i.e. whether a cold boot's preload rolls the
+     * post-TooMuchLoot table rather than the pre one. Read this, do not infer it.
+     *
+     * <p>
+     * Exists for {@code WorldgenProbe}, whose warm slots replicate the spawn preload inside a live JVM and must
+     * restore whichever table a real cold boot would have had. It used to decide that by
+     * {@code Class.forName("…EarlyLootTables")}, which was right until {@code -Dgtnhdet.f9=false} existed: that flag
+     * deliberately keeps the same jar on the classpath in both arms (see {@link #enabled()}), so class presence
+     * stopped meaning F9 is on. A warm arm with the flag off would then restore the post table against a cold boot
+     * that used pre — the 2.8.4 warm-slot contamination with the sign flipped, deterministic and so invisible to a
+     * warm[A-&gt;A] self-test.
+     *
+     * <p>
+     * The property alone would not be enough either. {@link #apply()} also leaves the split open when TooMuchLoot is
+     * absent, reports {@code failed}, has no loot folder, or throws — every one of those is "cold preload rolls pre"
+     * while the flag reads on. So this reports the measured outcome of the last {@link #apply()}, falling back to
+     * the configured intent before the first one.
+     *
+     * <p>
+     * Unlike {@link #consumeApplied()} this does not reset anything: that flag is the mixin's one-shot permission to
+     * suppress TooMuchLoot's later run, and a second reader would steal it.
+     */
+    public static synchronized boolean isActive() {
+        return activeLatch != null ? activeLatch : enabled();
     }
 
     /**
@@ -107,8 +141,22 @@ public final class EarlyLootTables {
         return !"false".equalsIgnoreCase(System.getProperty("gtnhdet.f9"));
     }
 
-    /** Called from the {@code loadAllWorlds} head injectors; safe when TooMuchLoot is absent. */
+    /**
+     * Called from the {@code loadAllWorlds} head injectors; safe when TooMuchLoot is absent.
+     *
+     * <p>
+     * The latch behind {@link #isActive()} is set here, in a {@code finally} over the whole body rather than at each
+     * of the six exits, so the two cannot disagree about what happened however this method returns.
+     */
     public static synchronized void apply() {
+        try {
+            applyInner();
+        } finally {
+            activeLatch = applied;
+        }
+    }
+
+    private static void applyInner() {
         applied = false;
         deferredBonusChest = null;
         if (!enabled()) {

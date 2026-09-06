@@ -27,6 +27,11 @@ dependencies {
     // call-site target is a string the annotation processor does not resolve.
     // transitive=false: GT pulls CodeChickenLib 1.3.0, purged from the GTNH maven. Nothing we touch in GT exposes a
     // CCL type, so the stubs are unnecessary.
+    // Left at .115 deliberately though 2.9.0-beta-3 ships 5.09.54.133: every class the mixins bind to or name is
+    // unchanged between the two. GTWorldgenerator$WorldGenContainer is byte-for-byte identical, and WorldgenGTOreLayer
+    // and gregtech.common.ores.OreManager do not appear in the changed-entry list at all. The .133 diff is confined to
+    // the oregen-pattern persistence rework (GT PR 7919), which this jar does not touch. Verified by disassembly and
+    // by a measured run — results/2026-09-06-2.9.0-beta-3-compatibility.
     compileOnly('com.github.GTNewHorizons:GT5-Unofficial:5.09.54.115:dev') { transitive = false }
     compileOnly(rfg.deobf('curse.maven:biomes-o-plenty-220318:2499612'))
     compileOnly(rfg.deobf('curse.maven:witchery-69673:2234410'))

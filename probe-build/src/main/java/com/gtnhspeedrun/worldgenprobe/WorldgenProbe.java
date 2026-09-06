@@ -1084,25 +1084,87 @@ public class WorldgenProbe {
      * With the determinism jar's F9 the split no longer exists: TooMuchLoot is applied at {@code loadAllWorlds}
      * before any chunk, so a cold boot's preload rolls the post table and the warm path must match. Restoring
      * {@code pre} under F9 would be the same contamination with the sign flipped.
+     *
+     * <p>
+     * Which of the two applies is asked of the fix jar, never inferred from the classpath — {@code -Dgtnhdet.f9=false}
+     * keeps the same jar loaded on purpose, and F9 also leaves the split open when TooMuchLoot is absent, failed, or
+     * threw. See {@link #f9Active()}.
      */
     private static java.util.Map<String, LootSnap> lootSnapForPreload() {
         if (f9Active()) return lootSnapPost;
         return lootSnapPre;
     }
 
-    private static Boolean f9Cache;
+    /**
+     * Whether the determinism jar's F9 actually closed the spawn-preload split, which decides the table
+     * {@link #lootSnapForPreload()} restores.
+     *
+     * <p>
+     * Asks {@code EarlyLootTables.isActive()}, the fix jar's own answer, so the probe cannot hold a stale opinion
+     * about the jar's behaviour. It used to test class presence alone, which was correct until
+     * {@code -Dgtnhdet.f9=false} was added: that flag deliberately leaves the jar on the classpath in both arms so
+     * the {@code require = 1} mixins still bind, which made class presence stop meaning "F9 on". A warm arm with the
+     * flag off then restored the post table while a real cold boot in that configuration used pre — the documented
+     * 17-wrong-chests-per-seed warm-slot contamination, sign flipped, and deterministic enough to survive a
+     * warm[A-&gt;A] self-test unnoticed.
+     *
+     * <p>
+     * Not memoised. The old cache predated a jar-side answer that can differ per server start, and the call is a
+     * cached-{@code Method} invoke on a path that already copies whole loot tables. The log line is rate-limited to
+     * one per distinct verdict instead, so a run still states which table it chose without repeating it per slot.
+     *
+     * <p>
+     * Falls back to the property for fix jars older than {@code isActive()}. That fallback is strictly worse — it
+     * cannot see a TooMuchLoot failure — so it says so in the log rather than passing for the real answer.
+     */
+    private static java.lang.reflect.Method f9IsActive;
+    private static boolean f9Resolved;
+    private static Boolean f9LastLogged;
 
     private static boolean f9Active() {
-        if (f9Cache == null) {
+        final Class<?> earlyLootTables;
+        try {
+            earlyLootTables = Class.forName("com.gtnhspeedrun.determinism.worldgen.EarlyLootTables");
+        } catch (ClassNotFoundException absent) {
+            return f9Log(false, "determinism jar absent");
+        }
+        if (!f9Resolved) {
+            f9Resolved = true;
             try {
-                Class.forName("com.gtnhspeedrun.determinism.worldgen.EarlyLootTables");
-                f9Cache = Boolean.TRUE;
-                LOG.info("[probe][loot] determinism jar F9 present — replicated preloads use the post-TML table");
-            } catch (ClassNotFoundException absent) {
-                f9Cache = Boolean.FALSE;
+                f9IsActive = earlyLootTables.getMethod("isActive");
+            } catch (NoSuchMethodException older) {
+                f9IsActive = null;
             }
         }
-        return f9Cache;
+        if (f9IsActive == null) {
+            // Pre-isActive fix jar. Honour the flag at least; a TooMuchLoot failure is invisible from here.
+            final boolean on = !"false".equalsIgnoreCase(System.getProperty("gtnhdet.f9"));
+            return f9Log(
+                on,
+                "fix jar predates EarlyLootTables.isActive() — read from -Dgtnhdet.f9, which cannot "
+                    + "see a TooMuchLoot failure");
+        }
+        try {
+            return f9Log((Boolean) f9IsActive.invoke(null), "EarlyLootTables.isActive()");
+        } catch (Exception e) {
+            // Do not guess. Guessing wrong silently poisons every chest inside the preload radius.
+            throw new IllegalStateException(
+                "could not read EarlyLootTables.isActive(); warm preload table is "
+                    + "unknowable and any result would be silently wrong",
+                e);
+        }
+    }
+
+    private static boolean f9Log(boolean active, String via) {
+        if (f9LastLogged == null || f9LastLogged.booleanValue() != active) {
+            f9LastLogged = active;
+            LOG.info(
+                "[probe][loot] determinism jar F9 {} ({}) — replicated preloads use the {} table",
+                active ? "ACTIVE" : "inactive",
+                via,
+                active ? "post-TML" : "pre-TML");
+        }
+        return active;
     }
 
     @SuppressWarnings("unchecked")

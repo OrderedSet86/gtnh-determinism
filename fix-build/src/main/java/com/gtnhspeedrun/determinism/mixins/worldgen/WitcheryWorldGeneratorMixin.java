@@ -38,9 +38,19 @@ import com.gtnhspeedrun.determinism.worldgen.WitcheryTrace;
  * which is why the trace exists. See results/2026-08-29-witchery-placement-trace.
  *
  * <p>
- * Known residual: {@code nonInRange} consults {@code structuresList}, whose contents depend on what was placed
- * earlier in the run, so cell verdicts are order-dependent in principle. It did not fire on those seeds, where
- * placements are sparse; a denser seed is the case to test next.
+ * No order dependence remains, and the obvious suspect is cleared. {@code structuresList} is one list shared by every
+ * dimension, but nothing gates on it: its only three references in {@code witchery-1.7.10-0.24.1} are the
+ * constructor, the {@code add} below, and {@code initiate()}'s {@code clear()}. {@code nonInRange} is the vanilla
+ * scattered-feature region formula ({@code World.setRandomSeed(regionX, regionZ, 10387312)}) — it reads no blocks,
+ * touches no list, and ignores its {@code range} argument entirely, so every handler shares one region grid.
+ * Disassembled, not inferred; {@code WitcheryPrefilter} predicts cells from the same reading.
+ *
+ * <p>
+ * The dimension branch in {@link #generate} is stock. Surface structures generate in the overworld, and — when
+ * {@code Config.worldGenTwilightForest} is set, which GTNH ships {@code true} — in any dimension whose
+ * {@code getDimensionName()} is the literal {@code "Twilight Forest"}. That match is on the NAME, so retuning TF's
+ * dimension id does not move it. This overwrite reproduces the branch verbatim; the only change is which
+ * {@code Random} is handed on, stock passing {@code world.rand} where this passes FML's seeded per-chunk one.
  */
 @Mixin(value = WitcheryWorldGenerator.class, remap = false)
 public abstract class WitcheryWorldGeneratorMixin {
