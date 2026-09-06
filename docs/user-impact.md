@@ -12,11 +12,16 @@ same seed → same world, every launch, every machine, every route.
 Existing saves are safe: worldgen fixes only affect **newly generated chunks**. Nothing regenerates or corrupts in
 areas you've already explored.
 
-**Singleplayer worlds made before 2026-09-05 reset a second time.** The loot fix that unifies the spawn-region chest
-table (F9) hooks `MinecraftServer.loadAllWorlds`, but singleplayer runs an `IntegratedServer`, which overrides that
-method — so on a client the fix silently never ran, and the ~400x400-block area around spawn kept stock's separate,
-richer loot table. Dedicated servers were always correct. Chests inside that spawn window change once, on the jar
-that adds `IntegratedServerLootMixin`; everything outside it is unaffected.
+**Singleplayer worlds made before 2026-09-05 reset a second time, and not just the loot.** The fix that unifies the
+spawn-region chest table (F9) hooks `MinecraftServer.loadAllWorlds`, but singleplayer runs an `IntegratedServer`,
+which overrides that method — so on a client the fix silently never ran, and the ~400x400-block area around spawn
+kept stock's separate, richer loot table. Dedicated servers were always correct.
+
+The catch: filling a chest consumes randomness from the shared chunk stream, and how much it consumes depends on
+which loot table is live. So changing the table inside the spawn region also shifts everything generated after a
+chest in those chunks — ores, caves, lakes, and in a few cases whether a chest exists at all. Measured on one seed:
+about 76 of ~1000 chunks differ, against a 5-chunk noise floor, with ore-depth changes at y0-47. **Re-scout the area
+within ~200 blocks of spawn; outside it nothing changes.**
 
 **The bonus chest is not nerfed and never should have been.** If you tick "bonus chest" at world creation, its
 contents come from the pre-TooMuchLoot table, exactly as on stock — that chest is filled before TooMuchLoot applies,

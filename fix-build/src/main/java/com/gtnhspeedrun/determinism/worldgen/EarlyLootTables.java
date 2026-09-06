@@ -97,10 +97,26 @@ public final class EarlyLootTables {
         }
     }
 
-    /** Called from the {@code MinecraftServer.loadAllWorlds} head injector; safe when TooMuchLoot is absent. */
+    /**
+     * {@code -Dgtnhdet.f9=false} restores stock ordering: nothing is applied early, {@link #consumeApplied()} stays
+     * false, and TooMuchLoot's own handler runs untouched at {@code FMLServerStartingEvent}. Same jar in both arms
+     * — the mixins still load and still bind at {@code require = 1}, so a binding failure is loud on both sides of
+     * an A/B rather than silently turning one arm into a no-op. Same reasoning as {@code gtnhdet.orepin}.
+     */
+    private static boolean enabled() {
+        return !"false".equalsIgnoreCase(System.getProperty("gtnhdet.f9"));
+    }
+
+    /** Called from the {@code loadAllWorlds} head injectors; safe when TooMuchLoot is absent. */
     public static synchronized void apply() {
         applied = false;
         deferredBonusChest = null;
+        if (!enabled()) {
+            GtnhDeterminism.LOG.info(
+                "F9 disabled by -Dgtnhdet.f9=false — TooMuchLoot applies at its own time, spawn-preload "
+                    + "split restored (stock behaviour)");
+            return;
+        }
         final Class<?> main;
         try {
             main = Class.forName(TML_MAIN);

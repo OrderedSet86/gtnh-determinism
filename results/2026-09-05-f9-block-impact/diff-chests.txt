@@ -1,0 +1,27 @@
+batch A: 1 seeds   batch B: 1 seeds   compared: 1
+  DIFF seed -1636594104014467454@0  chests A= 129 B= 130  existence=3  contents=26  nbt=0
+        only-A (230, 40, 101) TileEntityChest
+        only-B (189, 40, 325) TileEntityChest
+        only-B (228, 40, 104) TileEntityChest
+        CHANGED (-37, 34, -17)
+          A: [(3, 'gregtech:gt.metaitem.01', 11365, 2, None), (8, 'minecraft:redstone', 0, 4, None), (15, 'minecraft:record_blocks', 0, 1, None), (16, 'gregtech:gt.metaitem.01', 11054, 2, None), (18, 'gregtech:gt.metaitem.01', 11302, 3, None), (24, 'gregtech:gt.metaitem.01', 11035, 5, None), (26, 'gregtech:gt.me
+          B: [(3, 'gregtech:gt.metaitem.01', 8505, 5, None), (8, 'gregtech:gt.metaitem.01', 2067, 3, None), (15, 'gregtech:gt.metaitem.02', 32137, 4, None), (16, 'gregtech:gt.metaitem.01', 11054, 2, None), (18, 'IC2:itemIngot', 1, 4, None), (24, 'gregtech:gt.metaitem.01', 11054, 6, None), (26, 'Railcraft:armor.s
+        CHANGED (-32, 34, -20)
+          A: [(0, 'gregtech:gt.metaitem.01', 11054, 3, None), (5, 'gregtech:gt.metaitem.01', 11054, 4, None), (8, 'gregtech:gt.metaitem.01', 11057, 12, None), (9, 'gregtech:gt.metaitem.01', 11036, 5, None), (10, 'gregtech:gt.metaitem.01', 11306, 1, None), (12, 'minecraft:redstone', 0, 1, None)]
+          B: [(0, 'etfuturum:beetroot_seeds', 0, 2, None), (5, 'gregtech:gt.metaitem.01', 8527, 4, None), (8, 'gregtech:gt.metaitem.01', 11305, 5, None), (9, 'gregtech:gt.metaitem.01', 2030, 3, None), (10, 'IC2:itemIngot', 1, 2, None), (12, 'minecraft:record_stal', 0, 1, None)]
+        CHANGED (-14, 12, 288)
+          A: [(0, 'gregtech:gt.metaitem.01', 11303, 1, None), (3, 'gregtech:gt.metaitem.01', 11300, 1, None), (7, 'gregtech:gt.metaitem.01', 11034, 6, None), (13, 'gregtech:gt.metaitem.01', 11048, 4, None), (16, 'Forestry:beeDroneGE', 0, 1, '{Genome:{Chromosomes:[{Slot:0b,UID0:"forestry.speciesSteadfast",UID1:"f
+          B: [(0, 'gregtech:gt.metaitem.01', 11305, 2, None), (6, 'gregtech:gt.metaitem.01', 11054, 4, None), (7, 'harvestcraft:beefwellingtonItem', 0, 21, None), (10, 'IC2:itemShardIridium', 0, 13, None), (18, 'gregtech:gt.metaitem.01', 8528, 6, None), (20, 'IC2:itemIngot', 1, 4, None), (21, 'OpenComputers:item
+        CHANGED (-8, 14, 207)
+          A: [(5, 'gregtech:gt.metaitem.01', 11018, 1, None), (6, 'gregtech:gt.metaitem.01', 11058, 2, None), (12, 'gregtech:gt.metaitem.02', 32137, 8, None), (13, 'gregtech:gt.metaitem.01', 8503, 5, None), (17, 'Railcraft:armor.steel.legs', 0, 1, None), (25, 'gregtech:gt.metaitem.01', 11054, 3, None), (26, 'gre
+          B: [(5, 'harvestcraft:beefwellingtonItem', 0, 1, None), (6, 'gregtech:gt.metaitem.01', 11305, 2, None), (12, 'gregtech:gt.metaitem.01', 8502, 3, None), (13, 'gregtech:gt.metaitem.01', 11305, 5, None), (17, 'gregtech:gt.metaitem.01', 11031, 2, None), (25, 'openmodularturrets:baseTierWood', 0, 1, None), 
+        CHANGED (10, 29, 138)
+          A: [(1, 'Thaumcraft:ItemBaubleBlanks', 1, 1, None), (8, 'HardcoreEnderExpansion:knowledge_note', 0, 1, '{pts:10b,}'), (9, 'gregtech:gt.metaitem.01', 11054, 6, None), (14, 'gregtech:gt.metaitem.01', 8527, 3, None), (19, 'gregtech:gt.metaitem.01', 11036, 8, None), (20, 'Thaumcraft:ItemBaubleBlanks', 1, 1
+          B: [(1, 'harvestcraft:heartybreakfastItem', 0, 21, None), (8, 'TConstruct:heartCanister', 1, 1, None), (9, 'harvestcraft:delightedmealItem', 0, 19, None), (14, 'minecraft:iron_ingot', 0, 4, None), (19, 'gregtech:gt.metaitem.01', 11335, 3, None), (24, 'gregtech:gt.metaitem.02', 32100, 12, None), (26, 'g
+
+total chests: A=129 B=130
+existence differences: 3
+contents  differences: 26
+NBT-only  differences: 0   <- a failure, not a footnote
+
+VERDICT: 1/1 seeds differ: -1636594104014467454@0

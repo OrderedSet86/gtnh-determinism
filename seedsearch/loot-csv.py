@@ -86,13 +86,22 @@ def main():
 
     sx, _sy, sz = row["spawn"]
 
-    # Categories whose contents are known NOT to reproduce across environments. `villageBlacksmith` is
-    # the vanilla ChestGenHooks table that mods mutate at runtime; its roll COUNT is drawn inside
-    # addComponentParts from the structure RNG, which F10 does not fork, so the number of stacks — and
-    # therefore everything in the chest — varies between a probe server and a client even on the same
-    # seed and jar. Measured on -1636594104014467454 (43,63,27): 3 stacks predicted, 7 in the user's
-    # world, while 67 of the 68 chests in the surrounding window matched exactly. See HANDOFF item 12.
-    ENV_DEPENDENT = {"villageBlacksmith"}
+    # Categories whose contents do not reproduce across environments. Empty since 2026-09-05.
+    #
+    # `villageBlacksmith` lived here from 2026-09-04: on -1636594104014467454 (43,63,27) the probe
+    # server drew 3 stacks and the user's client drew 7, so its contents were labelled unreliable. The
+    # cause was NOT the roll count being drawn outside F10's fork, as the note here used to say. It was
+    # that F9 never fired in singleplayer at all — `IntegratedServer` overrides `loadAllWorlds` without
+    # calling `super` — so the client rolled that chest from the PRE-TooMuchLoot table (60 entries,
+    # 3-9) while the probe rolled it from the post table (118 entries, 4-11). The chest sits at chunk
+    # (2,1) with spawn chunk (9,9), i.e. inside the 25x25 spawn preload, which is the only region where
+    # the two tables differ.
+    #
+    # Both sides were reproduced exactly on a dedicated server by toggling `-Dgtnhdet.f9`, and the fix
+    # makes singleplayer agree with the probe. See `results/2026-09-05-f9-block-impact/` and HANDOFF
+    # item 12. Chests predicted for worlds generated BEFORE that fix are still wrong inside the
+    # preload — regenerate rather than re-adding an exclusion here.
+    ENV_DEPENDENT: set[str] = set()
 
     # Piece classes the chest-site table covers, from BOTH lists: a piece in `chestless` is a measured
     # "this one places nothing", which is a different statement from absence.
