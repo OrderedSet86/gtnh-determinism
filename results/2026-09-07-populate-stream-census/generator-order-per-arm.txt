@@ -1,0 +1,36 @@
+# FML IWorldGenerator dispatch order, one row per position, one column per arm.
+# daily-707, seed -777, probe jar md5 e3e2c1fd9df11bf3623d0459bb6bca1e, default -XX:hashCode.
+# Raw gencensus-*.json dumps are gitignored (results/**/*.json); this is the extract the
+# headline claim rests on. Distinct weights are pinned by the sort; ties are identity-hash order.
+
+  i      weight  java17a                           java17b                           java17c                           java21a                           java21b                         
+  0           0  IC2                               IC2                               ThaumcraftWorldGenerator          WorldGeneratorNether              PamGardenGenerator              
+  1           0  SimpleGenHandler$                 IglooGeneratorIWG                 WorldGenerator                    DraconicWorldGenerator            WorldGeneratorNether            
+  2           0  WorldHandler                      WorldGeneratorNether              IC2                               DungeonGenerator                  WorldGeneratorNether            
+  3           0  TBaseWorldGenerator               DraconicWorldGenerator            DungeonGenerator                  MonumentGeneratorIWG              WitcheryWorldGenerator          
+  4           0  WorldGenerator                    ThaumcraftWorldGenerator          DraconicWorldGenerator            ModuleGeneration                  PamTreeGenerator                
+  5           0  DraconicWorldGenerator            MeteoriteWorldGen                 PamGardenGenerator                MeteoriteWorldGen                 WorldHandler                    
+  6           0  WorldGeneratorNether              PamGardenGenerator                EtFuturumWorldGenerator           WorldGeneratorNether              SimpleGenHandler$               
+  7           0  MonumentGeneratorIWG              TBaseWorldGenerator               WorldGeneratorNether              WitcheryWorldGenerator            WorldGenerator                  
+  8           0  ThaumcraftWorldGenerator          WorldGenerator                    PamTreeGenerator                  WorldGenerator                    IglooGeneratorIWG               
+  9           0  WorldGeneratorNether              WorldGeneratorNether              MeteoriteWorldGen                 IC2                               IC2                             
+ 10           0  PamGardenGenerator                MonumentGeneratorIWG              WorldGeneratorNether              EtFuturumWorldGenerator           EtFuturumWorldGenerator         
+ 11           0  MeteoriteWorldGen                 DungeonGenerator                  WitcheryWorldGenerator            TBaseWorldGenerator               WorldGeneratorNether            
+ 12           0  DungeonGenerator                  SimpleGenHandler$                 SimpleGenHandler$                 PamGardenGenerator                DungeonGenerator                
+ 13           0  WitcheryWorldGenerator            WorldHandler                      WorldHandler                      WorldGeneratorNether              TBaseWorldGenerator             
+ 14           0  ModuleGeneration                  EtFuturumWorldGenerator           IglooGeneratorIWG                 WorldHandler                      MeteoriteWorldGen               
+ 15           0  WorldGeneratorNether              WitcheryWorldGenerator            MonumentGeneratorIWG              PamTreeGenerator                  MonumentGeneratorIWG            
+ 16           0  EtFuturumWorldGenerator           PamTreeGenerator                  ModuleGeneration                  IglooGeneratorIWG                 ModuleGeneration                
+ 17           0  PamTreeGenerator                  ModuleGeneration                  WorldGeneratorNether              SimpleGenHandler$                 ThaumcraftWorldGenerator        
+ 18           0  IglooGeneratorIWG                 WorldGeneratorNether              TBaseWorldGenerator               ThaumcraftWorldGenerator          DraconicWorldGenerator          
+ 19           1  AutomagyWorldGenerator            AutomagyWorldGenerator            AutomagyWorldGenerator            AutomagyWorldGenerator            AutomagyWorldGenerator          
+ 20           2  SlimeIslandGen                    SlimeIslandGen                    SlimeIslandGen                    SlimeIslandGen                    SlimeIslandGen                  
+ 21          20  BaseTreeWorldgen                  BaseCropWorldgen                  BaseCropWorldgen                  BaseCloudWorldgen                 BaseCloudWorldgen               
+ 22          20  BaseCloudWorldgen                 BaseCloudWorldgen                 BaseCloudWorldgen                 BaseCropWorldgen                  BaseCropWorldgen                
+ 23          20  BaseCropWorldgen                  BaseTreeWorldgen                  BaseTreeWorldgen                  BaseTreeWorldgen                  BaseTreeWorldgen                
+ 24        1000  GeneratorChisel                   GeneratorChisel                   GeneratorChisel                   GeneratorChisel                   GeneratorChisel                 
+ 25  2147483647  LootGamesWorldGen                 EtFuturumLateWorldGenerator       EtFuturumLateWorldGenerator       WorldGeneratorSpace               PendingSlices$SliceApplier      
+ 26  2147483647  EtFuturumLateWorldGenerator       PendingSlices$SliceApplier        PendingSlices$SliceApplier        PendingSlices$SliceApplier        LootGamesWorldGen               
+ 27  2147483647  WorldGeneratorSpace               WorldGeneratorSpace               LootGamesWorldGen                 LootGamesWorldGen                 WorldGeneratorSpace             
+ 28  2147483647  PendingSlices$SliceApplier        LootGamesWorldGen                 WorldGeneratorSpace               EtFuturumLateWorldGenerator       EtFuturumLateWorldGenerator     
+ 29  2147483647  GTWorldgenerator                  GTWorldgenerator                  GTWorldgenerator                  GTWorldgenerator                  GTWorldgenerator                

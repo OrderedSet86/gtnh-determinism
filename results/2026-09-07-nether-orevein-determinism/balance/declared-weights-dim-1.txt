@@ -1,0 +1,19 @@
+GT declared table weights vs realised share, Nether (dim -1), 18 paired seeds
+
+mix                              weight  declared     stock    pinned   closer
+ore.mix.iron                        120    0.1920    0.1820    0.1989   pinned
+ore.mix.sulfur                      100    0.1600    0.2370    0.1781   pinned
+ore.mix.netherquartz                 80    0.1280    0.0919    0.1133   pinned
+ore.mix.copper                       80    0.1280    0.1042    0.1129   pinned
+ore.mix.tetrahedrite                 70    0.1120    0.1118    0.1072   stock
+ore.mix.redstone                     60    0.0960    0.0976    0.1020   stock
+ore.mix.saltpeterelectrotine         40    0.0640    0.0571    0.0608   pinned
+ore.mix.beryllium                    30    0.0480    0.0510    0.0487   pinned
+ore.mix.manganese                    20    0.0320    0.0259    0.0361   pinned
+ore.mix.quartz                       20    0.0320    0.0356    0.0342   pinned
+ore.mix.molybdenum                    5    0.0080    0.0057    0.0080   pinned
+
+total-variation distance from declared:  stock 0.0853   pinned 0.0379
+pinned closer on 9 of 11 mixes
+
+Overworld comparison (results/2026-09-05-gt-ore-canonical-trigger): stock 0.3032, pinned 0.2826

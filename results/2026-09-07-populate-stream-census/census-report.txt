@@ -1,0 +1,75 @@
+5 arms
+
+  final-17a        jvm=17.0.19+10-LTS / 17.0.19   hashCode=default  generators=30
+  final-17b        jvm=17.0.19+10-LTS / 17.0.19   hashCode=default  generators=30
+  final-17c        jvm=17.0.19+10-LTS / 17.0.19   hashCode=default  generators=30
+  final-21a        jvm=21.0.11+10-LTS / 21.0.11   hashCode=default  generators=30
+  final-21b        jvm=21.0.11+10-LTS / 21.0.11   hashCode=default  generators=30
+
+=== FML IWorldGenerator dispatch order (stream B: own Random, write order only) ===
+pair                       identical  positions differing
+  final-17a vs final-17b      False      22/30
+  final-17a vs final-17c      False      25/30
+  final-17a vs final-21a      False      25/30
+  final-17a vs final-21b      False      24/30
+  final-17b vs final-17c      False      19/30
+  final-17b vs final-21a      False      22/30
+  final-17b vs final-21b      False      23/30
+  final-17c vs final-21a      False      23/30
+  final-17c vs final-21b      False      23/30
+  final-21a vs final-21b      False      20/30
+
+  per weight tie-block, order across arms:
+    weight 0            19 member(s)  5 DISTINCT ORDERS
+        PamGardenGenerator -> WorldGeneratorNether -> WorldGeneratorNether -> WitcheryWorldGenerator -> PamTreeGenerator -> WorldHandler -> SimpleGenHandler$ -> WorldGenerator -> IglooGeneratorIWG -> IC2 -> EtFuturumWorldGenerator -> WorldGeneratorNether -> DungeonGenerator -> TBaseWorldGenerator -> MeteoriteWorldGen -> MonumentGeneratorIWG -> ModuleGeneration -> ThaumcraftWorldGenerator -> DraconicWorldGenerator
+        WorldGeneratorNether -> DraconicWorldGenerator -> DungeonGenerator -> MonumentGeneratorIWG -> ModuleGeneration -> MeteoriteWorldGen -> WorldGeneratorNether -> WitcheryWorldGenerator -> WorldGenerator -> IC2 -> EtFuturumWorldGenerator -> TBaseWorldGenerator -> PamGardenGenerator -> WorldGeneratorNether -> WorldHandler -> PamTreeGenerator -> IglooGeneratorIWG -> SimpleGenHandler$ -> ThaumcraftWorldGenerator
+        IC2 -> IglooGeneratorIWG -> WorldGeneratorNether -> DraconicWorldGenerator -> ThaumcraftWorldGenerator -> MeteoriteWorldGen -> PamGardenGenerator -> TBaseWorldGenerator -> WorldGenerator -> WorldGeneratorNether -> MonumentGeneratorIWG -> DungeonGenerator -> SimpleGenHandler$ -> WorldHandler -> EtFuturumWorldGenerator -> WitcheryWorldGenerator -> PamTreeGenerator -> ModuleGeneration -> WorldGeneratorNether
+        IC2 -> SimpleGenHandler$ -> WorldHandler -> TBaseWorldGenerator -> WorldGenerator -> DraconicWorldGenerator -> WorldGeneratorNether -> MonumentGeneratorIWG -> ThaumcraftWorldGenerator -> WorldGeneratorNether -> PamGardenGenerator -> MeteoriteWorldGen -> DungeonGenerator -> WitcheryWorldGenerator -> ModuleGeneration -> WorldGeneratorNether -> EtFuturumWorldGenerator -> PamTreeGenerator -> IglooGeneratorIWG
+        ThaumcraftWorldGenerator -> WorldGenerator -> IC2 -> DungeonGenerator -> DraconicWorldGenerator -> PamGardenGenerator -> EtFuturumWorldGenerator -> WorldGeneratorNether -> PamTreeGenerator -> MeteoriteWorldGen -> WorldGeneratorNether -> WitcheryWorldGenerator -> SimpleGenHandler$ -> WorldHandler -> IglooGeneratorIWG -> MonumentGeneratorIWG -> ModuleGeneration -> WorldGeneratorNether -> TBaseWorldGenerator
+    weight 1             1 member(s)  PINNED
+    weight 2             1 member(s)  PINNED
+    weight 20            3 member(s)  3 DISTINCT ORDERS
+        BaseCloudWorldgen -> BaseCropWorldgen -> BaseTreeWorldgen
+        BaseCropWorldgen -> BaseCloudWorldgen -> BaseTreeWorldgen
+        BaseTreeWorldgen -> BaseCloudWorldgen -> BaseCropWorldgen
+    weight 1000          1 member(s)  PINNED
+    weight 2147483647    5 member(s)  5 DISTINCT ORDERS
+        PendingSlices$SliceApplier -> LootGamesWorldGen -> WorldGeneratorSpace -> EtFuturumLateWorldGenerator -> GTWorldgenerator
+        LootGamesWorldGen -> EtFuturumLateWorldGenerator -> WorldGeneratorSpace -> PendingSlices$SliceApplier -> GTWorldgenerator
+        WorldGeneratorSpace -> PendingSlices$SliceApplier -> LootGamesWorldGen -> EtFuturumLateWorldGenerator -> GTWorldgenerator
+        EtFuturumLateWorldGenerator -> PendingSlices$SliceApplier -> LootGamesWorldGen -> WorldGeneratorSpace -> GTWorldgenerator
+        EtFuturumLateWorldGenerator -> PendingSlices$SliceApplier -> WorldGeneratorSpace -> LootGamesWorldGen -> GTWorldgenerator
+
+=== terraingen event dispatch order (stream A: SHARED populate Random) ===
+  PopulateChunkEvent             EVENT_BUS        entries=0   stable=True
+  PopulateChunkEvent$Pre         EVENT_BUS        entries=8   stable=True
+  PopulateChunkEvent$Post        EVENT_BUS        entries=7   stable=True
+  PopulateChunkEvent$Populate    TERRAIN_GEN_BUS  entries=0   stable=True
+  DecorateBiomeEvent             EVENT_BUS        entries=0   stable=True
+  DecorateBiomeEvent$Pre         EVENT_BUS        entries=0   stable=True
+  DecorateBiomeEvent$Post        EVENT_BUS        entries=2   stable=True
+  DecorateBiomeEvent$Decorate    TERRAIN_GEN_BUS  entries=7   stable=True
+  OreGenEvent                    ORE_GEN_BUS      entries=0   stable=True
+  OreGenEvent$Pre                ORE_GEN_BUS      entries=0   stable=True
+  OreGenEvent$Post               ORE_GEN_BUS      entries=0   stable=True
+  OreGenEvent$GenerateMinable    ORE_GEN_BUS      entries=5   stable=True
+
+  every terraingen dispatch order identical across all 5 arms: True
+
+=== reconciliation: source enumeration vs what registered ===
+  source IWorldGenerator classes : 30
+  registered at runtime          : 28
+
+  in SOURCE but not registered (6) — each needs a named reason:
+    NaquadahOreWorldGen
+    OreClusterGenerator
+    OverworldGenerator
+    PamBeeGenerator
+    QuartzWorldGen
+    WorldGenPamSalt
+
+  registered but not in the source scan (4) — closed-source, or a scan miss:
+    IC2
+    PendingSlices$SliceApplier
+    ThaumcraftWorldGenerator
+    WitcheryWorldGenerator

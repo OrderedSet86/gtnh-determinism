@@ -158,6 +158,13 @@ Two readings that the chunk metric hides:
 | GT / mod ore placement | 3,741 — 5.3% | 3,407 — 4.2% | 0 | 0 |
 | **total** | **70,348 / 169 chunks** | **80,709 / 188 chunks** | **122 / 5 chunks** | **49 / 67 / 116** |
 
+**Correction (2026-09-06): the per-category zeros in the daily launch-pair column are not exact.**
+Re-measured on 0.8 at the same seed and radius, a same-order launch pair shows GT ore 1 and
+sand/gravel/clay 1, and 21 in the deepslate band once dirt/gravel generation is off. The floor is
+small and decoration-dominated, as this table says, but it is not zero and it moves between run-sets
+(2 blocks in one set, 6 in another). See
+[results/2026-09-06-dirt-gravel-attribution](../2026-09-06-dirt-gravel-attribution/README.md).
+
 The 2.7.4 launch-pair column is a **range over three cold launches**, not one pair, because two runs
 give a number with no scale attached to it. All three are IDENTICAL by live chunk hash — the spread
 is settling written to disk after hashing, dominated by deep dirt/gravel patch toggles. The daily

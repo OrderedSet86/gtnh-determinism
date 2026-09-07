@@ -320,6 +320,23 @@ public class WorldgenProbe {
             ChestLootExport.writeItemAttributes(ChestLootExport.dir());
         }
         MinecraftForge.EVENT_BUS.register(POP_LISTENER);
+        // -Dprobe.gencensus: dump the populate-RNG consumer registry and exit. Placed before every other
+        // mode so it never runs alongside one — it forces GameRegistry's sorted generator list early, and
+        // while that recompute is idempotent, a dump that shares a JVM with a measurement run is a dump
+        // whose provenance nobody can state later.
+        final String gencensus = GeneratorCensus.outPath();
+        if (gencensus != null) {
+            try {
+                GeneratorCensus.dump(new File(gencensus));
+            } catch (Exception e) {
+                LOG.error("Generator census failed", e);
+            }
+            LOG.info("[probe] shutting down server");
+            FMLCommonHandler.instance()
+                .getMinecraftServerInstance()
+                .initiateShutdown();
+            return;
+        }
         final String daemonDir = System.getProperty("probe.daemon");
         if (daemonDir != null) {
             try {

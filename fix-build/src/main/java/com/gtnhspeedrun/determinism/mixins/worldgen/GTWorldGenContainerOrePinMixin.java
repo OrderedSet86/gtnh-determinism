@@ -46,6 +46,18 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
  * {@code gtnhdet$pin}; see that field for why pinning it would be both unsafe and insufficient.
  *
  * <p>
+ * <b>The pin removes channel 1 by making it unreachable, not by correcting it.</b> With {@code chunkX == seedX},
+ * {@code resolveVeinPlacement} guarantees {@code veinWestX <= seedX} and {@code veinEastX >= seedX + 16}
+ * ({@code mSize >= 1}), so {@code limitWestX} is always {@code seedX + 2} and {@code limitEastX} always at least
+ * {@code seedX + 16}. The clipping test {@code limitWestX >= limitEastX} therefore never fires under the pin, in
+ * any dimension, and neither does the nine-sample stone probe behind it. What still filters is
+ * {@code generateWithPlacement}, which dry-runs a full placement at {@code dx == dz == 0} and returns
+ * {@code NO_OVERLAP_AIR_BLOCK} iff zero blocks landed — the terrain filter is relocated to the oreseed, which is
+ * what the F4d writeup means by "relocated, not disabled". The reachability claim is load-bearing for that
+ * writeup's balance argument, so it is asserted at runtime rather than left to arithmetic; see
+ * {@code -Dgtnhdet.orepin.assertprobe}.
+ *
+ * <p>
  * Applies to every other dimension, with no per-dimension code: Twilight Forest is covered by the same handlers
  * and measured at 0 of 1728 regions differing between a rows and a spiral walk, down from 225 of 1702.
  *
@@ -83,6 +95,11 @@ public class GTWorldGenContainerOrePinMixin {
      * Whether to pin for THIS container, from {@link GtOrePin#appliesTo} — a dimension WHITELIST, default
      * overworld and Twilight Forest, the only two with measured evidence. Every other dimension keeps stock
      * behaviour until someone measures it; see that field for why a blacklist here was the wrong shape.
+     *
+     * <p>
+     * "Every other dimension keeps stock behaviour" was false as written until 2026-09-07: the whitelist gated
+     * this mixin only, while the F4-family virgin reads ran unconditionally in every dimension. It is now true
+     * because all four handlers share {@link GtOrePin#appliesTo(World)}.
      */
     @Unique
     private boolean gtnhdet$pin;

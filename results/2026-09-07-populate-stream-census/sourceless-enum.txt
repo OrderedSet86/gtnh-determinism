@@ -1,0 +1,14 @@
+
+Thaumcraft-1.7.10-4.2.3.5.jar
+    REGISTERS   weight=0                        thaumcraft.common.Thaumcraft
+
+witchery-1.7.10-0.24.1.jar
+    REGISTERS   weight=0                        com.emoniph.witchery.Witchery
+
+extrautilities-1.2.12.jar
+    SUBSCRIBER  PopulateChunkEvent.Post        NORMAL   com.rwtema.extrautils.EventHandlerServer  #329 = Utf8               (Lnet/minecraftforge/event/terraingen/PopulateChunkEvent$Post;)V
+    REGISTERS   weight=9                        com.rwtema.extrautils.ExtraUtils
+    SUBSCRIBER  DecorateBiomeEvent.Decorate    NORMAL   com.rwtema.extrautils.worldgen.Underdark.EventHandlerUnderdark  #183 = Utf8               (Lnet/minecraftforge/event/terraingen/DecorateBiomeEvent$Decorate;)V
+
+industrialcraft-2-2.2.828-experimental.jar
+    REGISTERS   weight=0                        ic2.core.IC2

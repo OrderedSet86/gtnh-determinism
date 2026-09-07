@@ -64,7 +64,9 @@ public class OreManagerVirginDryRunMixin {
         require = 1)
     private static boolean gtnhdet$scopedDryRun(World world, int x, int y, int z, IStoneType defaultStone,
         IOreMaterial material, boolean small) {
-        if (!GtOrePin.ON) return OreManager.canSetOreForWorldGen(world, x, y, z, defaultStone, material, small);
+        if (!GtOrePin.appliesTo(world)) {
+            return OreManager.canSetOreForWorldGen(world, x, y, z, defaultStone, material, small);
+        }
         GtOreDryRun.open();
         try {
             return OreManager.canSetOreForWorldGen(world, x, y, z, defaultStone, material, small);
@@ -81,7 +83,7 @@ public class OreManagerVirginDryRunMixin {
                 + "Lgregtech/api/enums/StoneType;"),
         require = 1)
     private static StoneType gtnhdet$virginStone(World world, int x, int y, int z) {
-        if (!GtOrePin.ON || !GtOreDryRun.active()) return StoneType.findStoneType(world, x, y, z);
+        if (!GtOrePin.appliesTo(world) || !GtOreDryRun.active()) return StoneType.findStoneType(world, x, y, z);
         try {
             return VirginStoneType.at(world, x, y, z);
         } catch (Throwable t) {
@@ -100,8 +102,9 @@ public class OreManagerVirginDryRunMixin {
                 + "Lgregtech/common/ores/OreInfo;"),
         require = 1)
     private static OreInfo<IOreMaterial> gtnhdet$virginOreInfo(IBlockAccess access, int x, int y, int z) {
-        if (!GtOrePin.ON || !(access instanceof World)) return OreManager.getOreInfo(access, x, y, z);
+        if (!(access instanceof World)) return OreManager.getOreInfo(access, x, y, z);
         final World world = (World) access;
+        if (!GtOrePin.appliesTo(world)) return OreManager.getOreInfo(access, x, y, z);
         try {
             // GT's own (Block, meta) overload, fed virgin inputs — not a reimplementation of the adapter walk.
             return OreManager.getOreInfo(TerrainOracle.block(world, x, y, z), TerrainOracle.meta(world, x, y, z));

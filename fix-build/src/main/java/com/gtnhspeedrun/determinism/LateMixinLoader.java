@@ -10,6 +10,8 @@ import org.apache.logging.log4j.Logger;
 import com.gtnewhorizon.gtnhmixins.ILateMixinLoader;
 import com.gtnewhorizon.gtnhmixins.LateMixin;
 import com.gtnhspeedrun.determinism.worldgen.GtOrePin;
+import com.gtnhspeedrun.determinism.worldgen.NetherPopulateRng;
+import com.gtnhspeedrun.determinism.worldgen.OracleRngGuard;
 
 @LateMixin
 public class LateMixinLoader implements ILateMixinLoader {
@@ -100,6 +102,11 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (loadedMods.contains("Forestry")) {
             mixins.add("worldgen.ComponentVillageBeeHouseMixin");
         }
+        // Vanilla ChunkProviderHell, so no mod gate: unlike ChunkProviderGenerate and RWG's generator, its
+        // populate never re-seeds hellRNG, which makes the whole Nether decoration layer a function of chunk
+        // load order. Registered unconditionally and switched by gtnhdet.netherpop inside the handler, so both
+        // arms of an A/B are the same jar.
+        mixins.add("worldgen.ChunkProviderHellPopulateMixin");
         if (loadedMods.contains("lootgames")) {
             mixins.add("worldgen.LootGamesStructureGeneratorMixin");
         }
@@ -122,6 +129,8 @@ public class LateMixinLoader implements ILateMixinLoader {
         // is. Every mixin here binds with require >= 1, so anything listed either applied or brought the game down.
         LOG.info("{} worldgen mixins selected for this pack: {}", mixins.size(), mixins);
         GtOrePin.logState();
+        NetherPopulateRng.logState();
+        OracleRngGuard.logState();
         return mixins;
     }
 }

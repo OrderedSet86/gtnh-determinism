@@ -11,12 +11,21 @@ transition pair and by chunk. Ground truth for whether live-probe block jitter
 reaches the saved world.
 """
 import gzip
+import importlib.util
 import io
 import struct
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 import zlib
+
+# Provenance is printed by every tool that consumes a world, so nobody has to remember to look it up.
+# Imported by path because the filename is not a valid module identifier; inventory-region-diff.py
+# imports THIS module the same way and inherits the header for free.
+_pspec = importlib.util.spec_from_file_location(
+    "probe_provenance", Path(__file__).resolve().parent / "probe-provenance.py")
+prov = importlib.util.module_from_spec(_pspec)
+_pspec.loader.exec_module(prov)
 
 
 def read_nbt(buf):
@@ -135,6 +144,7 @@ def main():
             ids = {int(x) for x in nxt.split(",") if x.strip()}
     if ids is not None:
         print(f"filtering to {len(ids)} block ids")
+    prov.header(a_dir, b_dir)
     A = world_chunks(a_dir, window)
     B = world_chunks(b_dir, window)
     both = sorted(set(A) & set(B))

@@ -22,11 +22,35 @@ and TooMuchLoot parses its XML after `Preparing start region`. With it on, `firs
 1302. Every run below was checked for `F9 disabled by -Dgtnhdet.f9=false` (expect 1 in arm B, 0 in
 arm A) and `TooMuchLoot applied before world load` (the reverse) before any number was read.
 
-**`warm-probe.sh` cannot measure this flag.** `WorldgenProbe.f9Active()` detects F9 by
-`Class.forName("…EarlyLootTables")` and never reads `gtnhdet.f9`, so a warm arm with the flag off
-would restore `lootSnapPost` for its replicated preload while a real cold boot in that configuration
-uses `lootSnapPre` — the documented 17-wrong-chests-per-seed contamination with the sign flipped, and
-invisible to a warm self-test. All arms here are cold `run-probe.sh` boots.
+**`warm-probe.sh` could not measure this flag when this was written, and all arms below are cold
+`run-probe.sh` boots for that reason.** `WorldgenProbe.f9Active()` detected F9 by
+`Class.forName("…EarlyLootTables")` and never read `gtnhdet.f9`, so a warm arm with the flag off
+restored `lootSnapPost` for its replicated preload while a real cold boot in that configuration uses
+`lootSnapPre` — the documented 17-wrong-chests-per-seed contamination with the sign flipped, and
+invisible to a warm self-test.
+
+> **Fixed 2026-09-06.** `f9Active()` now asks the fix jar via `EarlyLootTables.isActive()`, which
+> reports the latched outcome of the last `apply()` — so it also catches the cases where F9 is
+> configured on but left the split open anyway (TooMuchLoot absent, `failed`, no loot folder, threw).
+> Class presence was never going to be enough: `-Dgtnhdet.f9=false` deliberately keeps the same jar on
+> the classpath in both arms.
+>
+> Measured against the old detection under otherwise identical conditions, seed
+> `-1636594104014467454`, radius 6, 625 chunks, beta-3:
+>
+> | warm run, `-Dgtnhdet.f9=false` | verdict logged | vs cold `f9=off` ground truth |
+> | --- | --- | ---: |
+> | old class-presence detection | `F9 ACTIVE — post-TML table` (wrong) | 321 / 625 |
+> | `isActive()` detection | `F9 inactive — pre-TML table` | 292 / 625 |
+>
+> The two warm runs differ from each other by **64 / 625 chunks — 40 blocks-only, 13 te-only, 10
+> both**. That is the contamination, quantified, and it is the same order as the real cold F9 effect
+> (65 / 625): inside the preload the old warm arm was reproducing the *other* arm entirely.
+>
+> Warm still does not equal cold here — 292 residual, all blocks-only. That gap is present in the
+> `f9=on` control too, so it is not this flag. It was chased separately and is real: against a
+> cold-vs-cold floor of 5 / 625 and a warm-vs-warm floor of 8 / 625, warm vs cold is 293 / 625, and it
+> contradicts `docs/HANDOFF.md:224`. See `results/2026-09-06-warm-vs-cold-terrain`.
 
 ## Blocks
 

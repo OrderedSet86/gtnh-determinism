@@ -29,7 +29,7 @@ version is installed, and every other fix targets code that is unchanged across 
 | Thaumcraft | Terrain-gated draw skew, `world.rand` barrow loot, first-chunk-wins bonus nodes, maze gen on a racing thread | Nodes, totems, barrows + loot seed-stable |
 | Thaumcraft (eldritch rings) | Obelisk presence was a population-order lottery — earlier rings suppressed up to 25 later candidates per window | One seed-pure site per 25×25-chunk region at stock density; spawner/banners deterministic |
 | Thaumcraft (loot amulet) | `Config.initLoot()` seeds a `Random` from the wall clock at mod init and bakes the roll into the loot Vis Amulet's NBT, then copies that one stack into the chest and loot-bag tables — so every launch dealt a different charge, and every amulet within a session dealt the *same* one | Charge derived from world seed + chest position + slot, so it is seed-stable and route-stable while differing from chest to chest. Per-aspect distribution is stock's `nextInt(5)`; only the correlation between amulets changes, from identical to independent. The init-time roll is pinned too, so an amulet pulled from a Thaumcraft loot bag carries a fixed charge rather than a per-launch one — but **which** item a bag gives you is rolled from `world.rand` when the player opens it, and stays gameplay-time random |
-| GregTech (ore veins) | Vein identity was decided from whichever of the surrounding 5x5 chunks the player's route populated FIRST: that chunk's coordinates set the clipping window, the local density AND the probe column, and a rejected candidate rolls a *different* mix | The identity decision is pinned to the vein's own oreseed chunk, and the reads it still makes answer from virgin terrain — a function of (seed, dim, oreseed, mix). Rows-vs-spiral on `-1636594104014467454` r60: overworld **140/1760 -> 0/1764**, Twilight Forest **225/1702 -> 0/1728**, against a 0/1762 same-order floor. Whitelisted to those two dimensions (`gtnhdet.orepin.dims`, default `0,7`) because they are the only two measured; the Nether is 21.9% and stays on stock. `-Dgtnhdet.orepin=false` restores stock bit-for-bit. The reroll is relocated, not disabled |
+| GregTech (ore veins) | Vein identity was decided from whichever of the surrounding 5x5 chunks the player's route populated FIRST: that chunk's coordinates set the clipping window, the local density AND the probe column, and a rejected candidate rolls a *different* mix | The identity decision is pinned to the vein's own oreseed chunk, and the reads it still makes answer from virgin terrain — a function of (seed, dim, oreseed, mix). Rows-vs-spiral on `-1636594104014467454` r60: overworld **140/1760 -> 0/1764**, Twilight Forest **225/1702 -> 0/1728**, Nether **413/1806 -> 0/1806**, each against a zero same-order floor. Whitelisted to those three dimensions (`gtnhdet.orepin.dims`, default `0,7,-1`) because they are the only three measured. `-Dgtnhdet.orepin=false` restores stock bit-for-bit. The reroll is relocated, not disabled. **Ore veins only** — the Nether's *decoration* (glowstone, quartz, lava, fortresses) is route-dependent in stock Minecraft and is NOT fixed; see results/2026-09-07-nether-orevein-determinism |
 | Et Futurum Requiem | `doDeepslateGen` gated the 4-block deepslate transition band with `chunk.worldObj.rand.nextInt(4)` per block — clock-seeded `World.rand`, so the y16-31 band was redrawn every launch. Cave-vine tile entities jittered their length the same way | Band derived from world seed + position; vine length seed-stable. Largest single source on the 2.9/daily line: 192,495 route-differing blocks before, 4,847 after |
 | Roguelike Dungeons | Position probed live neighbor terrain; placement decisions read live world state; MST-floor decoration iterated an identity-hashed `HashSet`; three rooms placed fireplaces/chests with clock-seeded `Collections.shuffle`; loot pipeline shifted with chest membership; dungeons wrote far outside their trigger chunk, racing each neighbor chunk's own lakes/decoration by approach order (a deep chest could exist or not per route) | Dungeon position, layout, every floor's decoration, and every chest's contents are a pure function of the seed; writes are sliced per chunk and applied after that chunk's own decoration, so the dungeon-vs-lake contest resolves identically on every route |
 | LootGames | Puzzle-room cracked-wall/broken-lamp variants rolled off a static clock-seeded `Random` | Room cosmetics seed-stable (minigame rewards are gameplay-time and untouched) |
@@ -84,39 +84,36 @@ contents, and — from probe format 5 — the entity list):
   small ores, village pieces, and witchery counts statistically equivalent (±10% bounds); a
   500k-draw Monte-Carlo over the shipped loot tables certifies rare chest items.
 - **Daily build** — on `daily-2026-08-28+707` a rows-vs-spiral route test drops from 371,406 to
-  66,034 differing blocks, and vein identity is route-stable exactly: 0 differing regions, not a
-  percentage. **66,034 is not a good number — the target is zero**, and the reduction should not be
+  67,519 differing blocks, and vein identity is route-stable exactly: 0 differing regions, not a
+  percentage. **67,519 is not a good number — the target is zero**, and the reduction should not be
   quoted without it. A full inventory of the residual, every differing block assigned
   to a category summing to 100%, is in
-  [results/2026-08-28-daily-2.9-compatibility](results/2026-08-28-daily-2.9-compatibility/README.md).
+  [results/2026-08-28-daily-2.9-compatibility](results/2026-08-28-daily-2.9-compatibility/README.md);
+  the 0.8 figures come from
+  [results/2026-09-06-dirt-gravel-attribution](results/2026-09-06-dirt-gravel-attribution/README.md),
+  whose worlds carry provenance stamps.
 
 ### Known remaining nondeterminism
 
 **The target is zero and this list is a defect backlog, not fine print.** Measured on the daily
-build, seed `-777`, radius 6, rows vs spiral, with the jar installed — 70,348 differing blocks
-across 169 chunks:
+build, seed `-777`, radius 6, rows vs spiral, with the 0.8 jar installed — **67,519 differing blocks
+across 168 chunks**. Categories sum to the total exactly.
 
-> **Re-measured on 0.8** (same seed, radius and walk pair): **66,034** differing blocks, down 4,314.
-> GT ore drops 36% — that is the vein-identity fix: identity no longer flips, so whole-footprint
-> replacements are gone and only host-stone variation on agreed veins remains. Every other category is
-> within noise of its 0.7 figure; deepslate is 16 blocks HIGHER. 0.8 values: decoration 38,082 / deep
-> dirt-gravel-stone 7,459 / GT stone blobs 7,044 / sand-gravel-clay-fluid 5,976 / deepslate 4,863 /
-> **GT ore 2,385**. These sum to 65,809, 225 short of the 66,034 total — the 0.7 categories summed
-> exactly, so one figure is misattributed or a seventh bucket appeared. Re-measure before quoting the
-> per-category 0.8 numbers.
->
-> Counting note: these are block-**ID** differences. `scripts/diff-region-blocks.py` reports `id:meta`
-> transitions and counts a change when EITHER moves, which on this world reads 157,325 — GT ore meta
-> encodes material *and* host stone. Metadata-only differences are 1,370.
+Two figures belong with it. The **launch floor is 6 blocks**, not zero, from a same-order pair of
+separate launches — an earlier run-set of the same six walks measured 2, so the floor is small but not
+stable, and no category count below should be read to a precision it does not have. And these are
+block-**ID** differences: `scripts/diff-region-blocks.py` reports `id:meta` transitions and counts a
+change when EITHER moves, which on this world reads 157,325, because GT ore meta encodes material
+*and* host stone. Metadata-only differences are 1,370.
 
 | source | blocks | note |
 |---|---|---|
-| decoration (grass/flowers/trees/hives) | 39,425 | endemic 1.7.10 decorator ordering; no per-mod fix known |
-| deep dirt/gravel/stone patches | 8,495 | GT ore placement is downstream of this — fixing it pays twice |
-| GT stone-layer blobs (granite/stone) | 7,451 | the one category the jar does not move at all (−3% vs stock) |
-| sand/gravel/clay/fluid settling | 6,389 | tick-timing; clay inherits it, since clay replaces sand/gravel |
-| EtFuturum deepslate band | 4,847 | was 192,495 before the deepslate fix |
-| GT / mod ore placement | 3,741 → **2,385** on 0.8 | per-BLOCK placement only. Vein *identity* is now exact: 0 differing regions rows-vs-spiral on this seed (106 regions), and on `-1636594104014467454` at r60 in both the overworld (0/1764) and Twilight Forest (0/1728). What remains is `OreManager.setOreForWorldGen` reading the live world at every write — mostly the same material in a different host stone — deliberately un-redirected |
+| decoration (grass/flowers/trees/hives) | 38,856 | no longer "endemic ordering, no per-mod fix known" — a source census of every consumer of the chunk's shared populate `Random` names four: Railcraft/NHCore geodes (`WorldGenGeode.placeOre` draws only where its own stone already landed, and the geode spans four chunks), TiC + NHCore surface ores (`SurfaceOreGen.findSurface` returns before the first draw), Forestry wild hives (`Collections.shuffle` on a shared list carried across chunks), and Botania flowers. [docs/populate-stream-census.md](docs/populate-stream-census.md) |
+| deep dirt/gravel/stone patches | 7,574 | **97.8% of it is `dirt <-> stone`** — RWG's `WorldGenMinable` pockets moving. Disabling them takes GT ore down 54% and the deepslate band 93% as well, so this bucket is worth ~21,600 blocks in total: [results/2026-09-06-dirt-gravel-attribution](results/2026-09-06-dirt-gravel-attribution/README.md) |
+| GT stone-layer blobs (granite/stone) | 7,468 | the one category the jar does not move at all. It gets *worse* when dirt/gravel is removed (+7%), since more stone is left for it to vary over |
+| sand/gravel/clay/fluid settling | 6,087 | tick-timing; clay inherits it, since clay replaces sand/gravel. Note the bucket above is named for gravel but contains none — every `*↔gravel` transition classifies here |
+| EtFuturum deepslate band | 4,582 | was 192,495 before the deepslate fix. The fix made the band's *decision* seed-pure; it could not make its substrate stable, so 93% of what is left is downstream of the dirt/gravel pockets above |
+| GT / mod ore placement | 2,952 | per-BLOCK placement only. Vein *identity* is now exact: 0 differing regions rows-vs-spiral on this seed (106 regions), and on `-1636594104014467454` at r60 in both the overworld (0/1764) and Twilight Forest (0/1728). What remains is `OreManager.setOreForWorldGen` reading the live world at every write — mostly the same material in a different host stone — deliberately un-redirected. **Over half of it is downstream of dirt/gravel** via first-writer-wins: `minecraft:dirt -> gt.blockores2` is among the commonest transitions |
 
 Chest loot is fully launch-deterministic, measured two ways: 131/131 chests identical across two cold
 launches of one seed with **zero tile-entity differences of any kind**, and 536 chests / 3,929 item
@@ -210,6 +207,8 @@ entry in that table still held as non-deterministic. The GregTech ore-vein ident
   interface friction only. It never changes what the game simulates, so install it with or without the fix jar.
 - `probe-build/` — **WorldgenProbe**, the headless determinism tester (inert without `-Dprobe.*` flags)
 - `scripts/` — verification + evidence tooling (see below)
+- `docs/populate-stream-census.md` — every consumer of the chunk populate `Random` in this pack, in
+  dispatch order, with a per-consumer verdict on whether it can move with chunk load order
 - `forks/` — mod forks carrying the same fixes at source level for upstream PRs (branch `determinism-fixes`)
 - `docs/` — audit report, fix list, user-impact notes
 - `jars/` — staging area for testing builds (releases are built by CI from tags)

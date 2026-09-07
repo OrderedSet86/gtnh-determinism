@@ -153,6 +153,32 @@ have reused, so it remains cheap to revisit if the distribution shift proves unp
   overworld is 0/334 and TF 0/330, while the **Nether is 78/356 (21.9%)** — still route-dependent, which is
   what proves the whitelist excludes rather than silently applying. The Nether is therefore a known-broken
   dimension, worse than the overworld's original 7.95%, and a candidate for the next round.
+
+  > **CORRECTION, 2026-09-07** — retract the sentence "which is what proves the whitelist excludes rather
+  > than silently applying", and treat 78/356 as void.
+  >
+  > The whitelist governed the coordinate pin **only**. `OreManagerVirginDryRunMixin` branched on
+  > `GtOrePin.ON` but never on the dimension, and `WorldgenGTOreLayerStoneTypeMixin` carried no gate at
+  > all — so the Nether was running virginised `OreManager` reads and a virginised stone probe the whole
+  > time, with only the trigger coordinates left unpinned. 78/356 measured that hybrid, not stock, and so
+  > it demonstrates that the *pin* was excluded, not that the *fix* was. It follows that
+  > `-Dgtnhdet.orepin=false` did not restore stock in any dimension either, which is stated as fact three
+  > times in this repo and was not true.
+  >
+  > The number also has no committed raw data and no command line, and its ~356 regions imply radius
+  > ~24-25 against the r60 that produced this page's 1760-region headline — so it was never comparable to
+  > the figures beside it.
+  >
+  > Replaced by `results/2026-09-07-nether-orevein-determinism`, which also **closes** the Nether: all
+  > four handlers now share `GtOrePin.appliesTo(World)`, so the whitelist governs the whole family and a
+  > stock arm is buildable, and `-1` is in the default `dims`. True stock r60 is **413/1806 (22.87%)**;
+  > pinned it is **0/1806** with zero differing geometry against a 0/1813 floor, and the totality audit
+  > goes **1,287 disagreeing oreseeds to 0**.
+  >
+  > That round also found the larger defect this page's framing obscured: ore veins are a small part of
+  > the Nether's route dependence. `ChunkProviderHell.populate` never re-seeds `hellRNG`, so **89% of
+  > Nether chunks differ between a rows and a spiral walk** (11,111,905 blocks, against a noisy
+  > same-order floor of order 10^4). That one is **not** fixed.
   Two review catches worth recording, both of which shipped briefly: the first version *documented* excluding
   The End but had no dimension check at all, so dim 1 was silently pinned; the second fixed that with
   `dimensionId != 1`, which is a blacklist — it left the Nether, every Galacticraft/GalaxySpace body,

@@ -1,0 +1,21 @@
+# GT vein-mix balance equivalence (dim -1)
+
+Seeds paired: 18.  Regions: stock 4771, fixed 4770.
+Cache entries kept 4771/4770, dropped as other-dimension 3119/3119.
+Equivalence bound +/-10%; 4000 seed-paired bootstrap replicates.
+
+mix                                 stock  fixed   ratio  95% CI            verdict
+ore.mix.sulfur                       1124    849   0.756  [0.725, 0.786]   FAIL
+ore.mix.iron                          863    948   1.099  [1.049, 1.160]   inconclusive
+ore.mix.tetrahedrite                  530    511   0.965  [0.912, 1.020]   PASS
+ore.mix.copper                        494    538   1.090  [1.010, 1.178]   inconclusive
+ore.mix.netherquartz                  436    540   1.239  [1.161, 1.325]   FAIL
+ore.mix.redstone                      463    486   1.051  [0.998, 1.116]   inconclusive
+ore.mix.saltpeterelectrotine          271    290   1.071  [0.983, 1.170]   inconclusive
+ore.mix.beryllium                     242    232   0.959  [0.876, 1.042]   inconclusive
+ore.mix.quartz                        169    163   0.969  [0.873, 1.082]   inconclusive
+ore.mix.manganese                     123    172   1.404  [1.266, 1.555]   FAIL
+ore.mix.molybdenum                     27     38   1.420  [1.068, 1.885]   inconclusive
+NoOresInVein                           29      3   0.102  [0.000, 0.200]   FAIL
+
+12 mixes tested (>= 5 observations): 4 FAIL, 7 inconclusive, 1 PASS

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Account for EVERY differing block between two saved 1.7.10 worlds, grouped by cause.
 
-Usage: inventory-region-diff.py <worldA> <worldB> [minCX maxCX minCZ maxCZ]
+Usage: inventory-region-diff.py <worldA> <worldB> [minCX maxCX minCZ maxCZ] [--detail CATEGORY]
+
+--detail takes a substring of a category name and dumps that bucket's transitions.
 
 diff-region-blocks.py prints the top 40 transitions, which hides the tail. This prints a
 complete inventory: every transition is assigned to a named category, the categories sum to
@@ -79,9 +81,32 @@ def classify(na, nb):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    # --detail CAT dumps the transitions behind one category. Without it this script reports six
+    # totals and no mechanism, which is enough to see a bucket move but not to say what moved.
+    #
+    # Consume the flag AND its value in one pass. Filtering on a leading "--" is not enough: the value
+    # has no dashes, so it survives the filter and becomes the first positional, silently shifting the
+    # world paths by one. That is the same defect as the --ids one documented in diff-region-blocks.py,
+    # and it fails the same way — a plausible-looking report over the wrong inputs.
+    argv = sys.argv[1:]
+    detail, args, i = None, [], 0
+    while i < len(argv):
+        a = argv[i]
+        if a.startswith("--detail="):
+            detail = a.split("=", 1)[1].lower()
+        elif a == "--detail":
+            if i + 1 >= len(argv):
+                sys.exit("--detail needs a category substring")
+            detail = argv[i + 1].lower()
+            i += 1
+        elif not a.startswith("--"):
+            args.append(a)
+        i += 1
+    if len(args) < 2:
+        sys.exit(__doc__)
     a_dir, b_dir = args[0], args[1]
     window = tuple(map(int, args[2:6])) if len(args) >= 6 else None
+    drb.prov.header(a_dir, b_dir)
     A = drb.world_chunks(a_dir, window)
     B = drb.world_chunks(b_dir, window)
     names = registry(a_dir)
@@ -142,6 +167,18 @@ def main():
         print("\nunclassified transitions (all of them):")
         for k, n in cat_pairs["unclassified"].most_common():
             print(f"  {n:8d}  {k}")
+    if detail:
+        hits = [c for c in cat_counts if detail in c.lower()]
+        if not hits:
+            print(f"\n--detail {detail!r} matched no category; try one of: "
+                  + ", ".join(sorted(cat_counts)))
+        for cat in hits:
+            print(f"\ntransitions in {cat!r} ({cat_counts[cat]} blocks, "
+                  f"{len(cat_pairs[cat])} distinct):")
+            for k, n in cat_pairs[cat].most_common(30):
+                print(f"  {n:8d}  {k}")
+            if len(cat_pairs[cat]) > 30:
+                print(f"  ... {len(cat_pairs[cat]) - 30} more distinct transitions")
 
 
 if __name__ == "__main__":

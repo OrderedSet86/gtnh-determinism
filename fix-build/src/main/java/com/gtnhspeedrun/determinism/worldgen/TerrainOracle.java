@@ -43,7 +43,11 @@ public final class TerrainOracle {
         Chunk c = CACHE.get(key);
         if (c == null) {
             final IChunkProvider generator = ((WorldServer) world).theChunkProviderServer.currentChunkProvider;
-            c = generator.provideChunk(cx, cz);
+            // Through OracleRngGuard, never generator.provideChunk directly: this is the LIVE generator, and
+            // its provideChunk re-seeds and then consumes the generator's own Random. Where populate does not
+            // re-seed that field - ChunkProviderHell does not - a call here permanently reroutes the
+            // dimension's decoration stream, and the number of calls depends on this cache, i.e. on the route.
+            c = OracleRngGuard.provideChunkIsolated(generator, cx, cz);
             CACHE.put(key, c);
         }
         return c;
