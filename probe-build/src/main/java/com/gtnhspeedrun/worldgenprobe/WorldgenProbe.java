@@ -51,6 +51,14 @@ import cpw.mods.fml.common.event.FMLServerStartedEvent;
  * ./probe-<order>.json) -Dprobe.dim=N (dimension to walk, default 0 = overworld; 7 is the Twilight Forest in
  * GTNH 2.8.4) -Dprobe.tffeatures=N (Twilight Forest feature map, region radius in 16-chunk regions; -1 or absent
  * disables — independent of probe.dim, because the map reads biomes only and generates no chunks)
+ *
+ * There is also a small group of world.rand diagnostics — -Dprobe.randstate, -Dprobe.randtrace and
+ * -Dprobe.randpin — added for the Thaumcraft loot-bag investigation (docs/world-rand-siting-leak.md).
+ * DO NOT reach for -Dprobe.randpin as part of an ordinary run. It overwrites world.rand before the walk,
+ * which is something no real world does, so any run using it is no longer a faithful reproduction of normal
+ * generation. It exists only to answer "did generation re-seed world.rand, or am I reading leftover boot
+ * state?", and it answers that by being deliberately unfaithful. Determinism runs must leave world.rand
+ * alone. See the flag's own comment before using it.
  */
 @Mod(
     modid = WorldgenProbe.MODID,
@@ -189,6 +197,18 @@ public class WorldgenProbe {
 
     @Mod.EventHandler
     public void loadComplete(FMLLoadCompleteEvent event) {
+        // -Dprobe.escbench=<path>: client-only ESC-menu driver (see EscBench). Behind a side check so the
+        // client-only class never loads on a dedicated server.
+        final String escOut = System.getProperty("probe.escbench");
+        if (escOut != null && FMLCommonHandler.instance()
+            .getSide()
+            .isClient()) {
+            try {
+                EscBench.install(escOut);
+            } catch (Throwable t) {
+                LOG.error("[escbench] install failed", t);
+            }
+        }
         // Pre-ServerStarting loot-table snapshot: cold boots generate the SPAWN REGION during loadAllWorlds,
         // BEFORE FMLServerStartingEvent mutates ChestGenHooks (TooMuchLoot rewrites categories there). Warm
         // recreates run their replicated spawn preload long after that mutation, so spawn-region chests roll
@@ -244,6 +264,151 @@ public class WorldgenProbe {
         m = java.util.regex.Pattern.compile("\"" + field + "\"\\s*:\\s*(-?[\\w.\\-/]+)")
             .matcher(json);
         return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * -Dprobe.bagpoc=&lt;path&gt;: proof of concept for the world.rand siting leak
+     * (docs/world-rand-siting-leak.md).
+     *
+     * Each trial generates one never-before-generated chunk and then immediately runs Thaumcraft's real
+     * {@code Utils.generateLoot} off {@code world.rand}, in the exact shape of
+     * {@code ItemLootBag.onItemRightClick}: {@code q = 8 + rand.nextInt(5)} then {@code q} draws. That
+     * reproduces the packet-path ordering — generation, then the bag read, with nothing in between — which is
+     * what a player produces by walking into fresh chunks and right-clicking, since
+     * {@code NetHandlerPlayServer.processPlayer} generates synchronously inside networkTick.
+     *
+     * The predictions under test:
+     * - two chunks in the SAME structure-grid cell pin world.rand to the same value, so their bags are
+     * byte-identical despite being separate generations;
+     * - a chunk in a DIFFERENT cell pins to a different value, so its bag differs;
+     * - re-running the whole thing in a fresh JVM on the same seed reproduces every payload exactly.
+     *
+     * lastSetSeedArg is recorded per trial so that a race between siting callers (observed near the origin)
+     * is visible rather than silently making the result look flaky.
+     */
+    private void runBagPoc(WorldServer world, String out) throws Exception {
+        final java.lang.reflect.Method generateLoot = Class.forName("thaumcraft.common.lib.utils.Utils")
+            .getMethod("generateLoot", int.class, java.util.Random.class);
+        // cells at 32-chunk granularity: (5,5),(5,6),(6,5) share cell (0,0); (40,*) is (1,1); (80,80) is (2,2)
+        final int[][] targets = { { 5, 5 }, { 5, 6 }, { 6, 5 }, { 40, 40 }, { 40, 41 }, { 80, 80 } };
+        final TracingRandom tracer = new TracingRandom(0L);
+        world.rand = tracer;
+        final StringBuilder sb = new StringBuilder();
+        sb.append("{\"seed\":")
+            .append(world.getSeed())
+            .append(",\"trials\":[");
+        for (int i = 0; i < targets.length; i++) {
+            final int cx = targets[i][0], cz = targets[i][1];
+            world.theChunkProviderServer.loadChunk(cx, cz); // generation -> structure siting -> the pin
+            final long seedArg = tracer.lastSeedArg;
+            final long tail = tracer.drawsSinceSeed;
+            // Open BAGS_PER_PIN bags back-to-back off this one pin, the way a player emptying a saved-up
+            // stack does. Bag 1 reads the pin; bag 2 reads it advanced by bag 1's draws; and so on. The GoG
+            // community's advice ("save up bags and open them all at once") predicts these differ, while
+            // re-pinning returns bag 1 to the same contents.
+            final int BAGS_PER_PIN = 5;
+            final StringBuilder items = new StringBuilder();
+            int q = 0;
+            for (int bag = 0; bag < BAGS_PER_PIN; bag++) {
+                q = 8 + world.rand.nextInt(5); // ItemLootBag.onItemRightClick, rarity 0
+                if (bag > 0) items.append(',');
+                items.append('[');
+                for (int a = 0; a < q; a++) {
+                    final net.minecraft.item.ItemStack is = (net.minecraft.item.ItemStack) generateLoot
+                        .invoke(null, Integer.valueOf(0), world.rand);
+                    if (a > 0) items.append(',');
+                    items.append('"')
+                        .append(
+                            is == null ? "null"
+                                : net.minecraft.item.Item.itemRegistry.getNameForObject(is.getItem()) + "@"
+                                    + is.getItemDamage()
+                                    + "x"
+                                    + is.stackSize)
+                        .append('"');
+                }
+                items.append(']');
+            }
+            if (i > 0) sb.append(',');
+            sb.append("\n  {\"chunk\":[")
+                .append(cx)
+                .append(',')
+                .append(cz)
+                .append("],\"cell32\":[")
+                .append((cx + 8) / 32)
+                .append(',')
+                .append((cz + 8) / 32)
+                .append("],\"lastSetSeedArg\":")
+                .append(seedArg)
+                .append(",\"tailDraws\":")
+                .append(tail)
+                .append(",\"lastQ\":")
+                .append(q)
+                .append(",\"bags\":[")
+                .append(items)
+                .append("]}");
+        }
+        sb.append("\n]}\n");
+        try (FileWriter w = new FileWriter(out)) {
+            w.write(sb.toString());
+        }
+        LOG.info("[probe] bag PoC written to {}", out);
+    }
+
+    /**
+     * Counting {@link Random} for -Dprobe.randtrace. A fingerprint only says whether two runs agree; this says
+     * why. It records every setSeed against world.rand (and the argument, which is what attributes a re-pin to
+     * a specific caller — {@code x*341873128712 + z*132897987541 + worldSeed + salt}) plus how many next()
+     * calls follow the last one.
+     *
+     * Random's constructor calls setSeed when the receiver is a subclass, and field initialisers run after
+     * super(), so setSeed must tolerate being invoked before this object is ready.
+     */
+    static final class TracingRandom extends java.util.Random {
+
+        private static final long serialVersionUID = 1L;
+        long seeds, draws, drawsSinceSeed, lastSeedArg;
+        java.util.Set<Long> distinctArgs;
+        /** First call stack seen per distinct setSeed argument — this is what actually names the reseeders. */
+        java.util.Map<Long, String> firstStack;
+
+        TracingRandom(long seed) {
+            super(seed);
+            distinctArgs = new java.util.HashSet<>();
+            firstStack = new java.util.LinkedHashMap<>();
+            seeds = 0;
+            draws = 0;
+            drawsSinceSeed = 0;
+        }
+
+        @Override
+        public synchronized void setSeed(long s) {
+            super.setSeed(s);
+            if (distinctArgs == null) return; // invoked from super(); counters not live yet
+            seeds++;
+            lastSeedArg = s;
+            drawsSinceSeed = 0;
+            if (distinctArgs.add(s)) {
+                final StackTraceElement[] st = new Throwable().getStackTrace();
+                final StringBuilder b = new StringBuilder();
+                for (int i = 1; i < st.length && i <= 7; i++) {
+                    if (i > 1) b.append(" <- ");
+                    b.append(st[i].getClassName())
+                        .append('.')
+                        .append(st[i].getMethodName())
+                        .append(':')
+                        .append(st[i].getLineNumber());
+                }
+                firstStack.put(s, b.toString());
+            }
+        }
+
+        @Override
+        protected int next(int bits) {
+            final int v = super.next(bits);
+            draws++;
+            drawsSinceSeed++;
+            return v;
+        }
     }
 
     /** Sets level-seed in the live DedicatedServer PropertyManager (fields found by type: they are private). */
@@ -1264,6 +1429,62 @@ public class WorldgenProbe {
             + contents.size();
     }
 
+    /**
+     * -Dprobe.tclootdump=&lt;path&gt;: dump Thaumcraft's three loot-bag tables, i.e.
+     * {@code thaumcraft.api.internal.WeightedRandomLoot.lootBag{Common,Uncommon,Rare}}.
+     *
+     * {@code ItemLootBag.onItemRightClick} draws 8-12 items straight off these, so their entry count and
+     * weight spread bound how varied one bag can look no matter what state world.rand is in — which is the
+     * competing explanation for "the first bag always gives the same stuff". The lists are assembled at
+     * runtime (Thaumcraft's own entries, plus ThaumcraftApi.addLootBagItem from other mods, plus ModTweaker
+     * script add/remove), so they cannot be reconstructed from source and must be read from a live instance.
+     */
+    private static void dumpThaumcraftLootBags(String path) {
+        try {
+            final Class<?> wrl = Class.forName("thaumcraft.api.internal.WeightedRandomLoot");
+            final String[] fields = { "lootBagCommon", "lootBagUncommon", "lootBagRare" };
+            final StringBuilder sb = new StringBuilder("{\n");
+            for (int fi = 0; fi < fields.length; fi++) {
+                final java.util.List<?> list = (java.util.List<?>) wrl.getField(fields[fi])
+                    .get(null);
+                int total = 0;
+                for (Object o : list) total += ((net.minecraft.util.WeightedRandom.Item) o).itemWeight;
+                sb.append("  \"")
+                    .append(fields[fi])
+                    .append("\": {\"entries\":")
+                    .append(list.size())
+                    .append(",\"totalWeight\":")
+                    .append(total)
+                    .append(",\"items\":[");
+                for (int i = 0; i < list.size(); i++) {
+                    final Object o = list.get(i);
+                    final net.minecraft.item.ItemStack s = (net.minecraft.item.ItemStack) o.getClass()
+                        .getField("item")
+                        .get(o);
+                    if (i > 0) sb.append(',');
+                    sb.append("{\"name\":\"")
+                        .append(s == null ? "null" : net.minecraft.item.Item.itemRegistry.getNameForObject(s.getItem()))
+                        .append("\",\"meta\":")
+                        .append(s == null ? -1 : s.getItemDamage())
+                        .append(",\"count\":")
+                        .append(s == null ? 0 : s.stackSize)
+                        .append(",\"weight\":")
+                        .append(((net.minecraft.util.WeightedRandom.Item) o).itemWeight)
+                        .append('}');
+                }
+                sb.append("]}")
+                    .append(fi + 1 < fields.length ? ",\n" : "\n");
+            }
+            sb.append("}\n");
+            try (FileWriter w = new FileWriter(path)) {
+                w.write(sb.toString());
+            }
+            LOG.info("[probe] thaumcraft loot bag tables dumped to {}", path);
+        } catch (Throwable t) {
+            LOG.error("[probe] tclootdump failed", t);
+        }
+    }
+
     private static String describeLootEntry(Object o) {
         try {
             final net.minecraft.util.WeightedRandomChestContent c = (net.minecraft.util.WeightedRandomChestContent) o;
@@ -1522,6 +1743,13 @@ public class WorldgenProbe {
         // Full-gen runs need the raise too: the prefilter path gets it via OreVeinTableDump.dumpOnce,
         // but a dim-7 ground-truth walk goes through here.
         if (Boolean.getBoolean("probe.gtdebug")) OreVeinTableDump.enableGtDebugLogging();
+        final String tcLootOut = System.getProperty("probe.tclootdump");
+        if (tcLootOut != null) dumpThaumcraftLootBags(tcLootOut);
+        final String bagPocOut = System.getProperty("probe.bagpoc");
+        if (bagPocOut != null) {
+            runBagPoc(world, bagPocOut);
+            return;
+        }
         final long seed = world.getSeed();
         final int dim = probeDim();
         final int walkR = radius + 1;
@@ -1546,11 +1774,94 @@ public class WorldgenProbe {
             c[0] += cx;
             c[1] += cz;
         }
+        // -Dprobe.randpin=<long>: force world.rand to a known state before the walk.
+        //
+        // NOT FOR NORMAL USE. A real world never does this: world.rand is `new Random()` at construction and
+        // is thereafter only re-seeded by structure siting. Pinning it makes the run diverge from how the game
+        // actually generates, so it must not appear in determinism A/Bs, seed searches, or anything whose
+        // output is meant to describe real worldgen. Leaving world.rand alone is part of what those runs are
+        // measuring.
+        //
+        // Its one job was diagnostic: a post-walk fingerprint can differ between runs either because the walk
+        // is nondeterministic or because it inherited leftover state from a wall-clock-dependent number of
+        // boot ticks. Pinning removes the second explanation, so any residual difference is the walk. That
+        // question is answered (docs/world-rand-siting-leak.md): generation re-seeds world.rand tens of
+        // thousands of times per walk, so the pin is overwritten anyway and a pinned run converges with an
+        // unpinned one. Prefer -Dprobe.randtrace, which reports what happened without altering it.
+        final String randPin = System.getProperty("probe.randpin");
+        if (randPin != null) {
+            world.rand.setSeed(Long.parseLong(randPin));
+            LOG.info("[probe] randpin world.rand seeded to {}", randPin);
+        }
+        // -Dprobe.randtrace=true: swap world.rand for a counting subclass. Fingerprints only say whether two
+        // runs agree; this says WHY. It records every setSeed (who re-pins world.rand, and to what argument,
+        // which is what attributes the pin to a specific caller) and how many next() calls follow the last one
+        // (the tail — the part that was varying between runs).
+        TracingRandom tracer = null;
+        if (Boolean.getBoolean("probe.randtrace")) {
+            tracer = new TracingRandom(world.rand.nextLong());
+            world.rand = tracer;
+            LOG.info("[probe] randtrace installed on world.rand");
+        }
         long t0 = System.currentTimeMillis();
         int n = 0;
         for (int[] c : walk) {
             world.theChunkProviderServer.loadChunk(c[0], c[1]);
             if (++n % 100 == 0) LOG.info("[probe] generated {}/{} chunks", n, walk.size());
+        }
+        // -Dprobe.randstate=<path>: fingerprint world.rand the instant generation finishes, before anything
+        // else can draw from it. Thaumcraft's ItemLootBag reads this same Random (it takes no seeded rand of
+        // its own), so if two fresh JVMs on one seed agree here, the "first bag after a reload is decided by
+        // the world seed" report has a mechanical explanation. Drawing perturbs the state, so this runs once;
+        // nextLong is a 64-bit fingerprint rather than the 5-6 bits an item identity would give.
+        final String randOut = System.getProperty("probe.randstate");
+        if (randOut != null) {
+            final int[] last = walk.get(walk.size() - 1);
+            final StringBuilder sb = new StringBuilder();
+            sb.append("{\"seed\":")
+                .append(seed)
+                .append(",\"dim\":")
+                .append(dim)
+                .append(",\"lastChunk\":[")
+                .append(last[0])
+                .append(',')
+                .append(last[1])
+                .append("],\"chunks\":")
+                .append(walk.size());
+            if (tracer != null) {
+                sb.append(",\"setSeedCalls\":")
+                    .append(tracer.seeds)
+                    .append(",\"lastSetSeedArg\":")
+                    .append(tracer.lastSeedArg)
+                    .append(",\"totalNextCalls\":")
+                    .append(tracer.draws)
+                    .append(",\"nextCallsAfterLastSetSeed\":")
+                    .append(tracer.drawsSinceSeed)
+                    .append(",\"distinctSetSeedArgs\":")
+                    .append(tracer.distinctArgs.size())
+                    .append(",\"callers\":{");
+                boolean first = true;
+                for (java.util.Map.Entry<Long, String> e : tracer.firstStack.entrySet()) {
+                    if (!first) sb.append(',');
+                    first = false;
+                    sb.append('"')
+                        .append(e.getKey())
+                        .append("\":\"")
+                        .append(e.getValue())
+                        .append('"');
+                }
+                sb.append('}');
+            }
+            sb.append(",\"draws\":[");
+            for (int i = 0; i < 8; i++) {
+                if (i > 0) sb.append(',');
+                sb.append(world.rand.nextLong());
+            }
+            sb.append("]}");
+            try (FileWriter w = new FileWriter(randOut)) {
+                w.write(sb.toString());
+            }
+            LOG.info("[probe] randstate {}", sb);
         }
         LOG.info("[probe] generation done in {} ms, hashing…", System.currentTimeMillis() - t0);
         // Live-path vein selections, next to the report. See OreVeinTableDump.dumpVeinCache.

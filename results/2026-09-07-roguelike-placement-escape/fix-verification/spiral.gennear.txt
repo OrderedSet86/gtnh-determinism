@@ -1,0 +1,12 @@
+trigger=116,4 attempt=0 loc=112,-65
+trigger=116,4 attempt=0 valid=112,-65 -> false
+trigger=116,4 attempt=1 loc=149,-64
+trigger=116,4 attempt=1 valid=149,-64 -> false
+trigger=116,4 attempt=2 loc=67,-23
+trigger=116,4 attempt=2 valid=67,-23 -> true
+trigger=-668,836 attempt=0 loc=-668,891
+trigger=-668,836 attempt=0 valid=-668,891 -> false
+trigger=-668,836 attempt=1 loc=-726,871
+trigger=-668,836 attempt=1 valid=-726,871 -> false
+trigger=-668,836 attempt=2 loc=-623,749
+trigger=-668,836 attempt=2 valid=-623,749 -> true

@@ -124,6 +124,12 @@ public class LateMixinLoader implements ILateMixinLoader {
                 mixins.add("worldgen.SegmentFirePlaceTraceMixin");
                 mixins.add("worldgen.SegmentGeneratorTraceMixin");
             }
+            // Diagnostic for the placement escape: logs every attempt of generateNear's 50-attempt loop
+            // so two arms can be diffed to see whether the LOCATION or the VERDICT diverges first.
+            // Registered only under its flag so a normal run cannot pay for it or trip its require=1.
+            if (Boolean.getBoolean("gtnhdet.tracegennear")) {
+                mixins.add("worldgen.DungeonAttemptTraceMixin");
+            }
         }
         // The determinism guarantee is only as wide as the set of mixins that actually loaded, so say what that set
         // is. Every mixin here binds with require >= 1, so anything listed either applied or brought the game down.

@@ -5,6 +5,13 @@ Worldgen, one GregTech change, and it is persistence-only — a freshly created 
 ore-vein pattern it did on daily-707, so vein layout for a given seed is unchanged. The fix jar needs
 no code change and every mixin still binds.**
 
+> **Chest loot re-verified 2026-09-07 on a dedicated server** with the same seed the rest of
+> this project uses (`-1636594104014467454`), both packs on byte-identical fix and probe jars:
+> **704 chests compared across two windows, 0 existence / 0 contents / 0 NBT differences**, and both
+> packs reproduce the daily-707 prefilter oracle 108/108 slot for slot. See
+> results/2026-09-07-beta3-chest-loot-parity. Note that raw NUMERIC item ids do differ between the
+> packs (registry allocation is per-world); the probe compares registry names, which is the correct
+> basis.
 Packs compared: `GT_New_Horizons_2.9.0-beta-3_Java_17-26.zip` against
 `GTNH-daily-2026-08-28+707-mmcprism-java17-26.zip`, plus the matching server zips.
 Jar under test `gtnhdeterminism-v0.8-main.1+a5efcee3d6-dirty`, md5 `a44cb01777493a5b5f986f71505d6c2f`.

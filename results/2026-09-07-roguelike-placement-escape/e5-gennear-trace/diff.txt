@@ -1,0 +1,8 @@
+12,16c12
+< trigger=-668,836 attempt=2 valid=-623,749 -> false
+< trigger=-668,836 attempt=3 loc=-621,829
+< trigger=-668,836 attempt=3 valid=-621,829 -> false
+< trigger=-668,836 attempt=4 loc=-622,835
+< trigger=-668,836 attempt=4 valid=-622,835 -> true
+---
+> trigger=-668,836 attempt=2 valid=-623,749 -> true

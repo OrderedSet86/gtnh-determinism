@@ -1,0 +1,256 @@
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon BEGIN at 67,-23
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon-window OPEN depth=1
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=41,50,-46 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=72,51,3 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=100,51,-41 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=72,51,-64 level=0 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=40,51,-9 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=75,51,10 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=56,50,-30 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=87,51,-12 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=80,50,-12 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=80,52,-14 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=80,53,-13 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=82,50,-12 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=82,52,-14 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=82,53,-13 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=56,50,-12 level=0 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=65,40,-106 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=52,40,-49 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=60,41,-59 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=58,41,-31 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=30,41,-21 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=63,41,-84 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=43,41,-70 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=89,41,-9 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=50,41,-29 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=64,41,-9 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=40,41,-81 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=20,41,-47 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=77,41,-47 level=1 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=51,41,-62 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=42,41,-57 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=70,41,-99 level=1 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=46,30,-12 level=2 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=114,30,-67 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=93,30,-102 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=127,30,-118 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=144,30,-45 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=93,30,-119 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=97,30,-50 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=144,30,-17 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=46,30,-97 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=80,30,-33 level=2 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=97,30,-16 level=2 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=114,30,-80 level=2 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=64,30,-29 level=2 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply DEFERRED chunk=1,-4 depth=1
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=31,23,-47 level=3 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=25,23,-55 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply DEFERRED chunk=6,-4 depth=1
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply DEFERRED chunk=7,-4 depth=1
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=121,20,-53 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=122,20,-47 level=3 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=54,20,-62 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=106,21,-89 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=104,20,-84 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=108,20,-85 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=35,20,-63 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=39,20,-67 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=76,20,-39 level=3 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=57,20,-82 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=51,20,-84 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=127,20,-68 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=124,20,-65 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=117,21,-62 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=81,21,-21 level=3 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=73,21,-21 level=3 placed=true detached=false
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=40,21,-75 level=3 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=78,7,-82 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=82,7,-82 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=84,7,-80 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=84,7,-76 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=82,7,-74 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=78,7,-74 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=76,7,-76 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=76,7,-80 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=51,10,-71 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=57,10,-85 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=39,10,-54 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=107,9,-51 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=107,10,-56 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=107,10,-52 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=75,11,-56 level=4 placed=true detached=true
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon-window FLUSH chunk=1,-4
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=1,-4 writes=1159
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon-window FLUSH chunk=6,-4
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=6,-4 writes=6061
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon-window FLUSH chunk=7,-4
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=7,-4 writes=3855
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=7,-5 writes=3015
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=5,-4 writes=4232
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=5,-5 writes=6739
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=4,-5 writes=10528
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=4,-6 writes=6876
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=4,-4 writes=9462
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=3,-4 writes=8434
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=2,-4 writes=7615
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=2,-5 writes=4642
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=3,-5 writes=7891
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=3,-6 writes=3232
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=6,-5 writes=4083
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon-window CLOSE depth=0
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon END at 67,-23
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=7,-1 writes=1184
+[19:31:05] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=8,-3 writes=2409
+[19:31:06] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=8,-2 writes=2070
+[19:31:06] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=8,-1 writes=1141
+[19:31:06] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=9,-3 writes=1770
+[19:31:06] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=9,-4 writes=1306
+[19:31:06] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=8,-4 writes=2387
+[19:31:06] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=9,-2 writes=1241
+[19:31:06] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=9,-1 writes=595
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon BEGIN at -622,835
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon-window OPEN depth=1
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-631,50,855 level=0 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-595,50,851 level=0 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-620,50,805 level=0 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-619,50,859 level=0 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-599,40,795 level=1 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-616,41,771 level=1 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-618,41,824 level=1 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-619,40,840 level=1 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-593,40,818 level=1 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-606,40,836 level=1 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-566,40,819 level=1 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-611,40,866 level=1 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-593,40,858 level=1 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-618,31,793 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-616,33,793 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-624,33,799 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-638,30,831 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-638,30,836 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-586,30,864 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-552,33,827 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-550,31,839 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-552,33,839 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-545,31,810 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-544,31,814 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-544,33,818 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-550,31,822 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-552,33,822 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-556,31,814 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-618,31,776 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-620,33,776 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-561,31,865 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-567,33,873 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-573,33,867 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-573,31,869 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-612,31,814 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-615,30,835 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-599,31,771 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-599,33,771 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-607,31,760 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-632,30,865 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-641,31,850 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-641,33,850 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-641,33,852 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-641,31,848 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-550,31,873 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-539,31,852 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-598,30,784 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-556,31,782 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-595,31,801 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-608,31,804 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-538,31,810 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-528,31,810 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-527,31,814 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-527,33,814 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-531,31,822 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-535,31,822 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-539,33,816 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-539,33,818 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-535,30,870 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-604,30,831 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-565,31,810 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-618,33,873 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-624,31,869 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-624,33,869 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-527,31,782 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-527,31,780 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-629,31,787 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-633,31,788 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-618,31,844 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-618,33,844 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-620,31,844 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-612,31,845 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-624,33,852 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-552,30,762 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-533,31,793 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-527,33,799 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-538,31,806 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-586,33,759 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-589,31,772 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-590,31,760 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-545,31,806 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-630,31,823 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-641,33,814 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-544,33,848 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-630,31,771 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-573,31,768 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-564,31,777 level=2 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-640,31,861 level=2 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-543,21,804 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-557,21,794 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-569,19,750 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-569,21,750 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-551,21,771 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-547,20,765 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-551,20,768 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-549,20,748 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-593,20,772 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-565,20,736 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-549,20,850 level=3 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-548,19,850 level=3 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-537,21,794 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-579,21,773 level=3 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-545,7,815 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-541,7,815 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-539,7,817 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-539,7,821 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-541,7,823 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-545,7,823 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-547,7,821 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-547,7,817 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-594,10,812 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-600,10,812 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-606,10,831 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-567,10,797 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-570,11,813 level=4 placed=true detached=false
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] chest-generate pos=-531,11,834 level=4 placed=true detached=true
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon-window CLOSE depth=0
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] dungeon END at -622,835
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-40,52 writes=3455
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-39,52 writes=9695
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-38,52 writes=9515
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-37,52 writes=5157
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-36,52 writes=4966
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-35,52 writes=5996
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-34,52 writes=4780
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-33,52 writes=491
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-41,53 writes=341
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-40,53 writes=4095
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-39,53 writes=6581
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-37,53 writes=1069
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-38,53 writes=5332
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-36,53 writes=5410
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-35,53 writes=5024
+[19:31:16] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-34,53 writes=3286
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-33,53 writes=418
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-40,54 writes=1183
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-39,54 writes=2963
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-38,54 writes=1516
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-37,54 writes=609
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-36,54 writes=2481
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-35,54 writes=1847
+[19:31:17] [Server thread/INFO] [gtnhdeterminism]: [slicetrace] apply chunk=-34,54 writes=1160

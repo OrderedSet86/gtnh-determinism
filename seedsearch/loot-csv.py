@@ -8,6 +8,19 @@ structure, or by distance without further munging. Chests whose contents stage 0
 row too, with `predicted=no` and the reason — omitting them would make the sheet read as a complete
 inventory when it is not.
 
+ROUTE CAVEAT for roguelike rows, measured 2026-09-07. These rows come from the prefilter, which
+builds the dungeon against a fully virgin world -- and that is exactly the case a real player
+produces, because arriving at an unexplored region populates the trigger chunk with an empty
+neighbourhood. Verified: the prefilter's 114 chests for one dungeon were reproduced 114/114 by a
+full-gen run whose trigger fired first.
+
+They are NOT invariant to how much of the neighbourhood already exists when the trigger fires. Same
+seed, same jar, same dedicated server: trigger firing midway through a walk produced 0 of those 114
+chests (a different dungeon entirely, built 86 blocks away), and trigger firing last produced 40 of
+114. So a predicted chest can be genuinely absent if the surrounding region was generated before you
+ever reached the trigger -- which is what happens if you fly past a dungeon and come back. Contents
+of chests that DO exist are always correct. See results/2026-09-07-roguelike-placement-escape.
+
 TELEPORTING, three things the coordinates alone do not tell you:
 
   Roguelike     `structure_tp` is the dungeon's TRIGGER chunk and you must visit it FIRST. The mod

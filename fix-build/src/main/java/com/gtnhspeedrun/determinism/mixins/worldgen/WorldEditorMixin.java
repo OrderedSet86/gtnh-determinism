@@ -7,6 +7,7 @@ import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
+import net.minecraft.world.biome.BiomeGenBase;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -84,6 +85,43 @@ public abstract class WorldEditorMixin implements WorldEditorAccess {
             return new MetaBlock(own);
         }
         return new MetaBlock(TerrainOracle.block(world, pos.getX(), pos.getY(), pos.getZ()));
+    }
+
+    /**
+     * @author GTNH speedrun determinism audit
+     * @reason Biome from the biome PROVIDER, a pure function of the seed, instead of
+     *         {@code World.getBiomeGenForCoords}, which is not.
+     *
+     *         <p>
+     *         Vanilla {@code World.getBiomeGenForCoordsBody} branches on whether the chunk is LOADED:
+     *
+     *         <pre>
+     *         if (this.blockExists(x, 0, z)) return chunk.getBiomeGenForWorldCoords(...); // STORED array
+     *         // else                        return worldChunkMgr.getBiomeGenAt(x, z);    // the provider
+     *         </pre>
+     *
+     *         RWG writes river carving into a chunk's stored biome array at generation, so the two answers
+     *         disagree. {@code Dungeon.validLocation}'s FIRST statement is a biome read rejecting RIVER /
+     *         BEACH / MUSHROOM / OCEAN, so a candidate site flipped verdict purely on whether its chunk had
+     *         been loaded yet — and that moved the whole dungeon. Measured on seed -1636594104014467454: the
+     *         same attempt at (-623,749) was accepted with the chunk unloaded and rejected with it loaded,
+     *         because the stored biome there is Hot River (207, type RIVER). The dungeon relocated 86 blocks
+     *         and shared 0 of 114 chests with the correct one. See
+     *         results/2026-09-07-roguelike-placement-escape.
+     *
+     *         <p>
+     *         <b>Why the provider and not the virgin chunk's stored array.</b> {@link TerrainOracle} could
+     *         supply the biome the chunk WILL store, which is the loaded-chunk answer and equally seed-pure.
+     *         That is the wrong target: {@code RoguelikePrefilter} — the oracle this project validates
+     *         dungeons against, and the basis of the existing seed corpus — runs against a world whose
+     *         chunks are never loaded, so it always takes the provider branch. Matching the provider makes
+     *         full-gen agree with the oracle and with every prediction already published; matching the
+     *         stored array would be self-consistent but would invalidate the corpus. It is also cheaper —
+     *         no chunk generation.
+     */
+    @Overwrite
+    public BiomeGenBase getBiome(Coord pos) {
+        return world.provider.worldChunkMgr.getBiomeGenAt(pos.getX(), pos.getZ());
     }
 
     /**
