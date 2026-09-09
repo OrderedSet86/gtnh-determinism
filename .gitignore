@@ -16,6 +16,10 @@ results/**
 # These rules follow the negations above, because the last match decides.
 results/**/*.json.*
 results/**/*-progress.txt
+# Per-block chunk extractions (-Dprobe.dump). Hundreds of KB each and regenerable
+# from the command recorded in the run's README; the finding they support belongs
+# in the README, the raw block listing does not.
+results/**/*.dump.txt
 */build/
 */.gradle/
 */gtnhShared/

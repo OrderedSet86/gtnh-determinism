@@ -12,6 +12,8 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
+import com.gtnhspeedrun.determinism.GtnhDeterminism;
+
 import thaumcraft.common.config.Config;
 import thaumcraft.common.lib.world.ThaumcraftWorldGenerator;
 import thaumcraft.common.lib.world.WorldGenEldritchRing;
@@ -70,6 +72,18 @@ public abstract class ThaumcraftWorldGeneratorMixin {
     private static Random gtnhdet$fork(World world, int chunkX, int chunkZ, long salt) {
         return com.gtnhspeedrun.determinism.worldgen.TcForkUtil.fork(world, chunkX, chunkZ, salt);
     }
+
+    /**
+     * {@code -Dgtnhdet.hilltoptrace=true}: one line per hilltop candidate site giving the live and
+     * virgin anchors and the five-column verdict under each combination of anchor source and block
+     * source. Read once — this sits inside chunk population. Inert unless the flag is set.
+     */
+    @Unique
+    private static final boolean gtnhdet$HILLTOP_TRACE = Boolean.getBoolean("gtnhdet.hilltoptrace");
+
+    /** {@code -Dgtnhdet.moundtrace=true}: one line per barrow actually placed. */
+    @Unique
+    private static final boolean gtnhdet$MOUND_TRACE = Boolean.getBoolean("gtnhdet.moundtrace");
 
     /**
      * @author GTNH speedrun determinism audit
@@ -132,15 +146,50 @@ public abstract class ThaumcraftWorldGeneratorMixin {
                 int[] gtnhdet$ringSite;
                 if (srand.nextInt(150) == 0) {
                     final WorldGenMound mound = new WorldGenMound();
-                    if (mound.generate(world, srand, randPosX, randPosY, randPosZ)) {
+                    // Virgin anchor, matching the hilltop branch below. Stock passes
+                    // getHeightValue(x, z) - 9; MoundSiting.anchorY reproduces that off virgin
+                    // terrain. A virgin validity test (WorldGenMoundMixin) at a live anchor would
+                    // still be load-order-dependent, so both halves change together.
+                    if (gtnhdet$MOUND_TRACE) {
+                        GtnhDeterminism.LOG.info(
+                            "[moundcand] x={} z={} liveY={} virginY={}",
+                            randPosX,
+                            randPosZ,
+                            randPosY,
+                            com.gtnhspeedrun.determinism.worldgen.MoundSiting.anchorY(world, randPosX, randPosZ));
+                    }
+                    final int gtnhdet$moundY = com.gtnhspeedrun.determinism.worldgen.MoundSiting.ENABLED
+                        ? com.gtnhspeedrun.determinism.worldgen.MoundSiting.anchorY(world, randPosX, randPosZ)
+                        : randPosY;
+                    // Own forks, as for the eldritch and hilltop branches: mound.generate consumes a
+                    // live-condition-dependent COUNT of draws, so sharing srand left the node's roll a
+                    // function of the terrain the barrow happened to land on.
+                    if (mound.generate(
+                        world,
+                        com.gtnhspeedrun.determinism.worldgen.MoundSiting.ENABLED
+                            ? gtnhdet$fork(world, chunkX, chunkZ, 16)
+                            : srand,
+                        randPosX,
+                        gtnhdet$moundY,
+                        randPosZ)) {
                         auraGen = true;
+                        if (gtnhdet$MOUND_TRACE) {
+                            GtnhDeterminism.LOG.info(
+                                "[moundtrace] seed={} x={} y={} z={}",
+                                world.getSeed(),
+                                randPosX,
+                                gtnhdet$moundY,
+                                randPosZ);
+                        }
                         srand.nextInt(200); // preserved draw (unused 'value' in original)
                         ThaumcraftWorldGenerator.createRandomNodeAt(
                             world,
                             randPosX + 9,
-                            randPosY + 8,
+                            gtnhdet$moundY + 8,
                             randPosZ + 9,
-                            srand,
+                            com.gtnhspeedrun.determinism.worldgen.MoundSiting.ENABLED
+                                ? gtnhdet$fork(world, chunkX, chunkZ, 17)
+                                : srand,
                             false,
                             true,
                             false);
@@ -178,12 +227,63 @@ public abstract class ThaumcraftWorldGeneratorMixin {
                                 .run();
                         }
                     } else if (srand.nextInt(40) == 0) {
-                        randPosY = randPosY + 9;
+                        // Virgin anchor, not world.getHeightValue: the anchor is the second live read in
+                        // this decision, and a virgin predicate (WorldGenHilltopStonesMixin) evaluated at a
+                        // live anchor is still load-order-dependent. anchorY reproduces getHeightValue's
+                        // convention — one above the top solid block — so the gate arithmetic is unchanged.
+                        // -1 means water-topped or no terrain in range, which stock could not express and
+                        // which the y<85 floor rejects anyway.
+                        randPosY = com.gtnhspeedrun.determinism.worldgen.HilltopSiting.ENABLED
+                            ? com.gtnhspeedrun.determinism.worldgen.HilltopSiting.anchorY(world, randPosX, randPosZ)
+                            : randPosY + 9;
+                        // -Dgtnhdet.hilltoptrace=true: one line per candidate site, crossing anchor
+                        // source with block source. Isolates whether a rejection comes from the anchor
+                        // moving or from the terrain under it differing — guessing between the two is
+                        // how a placement change gets mistaken for a balance change.
+                        if (gtnhdet$HILLTOP_TRACE) {
+                            final int liveY = world.getHeightValue(randPosX, randPosZ);
+                            GtnhDeterminism.LOG.info(
+                                "[hilltoptrace] x={} z={} liveY={} virginY={} liveAnchorLiveBlk={} "
+                                    + "virginAnchorVirginBlk={} liveAnchorVirginBlk={} virginAnchorLiveBlk={}",
+                                randPosX,
+                                randPosZ,
+                                liveY,
+                                randPosY,
+                                com.gtnhspeedrun.determinism.worldgen.HilltopSiting
+                                    .siteReason(world, randPosX, liveY, randPosZ, false),
+                                com.gtnhspeedrun.determinism.worldgen.HilltopSiting
+                                    .siteReason(world, randPosX, randPosY, randPosZ, true),
+                                com.gtnhspeedrun.determinism.worldgen.HilltopSiting
+                                    .siteReason(world, randPosX, liveY, randPosZ, true),
+                                com.gtnhspeedrun.determinism.worldgen.HilltopSiting
+                                    .siteReason(world, randPosX, randPosY, randPosZ, false));
+                        }
                         final WorldGenHilltopStones hilltopStones = new WorldGenHilltopStones();
-                        if (hilltopStones.generate(world, srand, randPosX, randPosY, randPosZ)) {
+                        // Own forks, for the same reason the eldritch branch above has them: the circle's
+                        // cosmetic draws consume a live-condition-dependent COUNT of rolls (each ring column
+                        // only rolls where the existing block is replaceable), so a shared stream leaves the
+                        // node's roll a function of the terrain the circle happened to land on. The gate stays
+                        // on srand so placement probability and feature order are unchanged.
+                        //
+                        // SCOPE: this fixes draw skew, NOT existence. WorldGenHilltopStones.func_76484_a gates
+                        // on five LocationIsValidSpawn probes that read LIVE blocks (World.getBlock), so whether
+                        // a circle appears at all still depends on how much of the neighbourhood was decorated
+                        // when this chunk populated. Measured on beta-3 seed -1636594104014467454 at radius 60:
+                        // 12 circles walking `rows` vs 14 walking `spiral`. Closing that needs the eldritch
+                        // treatment — validity evaluated on virgin terrain via TerrainOracle, as
+                        // EldritchRingLottery.virginValid does — and is deliberately not done here.
+                        if (hilltopStones
+                            .generate(world, gtnhdet$fork(world, chunkX, chunkZ, 14), randPosX, randPosY, randPosZ)) {
                             auraGen = true;
-                            ThaumcraftWorldGenerator
-                                .createRandomNodeAt(world, randPosX, randPosY + 5, randPosZ, srand, false, true, false);
+                            ThaumcraftWorldGenerator.createRandomNodeAt(
+                                world,
+                                randPosX,
+                                randPosY + 5,
+                                randPosZ,
+                                gtnhdet$fork(world, chunkX, chunkZ, 15),
+                                false,
+                                true,
+                                false);
                         }
                     }
             }

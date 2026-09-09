@@ -16,7 +16,8 @@
     "worldgen.SpawnerAnimalsMixin",
     "worldgen.EntitySheepMixin",
     "worldgen.EntityOcelotMixin",
-    "worldgen.EntityHorseMixin"
+    "worldgen.EntityHorseMixin",
+    "worldgen.WorldGenDungeonsScanMixin"
   ],
   "client": [
     "worldgen.IntegratedServerLootMixin"

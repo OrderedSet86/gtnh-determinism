@@ -5,6 +5,7 @@ import java.util.Random;
 import net.minecraft.world.World;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,7 +26,46 @@ import thaumcraft.common.lib.world.WorldGenMound;
  * production runtime; in a deobfuscated dev environment the redirect will not match (harmless for the shipped jar).
  */
 @Mixin(value = WorldGenMound.class, remap = false)
-public class WorldGenMoundMixin {
+public abstract class WorldGenMoundMixin {
+
+    @Shadow
+    protected abstract net.minecraft.block.Block[] GetValidSpawnBlocks();
+
+    @Shadow
+    public abstract boolean LocationIsValidSpawn(World world, int x, int y, int z);
+
+    /**
+     * Placement half of the barrow fix: the five {@code LocationIsValidSpawn} probes read LIVE blocks,
+     * so whether a barrow existed depended on how much of the neighbourhood had decorated. Evaluated
+     * on virgin terrain instead — see {@link com.gtnhspeedrun.determinism.worldgen.MoundSiting}. The
+     * anchor is made virgin by the caller in ThaumcraftWorldGeneratorMixin; both halves are required.
+     */
+    @Redirect(
+        method = { "func_76484_a", "generate" },
+        at = @At(
+            value = "INVOKE",
+            target = "Lthaumcraft/common/lib/world/WorldGenMound;LocationIsValidSpawn(Lnet/minecraft/world/World;III)Z"))
+    private boolean gtnhdet$virginValidSpawn(WorldGenMound self, World world, int x, int y, int z) {
+        com.gtnhspeedrun.determinism.worldgen.MoundSiting.captureValidBases(GetValidSpawnBlocks());
+        if (!com.gtnhspeedrun.determinism.worldgen.MoundSiting.ENABLED) {
+            return self.LocationIsValidSpawn(world, x, y, z);
+        }
+        if (com.gtnhspeedrun.determinism.worldgen.MoundSiting.DIFF) {
+            final boolean stock = self.LocationIsValidSpawn(world, x, y, z);
+            final boolean mine = com.gtnhspeedrun.determinism.worldgen.MoundSiting.liveValid(world, x, y, z);
+            if (stock != mine) {
+                com.gtnhspeedrun.determinism.GtnhDeterminism.LOG.info(
+                    "[mounddiff] x={} y={} z={} stock={} mine={} why={}",
+                    x,
+                    y,
+                    z,
+                    stock,
+                    mine,
+                    com.gtnhspeedrun.determinism.worldgen.MoundSiting.reason(world, x, y, z, false));
+            }
+        }
+        return com.gtnhspeedrun.determinism.worldgen.MoundSiting.virginValid(world, x, y, z);
+    }
 
     @Unique
     private static final ThreadLocal<Random> gtnhdet$moundRand = new ThreadLocal<>();

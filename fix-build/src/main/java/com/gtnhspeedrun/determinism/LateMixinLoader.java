@@ -50,6 +50,7 @@ public class LateMixinLoader implements ILateMixinLoader {
             mixins.add("worldgen.ThaumcraftWorldGeneratorMixin");
             mixins.add("worldgen.WorldGenMoundMixin");
             mixins.add("worldgen.WorldGenEldritchRingMixin");
+            mixins.add("worldgen.WorldGenHilltopStonesMixin");
             mixins.add("worldgen.ThaumcraftInitLootMixin");
             mixins.add("worldgen.ChestAmuletVisMixin");
         }
@@ -89,6 +90,7 @@ public class LateMixinLoader implements ILateMixinLoader {
         }
         if (loadedMods.contains("RWG")) {
             mixins.add("worldgen.RwgDecoForkMixin");
+            mixins.add("worldgen.RwgDungeonAttemptMixin");
             mixins.add("worldgen.DecoBigTreeCtorMixin");
         }
         if (loadedMods.contains("etfuturum")) {

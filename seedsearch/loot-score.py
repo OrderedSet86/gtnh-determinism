@@ -58,7 +58,10 @@ SOURCE_GROUPS = [
     ("stronghold", lambda s, c: c.startswith("stronghold"),
      "generates (3 per world, no biome gate under RWG) but the first ring sits ~640-1150 blocks out."),
     ("vanilla WorldGenDungeons", lambda s, c: c == "dungeonChest",
-     "existence is route-dependent, held pending the GregTech ore live-terrain read."),
+     "existence is now seed-pure (2026-09-08: attempt coordinates forked + scan on virgin terrain,"
+     " rows vs spiral 69/69, 0 diffs at radius 30). Still unscoreable at stage 0 for a different"
+     " reason: stage 0 does not enumerate dungeon-room positions. The old note here blamed the"
+     " GregTech ore live-terrain read; that was never the whole story and the fix does not touch it."),
     ("mineshaft", lambda s, c: c.startswith("mineshaft"),
      "chest presence is a 1-in-100 draw inside addComponentParts; needs a replay against a"
      " write-absorbing world."),

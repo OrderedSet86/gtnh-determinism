@@ -279,14 +279,37 @@ public final class ChestFillContext {
         // reads 0..0 and deriving there would empty every bee-house chest. A table that never intended getCount
         // to be called keeps whatever the caller chose.
         final boolean degenerate = t.hooks.getMin() == 0 && t.hooks.getMax() == 0;
-        final int rolls = degenerate && !t.countSeen ? count : rollCount(t.hooks, rand);
-        final WeightedRandomChestContent[] pool = t.hooks.getItems(rand);
+        // Some generators fill ONE inventory more than once. WorldGenHilltopStones calls the filler twice
+        // (bytecode offsets 432 and 450, both dungeonChest); VillageNames' SwampMasonHouse and
+        // SwampWeaponSmithy call it four times from a single line. Stock accumulates those batches, because
+        // generateChestContents never clears — which is why this class needs its own clear() at all.
+        //
+        // Refilling each of them from the same fork(inv) reproduced batch 0 every time and clear()ed the
+        // previous one away, so a chest that stock filled four times kept one batch. Measured at radius 60 on
+        // beta-3: 23 of 829 fills land on an already-filled inventory, 12 Thaumcraft sites and 11 village
+        // sites, two of them four deep. Deterministic, but holding a quarter of the intended loot.
+        //
+        // Rebuild the whole stack on every fill instead: batch i gets its own seed, and batch 0's seed is
+        // fork(inv) unchanged, so the single-fill case — every other chest in the world — is bit-identical to
+        // before this change.
+        // -Dgtnhdet.chestbatch=false collapses back to the old single-batch behaviour, so an A/B can
+        // isolate THIS change from every other fix in the jar. Comparing two different jars instead
+        // conflates it with dungeon and hilltop placement and makes unrelated chests look like regressions.
+        final int batches = BATCH_REBUILD ? gtnhdet$fillIndex(inv) + 1 : 1;
+        int rolls = 0;
         REFILLING.set(Boolean.TRUE);
         try {
             clear(inv);
-            // Re-enter the real filler rather than reimplementing it: any other mixin on this method (the Vis
-            // Amulet position fix) then runs against the final inventory, whatever order the injectors ended up in.
-            WeightedRandomChestContent.generateChestContents(rand, pool, inv, rolls);
+            for (int i = 0; i < batches; i++) {
+                final Random r = i == 0 ? rand : new Random(gtnhdet$batchSeed(fork, i));
+                final int n = degenerate && !t.countSeen ? count : rollCount(t.hooks, r);
+                final WeightedRandomChestContent[] p = t.hooks.getItems(r);
+                // Re-enter the real filler rather than reimplementing it: any other mixin on this method (the
+                // Vis Amulet position fix) then runs against the final inventory, whatever order the injectors
+                // ended up in.
+                WeightedRandomChestContent.generateChestContents(r, p, inv, n);
+                rolls += n;
+            }
         } finally {
             REFILLING.remove();
         }
@@ -294,7 +317,62 @@ public final class ChestFillContext {
         noteRefill("chest");
     }
 
-    /** Dispenser filler hook — Witchery covens and jungle temples. */
+    /**
+     * How many times this inventory has already been filled in the current run of consecutive fills.
+     *
+     * <p>
+     * Repeat fills of one inventory are consecutive on one thread — they come from the same generator method,
+     * often the same line — so a last-seen slot is enough and costs no map. Returns 0 for the first fill,
+     * which is the only case every other chest in the world takes.
+     */
+    private static int gtnhdet$fillIndex(IInventory inv) {
+        final IInventory last = LAST_FILLED.get();
+        if (last == inv) {
+            final int n = LAST_FILL_INDEX.get() + 1;
+            LAST_FILL_INDEX.set(n);
+            return n;
+        }
+        LAST_FILLED.set(inv);
+        LAST_FILL_INDEX.set(0);
+        return 0;
+    }
+
+    /** Batch i>0's seed. Batch 0 deliberately uses fork(inv) untouched. */
+    private static long gtnhdet$batchSeed(long fork, int i) {
+        long z = fork + 0x9E3779B97F4A7C15L * (i + 1);
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
+    }
+
+    private static final boolean BATCH_REBUILD = !"false".equals(System.getProperty("gtnhdet.chestbatch"));
+
+    private static final ThreadLocal<IInventory> LAST_FILLED = new ThreadLocal<>();
+
+    private static final ThreadLocal<Integer> LAST_FILL_INDEX = ThreadLocal.withInitial(() -> 0);
+
+    /**
+     * Dispenser filler hook — jungle temples.
+     *
+     * <p>
+     * Deliberately NOT given the multi-batch rebuild that {@link #refillChest} has, because nothing
+     * reaches it. Measured at radius 60 on beta-3 seed -1636594104014467454: zero
+     * {@code generateDispenserContents} calls, and {@code SOURCE_GROUPS} in {@code loot-score.py}
+     * records why — RWG never constructs {@code MapGenScatteredFeature}, so temples do not generate.
+     *
+     * <p>
+     * The dispensers that DO get filled are not this path. Witchery's
+     * {@code WitcheryComponent.setDispenser} calls the <em>chest</em> filler on a
+     * {@code TileEntityDispenser} (traced: {@code what=chest itype=TileEntityDispenser}, 4 of them at
+     * radius 60), so they already get the batch treatment. Multi-filling was measured on
+     * {@code TileEntityChest} only — never on a dispenser, minecart chest, PatternChestLogic or
+     * CraftingStationLogic.
+     *
+     * <p>
+     * If a pack or dimension ever does construct temples, this path would collapse repeat fills the
+     * way {@link #refillChest} used to. That is a known and currently unreachable gap, not an
+     * oversight.
+     */
     public static void refillDispenser(WeightedRandomChestContent[] items,
         net.minecraft.tileentity.TileEntityDispenser inv, int count) {
         if (Boolean.TRUE.equals(REFILLING.get())) return;
