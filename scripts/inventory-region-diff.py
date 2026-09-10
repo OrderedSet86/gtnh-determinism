@@ -109,12 +109,20 @@ def main():
     drb.prov.header(a_dir, b_dir)
     A = drb.world_chunks(a_dir, window)
     B = drb.world_chunks(b_dir, window)
+    # An inventory of nothing sums to 100% of nothing. Without this, an unsaved world or a window
+    # that misses the generated region prints "differing blocks: 0" then "IDENTICAL". Checked before
+    # the registry read so the reason given is the empty comparison, not a missing level.dat.
+    both = sorted(set(A) & set(B))
+    if not both:
+        sys.exit(f"NO COMPARISON PERFORMED: no chunks common to {a_dir} and {b_dir}"
+                 + (f" inside window {window}" if window else "")
+                 + f" (A={len(A)} chunks, B={len(B)}). "
+                 + "An empty inventory is a failed run, not an identical pair.")
     names = registry(a_dir)
 
     def name(i):
         return names.get(i, f"id{i}")
 
-    both = sorted(set(A) & set(B))
     cat_counts = Counter()
     pair_counts = Counter()
     cat_pairs = defaultdict(Counter)

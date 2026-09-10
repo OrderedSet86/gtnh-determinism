@@ -130,6 +130,16 @@ public final class ChestFillContext {
          * to whatever piece is generating further up the stack — see ChunkPopulateBarrierMixin.
          */
         boolean barrier;
+        /**
+         * How many times each inventory has been filled <em>within this scope</em>. Allocated on first repeat
+         * fill, which is 23 of 829 fills at radius 60 — every other site pays nothing.
+         *
+         * <p>
+         * Living on the frame rather than in one thread-wide slot is what makes the batch count route-pure; see
+         * {@link #gtnhdet$fillIndex}. It also means the map dies when the frame is popped, so nothing holds a
+         * {@code TileEntity} alive past the chunk that made it.
+         */
+        java.util.IdentityHashMap<IInventory, Integer> fills;
     }
 
     private static final ThreadLocal<Table> TABLE = new ThreadLocal<>();
@@ -279,23 +289,30 @@ public final class ChestFillContext {
         // reads 0..0 and deriving there would empty every bee-house chest. A table that never intended getCount
         // to be called keeps whatever the caller chose.
         final boolean degenerate = t.hooks.getMin() == 0 && t.hooks.getMax() == 0;
-        // Some generators fill ONE inventory more than once. WorldGenHilltopStones calls the filler twice
-        // (bytecode offsets 432 and 450, both dungeonChest); VillageNames' SwampMasonHouse and
-        // SwampWeaponSmithy call it four times from a single line. Stock accumulates those batches, because
-        // generateChestContents never clears — which is why this class needs its own clear() at all.
+        // Some generators fill ONE inventory more than once, and generateChestContents never clears, so stock
+        // accumulates the batches — which is why this class needs its own clear() at all. Refilling each of them
+        // from the same fork(inv) would reproduce batch 0 every time and clear() the previous one away, so the
+        // whole stack is rebuilt on every fill: batch i gets its own seed, and batch 0's seed is fork(inv)
+        // unchanged, so the single-fill case — every other chest in the world — is bit-identical.
         //
-        // Refilling each of them from the same fork(inv) reproduced batch 0 every time and clear()ed the
-        // previous one away, so a chest that stock filled four times kept one batch. Measured at radius 60 on
-        // beta-3: 23 of 829 fills land on an already-filled inventory, 12 Thaumcraft sites and 11 village
-        // sites, two of them four deep. Deterministic, but holding a quarter of the intended loot.
+        // How deep the stack goes is gtnhdet$fillIndex's problem, and the answer is per SCOPE rather than per
+        // thread. Two different things produce a repeat fill and they do not deserve the same count:
         //
-        // Rebuild the whole stack on every fill instead: batch i gets its own seed, and batch 0's seed is
-        // fork(inv) unchanged, so the single-fill case — every other chest in the world — is bit-identical to
-        // before this change.
-        // -Dgtnhdet.chestbatch=false collapses back to the old single-batch behaviour, so an A/B can
+        // - Two call sites in one generator pass. WorldGenHilltopStones fills its centre chest twice
+        // (bytecode offsets 432 and 450, both dungeonChest, each with its own getInfo capture). Deliberate,
+        // route-pure, and reproduced here as two batches.
+        // - One call site reached by repeated addComponentParts invocations. Village Names' biome pieces clip
+        // only the block placement, not the fill, so every chunk box intersecting the piece refills the chest
+        // already standing there. Vanilla guards that case twice over and fills once; the number of repeats
+        // here is just a function of what order the chunks populated in. Counted per scope it reads 0 every
+        // time, so it rebuilds one batch — vanilla's quantity, not the walk's.
+        //
+        // -Dgtnhdet.chestbatch=false collapses back to a single batch unconditionally, so an A/B can
         // isolate THIS change from every other fix in the jar. Comparing two different jars instead
         // conflates it with dungeon and hilltop placement and makes unrelated chests look like regressions.
-        final int batches = BATCH_REBUILD ? gtnhdet$fillIndex(inv) + 1 : 1;
+        // The index is computed either way so the trace reports what actually happened under the lever.
+        final int fillIdx = gtnhdet$fillIndex(inv);
+        final int batches = BATCH_REBUILD ? fillIdx + 1 : 1;
         int rolls = 0;
         REFILLING.set(Boolean.TRUE);
         try {
@@ -313,28 +330,86 @@ public final class ChestFillContext {
         } finally {
             REFILLING.remove();
         }
-        trace("chest", inv, rolls, t.hooks, t.countSeen);
+        trace("chest", inv, rolls, t.hooks, t.countSeen, fillIdx);
         noteRefill("chest");
     }
 
     /**
-     * How many times this inventory has already been filled in the current run of consecutive fills.
+     * How many times this inventory has already been filled <em>within the innermost site scope</em>. Returns 0
+     * for the first fill, which is the case every singly-filled chest in the world takes.
      *
      * <p>
-     * Repeat fills of one inventory are consecutive on one thread — they come from the same generator method,
-     * often the same line — so a last-seen slot is enough and costs no map. Returns 0 for the first fill,
-     * which is the only case every other chest in the world takes.
+     * The scope is the point of it. Vanilla fills a structure chest exactly once, ever —
+     * {@code StructureComponent.generateStructureChestContents} is guarded by both
+     * {@code sbb.isVecInside(...)} and {@code getBlock(...) != Blocks.chest}. Village Names' biome pieces drop
+     * both guards: only their {@code placeBlockAtCurrentPosition} is clipped, while the following
+     * {@code getTileEntity} and {@code generateChestContents} run unconditionally. Since
+     * {@code MapGenStructure.generateStructuresInChunk} invokes {@code addComponentParts} once per
+     * {@code [16k+8 .. 16k+23]} clip box intersecting the component — and those boxes tile the plane without
+     * overlap — exactly one invocation places the chest and every later one refills the tile entity already
+     * sitting there. How many later ones there are depends on the order the chunks populated in, so stock's
+     * quantity at those chests is anywhere from 1 to N.
+     *
+     * <p>
+     * Counting per scope answers that with vanilla's number rather than with one walk's. Each
+     * {@code addComponentParts} invocation pushes its own {@link Site} (see {@code StructureStartPartsMixin}), so
+     * a repeat invocation restarts at 0 and rebuilds the same single batch — idempotent, and equal to what the
+     * vanilla guard would have produced. Generators that genuinely fill one inventory more than once in a single
+     * pass still accumulate: {@code WorldGenHilltopStones} has two deliberate call sites with separate
+     * {@code ChestGenHooks.getInfo} captures, both under one population barrier, so it reads 0 then 1.
+     *
+     * <p>
+     * A single thread-wide slot cannot express that. The version this replaces used a last-seen inventory, which
+     * assumed repeat fills were consecutive; measured at {@code vn_mason} (837,64,1111) the index ran 0,0,0,1
+     * instead of 0,1,2,3, because the four fills came from four separate invocations with other chests in
+     * between. That is the same defect {@code RwgDungeonAttemptMixin} documents for the dungeon attempt counter —
+     * one slot standing in for per-key state — and nesting is exactly why it must live on the frame: population
+     * nests, and an inner piece sharing one map would clobber the outer piece's count by however much the walk
+     * order happened to interleave them.
      */
     private static int gtnhdet$fillIndex(IInventory inv) {
-        final IInventory last = LAST_FILLED.get();
-        if (last == inv) {
-            final int n = LAST_FILL_INDEX.get() + 1;
-            LAST_FILL_INDEX.set(n);
-            return n;
+        final Site top = SITE.get()
+            .peek();
+        final Map<IInventory, Integer> m;
+        if (top == null) {
+            m = gtnhdet$rootFills();
+        } else {
+            if (top.fills == null) top.fills = new java.util.IdentityHashMap<>();
+            m = top.fills;
         }
-        LAST_FILLED.set(inv);
-        LAST_FILL_INDEX.set(0);
-        return 0;
+        final Integer prev = m.get(inv);
+        final int idx = prev == null ? 0 : prev + 1;
+        m.put(inv, idx);
+        return idx;
+    }
+
+    /**
+     * Fills reached with no site on the stack — outside chunk population and outside any structure piece.
+     *
+     * <p>
+     * No generator is known to reach this: every measured fill sits under either a component or the population
+     * barrier. It exists so that if one ever does, its repeats still accumulate instead of silently collapsing to
+     * one batch. Unlike a {@link Site}'s map there is no frame to free it, so it is capped rather than allowed to
+     * pin tile entities for the life of the thread, and its first use is logged — a fallback nobody can see is
+     * indistinguishable from one that never fires.
+     */
+    private static final ThreadLocal<java.util.IdentityHashMap<IInventory, Integer>> ROOT_FILLS = ThreadLocal
+        .withInitial(java.util.IdentityHashMap::new);
+
+    private static boolean rootFillsSeen;
+
+    private static Map<IInventory, Integer> gtnhdet$rootFills() {
+        final java.util.IdentityHashMap<IInventory, Integer> m = ROOT_FILLS.get();
+        if (!rootFillsSeen) {
+            rootFillsSeen = true;
+            GtnhDeterminism.LOG.info(
+                "Chest fill outside any site scope; repeat fills there are counted at thread root ({})",
+                caller());
+        }
+        // Bounded: a chest filled with no enclosing scope has no frame to free its entry. 1024 is far above any
+        // plausible run of repeats and far below anything that matters for heap.
+        if (m.size() > 1024) m.clear();
+        return m;
     }
 
     /** Batch i>0's seed. Batch 0 deliberately uses fork(inv) untouched. */
@@ -346,10 +421,6 @@ public final class ChestFillContext {
     }
 
     private static final boolean BATCH_REBUILD = !"false".equals(System.getProperty("gtnhdet.chestbatch"));
-
-    private static final ThreadLocal<IInventory> LAST_FILLED = new ThreadLocal<>();
-
-    private static final ThreadLocal<Integer> LAST_FILL_INDEX = ThreadLocal.withInitial(() -> 0);
 
     /**
      * Dispenser filler hook — jungle temples.
@@ -403,7 +474,7 @@ public final class ChestFillContext {
         } finally {
             REFILLING.remove();
         }
-        trace("dispenser", inv, rolls, t.hooks, t.countSeen);
+        trace("dispenser", inv, rolls, t.hooks, t.countSeen, 0);
         noteRefill("dispenser");
     }
 
@@ -507,7 +578,7 @@ public final class ChestFillContext {
         } finally {
             REFILLING.remove();
         }
-        trace(what, inv, rolls, null, false);
+        trace(what, inv, rolls, null, false, 0);
         noteRefill(what);
         return true;
     }
@@ -728,7 +799,8 @@ public final class ChestFillContext {
         }
     }
 
-    private static void trace(String what, IInventory inv, int rolls, ChestGenHooks hooks, boolean countSeen) {
+    private static void trace(String what, IInventory inv, int rolls, ChestGenHooks hooks, boolean countSeen,
+        int fillIdx) {
         if (!TRACE) return;
         final long worldSeed = worldSeedOf(inv);
         if (!TraceScope.emits(worldSeed)) return;
@@ -757,7 +829,8 @@ public final class ChestFillContext {
         // than trust that enterComponent was paired with the chest that followed it.
         GtnhDeterminism.LOG.info(
             "[chesttrace] seed={} what={} piece={} src={} mode={} countdrawn={} min={},{},{} local={},{},{} "
-                + "abs={},{},{} cat={} rolls={} tmin={} tmax={} size={} itype={} depth={} inbox={} caller={}",
+                + "abs={},{},{} cat={} rolls={} fillidx={} tmin={} tmax={} size={} itype={} depth={} inbox={} "
+                + "caller={}",
             // A warm-probe run generates the server's own boot world before the requested seed's, and chests are
             // filled in both. Without this, the two are indistinguishable in the log and any per-seed analysis
             // silently mixes them — which is exactly what happened to the Witchery trace.
@@ -782,6 +855,10 @@ public final class ChestFillContext {
             // than as zero, which would read as a real 0..0 table.
             hooks == null ? "(no-hooks)" : categoryOf(hooks),
             rolls,
+            // The batch index within the current site scope, so a repeat fill is visible directly instead of
+            // having to be reconstructed from the cumulative roll total. Reconstructing it is what it took to
+            // find that the previous last-seen-slot counter was reading 0,0,0,1 where it intended 0,1,2,3.
+            fillIdx,
             // The table's roll range AT GENERATION TIME. The prefilter reads the same range from a live
             // ChestGenHooks in a process that never generated this world; if the two ever disagree, every roll it
             // derives is off by a draw and the contents are wrong for a reason no chest diff would explain.

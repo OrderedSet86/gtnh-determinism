@@ -67,6 +67,14 @@ def main():
     window = tuple(map(int, args[2:6])) if len(args) >= 6 else None
     A = drb.world_chunks(a_dir, window)
     B = drb.world_chunks(b_dir, window)
+    # No common chunks makes every bucket zero, printing "GT/BW ore-involved differing blocks: 0" and
+    # "none" — indistinguishable from F4 holding over a real world. Checked before the registry read
+    # so the reason reported is the empty comparison, not a missing level.dat.
+    if not (set(A) & set(B)):
+        sys.exit(f"NO COMPARISON PERFORMED: no chunks common to {a_dir} and {b_dir}"
+                 + (f" inside window {window}" if window else "")
+                 + f" (A={len(A)} chunks, B={len(B)}). Zero ore differences over zero chunks says "
+                   "nothing about F4.")
     names = registry(a_dir)
     is_ore = lambda i: names.get(i, "").startswith(ORE_PREFIXES)
 

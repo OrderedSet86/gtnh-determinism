@@ -138,6 +138,15 @@ def main():
     print(f"{wpdir}/: {len(rows)} waypoints")
     print("  top mixes: " + ", ".join(f"{k} x{v}" for k, v in c.most_common(10)))
     if stable is not None:
+        # "0/0 identical, 0 differ — route-stable, safe to publish as-is" is the worst line this tool
+        # can print: it certifies a publication over an empty vein list. A wrong --dim, a radius that
+        # excludes everything, or a truncated dump all produce it.
+        if not rows:
+            print(f"  ROUTE CHECK vs {args.compare}: NOT RUN — no veins in range to check "
+                  f"({len(entries)} in dim {args.dim} out of {len(raw)} in the dump, none within "
+                  f"{args.radius} chunks of {args.spawn}). Nothing was verified; do not publish.",
+                  file=sys.stderr)
+            return 1
         ns = sum(1 for r in rows if r["route_stable"] == "NO")
         if ns:
             print(f"  ROUTE CHECK vs {args.compare}: {len(rows)-ns}/{len(rows)} identical, {ns} DIFFER "

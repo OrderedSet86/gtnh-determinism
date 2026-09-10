@@ -147,6 +147,15 @@ def main():
         rows.append((score, d["seed"], spawn, well, dists, furnace_houses))
 
     rows.sort()
+    # An empty ranking still writes an empty --seeds-out, and the next stage consumes that as a
+    # shortlist. "Every seed was killed by a gate" and "the input file was empty" then arrive
+    # downstream looking the same as a legitimate ranking. Refuse to write it, and say which it was.
+    if not rows:
+        why = (", ".join(f"{k}={v}" for k, v in sorted(killed.items())) if killed
+               else "no kill records either — the input carried no usable seeds")
+        raise SystemExit(f"NO SEEDS RANKED from {args.jsonl}: {why}. Not writing "
+                         f"{args.seeds_out or 'a seed list'} — an empty shortlist is "
+                         f"indistinguishable downstream from a ranked one.")
     if killed:
         print("killed:", ", ".join(f"{k}={v}" for k, v in sorted(killed.items())), file=sys.stderr)
     print(f"{'score':>7}  {'seed':>20}  {'spawn x,z':>13}  {'village x,z':>13}  "

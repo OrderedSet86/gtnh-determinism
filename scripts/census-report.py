@@ -31,6 +31,11 @@ def load(paths):
     out = {}
     for p in paths:
         d = json.loads(Path(p).read_text())
+        # Arms are keyed by filename stem, so two dumps with the same stem from different directories
+        # would collapse into one arm and quietly shrink the comparison.
+        if Path(p).stem in out:
+            raise SystemExit(f"two dumps share the stem {Path(p).stem!r} ({p}); rename one — "
+                             f"arms are keyed by stem and the second would replace the first")
         out[Path(p).stem] = d
     return out
 
@@ -53,6 +58,13 @@ def main():
 
     arms = load(args.dumps)
     names = list(arms)
+    # Cross-arm agreement needs two arms. With one, itertools.combinations yields no pairs and each
+    # listener signature is compared only against itself, so the report ends with "every terraingen
+    # dispatch order identical across all 1 arms: True" — a claim made over no comparison at all.
+    if len(arms) < 2:
+        raise SystemExit(f"NO COMPARISON PERFORMED: {len(arms)} arm(s) loaded. This report compares "
+                         f"arms against each other; a single arm cannot disagree with itself. Pass at "
+                         f"least two dumps from one JVM version and one jar set.")
     print(f"{len(arms)} arms\n")
     for n, d in arms.items():
         print(f"  {n:<16} jvm={d['jvm']:<26} hashCode={d['hashCodeMode']:<8} generators={len(d['generators'])}")
@@ -85,6 +97,11 @@ def main():
     # --- stream A: event dispatch order ------------------------------------------------------
     print("\n=== terraingen event dispatch order (stream A: SHARED populate Random) ===")
     allsame = True
+    # An arm with no recorded listeners leaves allsame at its initial True and prints a green line
+    # under an empty table. No events recorded is a broken dump, not a stable one.
+    if not arms[names[0]]["listeners"]:
+        raise SystemExit(f"NO COMPARISON PERFORMED: arm {names[0]} recorded no terraingen listeners. "
+                         f"An empty dispatch table cannot be stable or unstable.")
     for ev in arms[names[0]]["listeners"]:
         sigs = {tuple(listener_sig(arms[n], ev)) for n in names}
         n_entries = len(arms[names[0]]["listeners"][ev]["dispatch"])

@@ -388,13 +388,26 @@ final class VillageChestPrefilter {
                 out.add(unpredicted(wx, wy, wz, piece, s.category, "no measured inventory size"));
                 continue;
             }
-            final Random rand = new Random(fork(seed, piece, box.minX, box.minZ, s.lx, s.ly, s.lz));
-            // Exactly ChestFillContext.refillChest's order: the count draw happens first, and only when the
-            // original caller drew one. Getting this backwards shifts every item in the chest.
-            final int rolls = s.countDrawn ? rollCount(hooks, rand) : hooks.getMin();
-            final WeightedRandomChestContent[] pool = hooks.getItems(rand);
+            final long forkSeed = fork(seed, piece, box.minX, box.minZ, s.lx, s.ly, s.lz);
             final SizedInventory chest = new SizedInventory(s.size);
+            final int rolls;
             try {
+                // One batch, because a component chest gets exactly one. Vanilla's
+                // generateStructureChestContents is guarded by both isVecInside and
+                // getBlock != Blocks.chest, so it fills once however many chunk boxes intersect the piece,
+                // and ChestFillContext counts fills per addComponentParts invocation to reproduce that.
+                //
+                // A Village Names piece really is refilled 2-4 times by the game — it drops both guards — but
+                // how many times depends on the order its chunks populated in, so it is not a fact about the
+                // piece and cannot be predicted from a layout. An earlier version of this loop carried a
+                // measured `fills` count per piece from chest-sites.json; that number was one walk's
+                // population order written down as if it were the piece's, and it over-predicted every
+                // multi-fill village chest.
+                final Random rand = new Random(forkSeed);
+                // Exactly refillChest's order: the count draw happens first, and only when the
+                // original caller drew one. Getting this backwards shifts every item in the chest.
+                rolls = s.countDrawn ? rollCount(hooks, rand) : hooks.getMin();
+                final WeightedRandomChestContent[] pool = hooks.getItems(rand);
                 WeightedRandomChestContent.generateChestContents(rand, pool, chest, rolls);
             } catch (Throwable t) {
                 continue;
@@ -469,6 +482,11 @@ final class VillageChestPrefilter {
         }
         return false;
     }
+
+    // No batchSeed here. ChestFillContext has one, for generators that fill a chest more than once in a single
+    // pass — WorldGenHilltopStones is the only measured case, and it is not a structure component, so nothing
+    // this module predicts ever reaches a second batch. A copy kept here "for symmetry" would be an untested
+    // duplicate of a constant that has to match exactly.
 
     /** Stock's own count formula, off the derived rand — same as {@code ChestFillContext.rollCount}. */
     private static int rollCount(ChestGenHooks hooks, Random rand) {

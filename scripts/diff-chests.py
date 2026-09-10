@@ -18,6 +18,10 @@ nothing to do with each other:
 NBT-only differences are reported as a failure, not a footnote. Chest gameplay state lives in tags —
 enchantments, charge levels, aspect fills, bee genomes — and treating an NBT-only diff as cosmetic
 has hidden real defects in this project before.
+
+Exit status: 0 only when seeds were actually compared and every one of them matched. An empty batch,
+an empty intersection, or a batch pair that disagrees on which seeds it holds all exit non-zero — a
+run that compared nothing must never be mistaken for a run that found nothing wrong.
 """
 import json
 import sys
@@ -83,7 +87,20 @@ def main():
 
     seeds = sorted(set(A) & set(B), key=sort_key)
     print(f"batch A: {len(A)} seeds   batch B: {len(B)} seeds   compared: {len(seeds)}")
-    for s in sorted(set(A) ^ set(B)):
+
+    # A comparison over nothing is a broken run, not a clean one. A warm shard that aborts on its
+    # memory guard leaves both output directories empty, and every counter below then reads 0 —
+    # which printed VERDICT: ALL SEEDS IDENTICAL. Die here instead, before anything can be mistaken
+    # for a result.
+    if not A or not B or not seeds:
+        empty = [n for n, v in (("A", A), ("B", B)) if not v]
+        why = (f"no usable reports in batch {' and '.join(empty)}"
+               if empty else "the two batches share no seed/dim in common")
+        sys.exit(f"NO COMPARISON PERFORMED: {why}. "
+                 f"This is a failed run, not a passing one — check the probe output directories.")
+
+    only_one = sorted(set(A) ^ set(B))
+    for s in only_one:
         print(f"  ! seed {s} present in only one batch")
 
     t = Counter()
@@ -118,9 +135,18 @@ def main():
     print(f"existence differences: {t['existence']}")
     print(f"contents  differences: {t['contents']}")
     print(f"NBT-only  differences: {t['nbt']}   <- a failure, not a footnote")
-    print("\nVERDICT: " + ("ALL SEEDS IDENTICAL" if not bad
-                           else f"{len(bad)}/{len(seeds)} seeds differ: {', '.join(bad)}"))
-    return 1 if bad else 0
+    # An asymmetric pair is a partial result: the seeds only one batch carries were never compared
+    # at all, so "identical" describes the intersection and not the run that was asked for. A shard
+    # that died halfway fails exactly this way, so it exits non-zero rather than reading green.
+    if bad:
+        print(f"\nVERDICT: {len(bad)}/{len(seeds)} seeds differ: {', '.join(bad)}")
+    elif only_one:
+        print(f"\nVERDICT: INCOMPLETE — the {len(seeds)} seed/dim pairs that were compared are "
+              f"identical, but {len(only_one)} exist in only one batch and were never compared. "
+              f"Re-run the missing arm before calling this a pass.")
+    else:
+        print("\nVERDICT: ALL SEEDS IDENTICAL")
+    return 1 if (bad or only_one) else 0
 
 
 if __name__ == "__main__":

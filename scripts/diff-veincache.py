@@ -27,7 +27,9 @@ Three numbers come out, and they are not interchangeable:
 The target is zero on all three. A nonzero result is a regression to investigate, not noise: the
 measured same-order launch-pair floor for this metric is exactly 0 (results/2026-09-05-gt-ore-dryrun-virgin).
 
-Exit status is 0 when all three are zero, 1 otherwise, so this can gate a run.
+Exit status is 0 when all three are zero, 1 otherwise, so this can gate a run. A dump that carries no
+regions at all exits non-zero with an explicit message instead: three zeros over nothing is a failed
+run wearing a clean run's output.
 
 `--dim N --seed S` restricts to one dimension. The decode is `((key ^ (worldSeed << 16)) >> 56)`, the
 same one vein-balance.py uses, and it was checked against the mix names rather than assumed: on seed
@@ -91,6 +93,17 @@ def main():
         ap.error("--dim and --seed must be given together")
 
     (a, dropped_a), (b, dropped_b) = load(args.a, args.dim, args.seed), load(args.b, args.dim, args.seed)
+
+    # Zero regions on either side makes all three counters zero, which is the same output a perfect
+    # run produces. A dump truncated by an aborted walk, or a --dim filter that matched nothing, both
+    # land here — so refuse to report rather than gate a run on an empty comparison.
+    if not a or not b:
+        empty = [p for p, v in ((args.a, a), (args.b, b)) if not v]
+        extra = (f" (--dim {args.dim} dropped {dropped_a}/{dropped_b} entries as other-dimension)"
+                 if args.dim is not None else "")
+        raise SystemExit(f"NO COMPARISON PERFORMED: no vein regions loaded from "
+                         f"{' and '.join(empty)}{extra}. An empty cache is a failed run, not a clean one.")
+
     common = sorted(set(a) & set(b))
     only_a = sorted(set(a) - set(b))
     only_b = sorted(set(b) - set(a))

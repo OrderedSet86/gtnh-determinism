@@ -100,6 +100,12 @@ def main():
     window = tuple(map(int, sys.argv[3:7])) if len(sys.argv) >= 7 else None
     A = world_tes(a_dir, window)
     B = world_tes(b_dir, window)
+    # Two worlds with no tile entities compare equal and exit 0, which is also what an unsaved world
+    # or a wrong path produces. Refuse to answer instead of reporting a pass over nothing.
+    if not A and not B:
+        sys.exit(f"NO COMPARISON PERFORMED: no tile entities found in {a_dir} or {b_dir}"
+                 + (f" inside window {window}" if window else "")
+                 + ". Check the worlds were saved and the paths are right.")
     only_a = sorted(set(A) - set(B))
     only_b = sorted(set(B) - set(A))
     changed = sorted(p for p in set(A) & set(B) if A[p] != B[p])

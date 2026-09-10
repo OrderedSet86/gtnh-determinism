@@ -208,6 +208,12 @@ def main():
         return 2
 
     corpus = load_corpus(args[0])
+    # Splitting an empty corpus prints no per-seed section and no totals, so "0 unattributed" and
+    # "nothing to attribute" produce the same output — and this tool exists to size a residual.
+    if not corpus or not any(byxz for byxz, _c, _r in corpus.values()):
+        raise SystemExit(f"NOTHING TO ATTRIBUTE: {args[0]} yielded no chests "
+                         f"({len(corpus)} seed(s) loaded). An empty attribution is not a complete "
+                         f"one — check the reports carry a chest search.")
     pf = load_prefilter(args[1])
     boxes_by_seed = load_village_boxes(args[1])
     blocks = load_dumps(dumps)

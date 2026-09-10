@@ -108,6 +108,12 @@ def main():
     window = tuple(map(int, sys.argv[3:7])) if len(sys.argv) >= 7 else None
     A = world_entities(a_dir, window)
     B = world_entities(b_dir, window)
+    # Both sides empty compares equal and exits 0 — the same output as a clean A/B, and exactly what
+    # an unsaved world, a wrong path or an off-target window produces.
+    if not A and not B:
+        sys.exit(f"NO COMPARISON PERFORMED: no persisted entities found in {a_dir} or {b_dir}"
+                 + (f" inside window {window}" if window else "")
+                 + ". Check the worlds were saved and the paths are right.")
 
     only_a = sorted(set(A) - set(B))
     only_b = sorted(set(B) - set(A))

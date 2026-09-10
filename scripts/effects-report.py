@@ -77,7 +77,14 @@ def main():
     counter_keys = ["village_piece_types", "chest_items", "vein_materials", "biomes"]
 
     agg_flags = Counter()
-    for seed in sorted(set(stock) & set(fixed), key=str):
+    # No shared seed means no seed section, no fixed self-consistency check, and an "## Aggregate"
+    # heading with nothing under it — a document that reads like a report and contains no measurement.
+    common = sorted(set(stock) & set(fixed), key=str)
+    if not common:
+        sys.exit(f"NO COMPARISON PERFORMED: no seed present in both {sys.argv[1]} "
+                 f"({len(stock)} seeds) and {sys.argv[2]} ({len(fixed)} seeds). "
+                 f"An empty effects report is a failed run, not a clean one.")
+    for seed in common:
         sm = [metrics(r) for r in stock[seed]]
         fm = [metrics(r) for r in fixed[seed]]
         lines.append(f"## seed {seed}  (stock n={len(sm)}, fixed n={len(fm)})")

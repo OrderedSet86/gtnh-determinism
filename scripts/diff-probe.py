@@ -5,7 +5,8 @@ Handles v1 dumps (chunk -> hash string) and v3 dumps (chunk -> {"b": blocks, "t"
 For v3, classifies differences (blocks vs tile entities) and shows the Y-section histogram of block noise.
 
 Usage: diff-probe.py a.json b.json
-Exit 0 if identical, 1 otherwise.
+Exit 0 if identical, 1 if different, 2 if either dump carries no chunks — comparing nothing is a
+failed run and must not print IDENTICAL.
 """
 import json
 import sys
@@ -35,7 +36,17 @@ def main() -> int:
         print(f"(including {len(a['spawnextra'])} spawn-region chunks outside the main window)")
 
     keys = sorted(set(a["chunks"]) | set(b["chunks"]), key=lambda k: tuple(map(int, k.split(","))))
-    v3 = keys and isinstance(a["chunks"][keys[0]], dict)
+
+    # No chunks on either side means the walk never ran or the dump was truncated. Falling through
+    # would print "IDENTICAL — worldgen was deterministic" over zero chunks and exit 0.
+    if not a["chunks"] or not b["chunks"]:
+        empty = [p for p, d in ((a_path, a), (b_path, b)) if not d["chunks"]]
+        print(f"NO COMPARISON PERFORMED: no chunks in {' and '.join(empty)}. "
+              f"An empty dump is a failed run, not a deterministic one.", file=sys.stderr)
+        return 2
+
+    # Probe the format off a chunk A actually has: keys is the union, so keys[0] can be B-only.
+    v3 = isinstance(next(iter(a["chunks"].values())), dict)
 
     diffs, blocks_only, te_only, both = [], 0, 0, 0
     section_hist = Counter()

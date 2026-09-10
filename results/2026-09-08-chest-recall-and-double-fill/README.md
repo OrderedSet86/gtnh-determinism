@@ -101,6 +101,17 @@ chest holds less than the generator asked for. That distinction matters for how 
 
 ### Fixed: rebuild the whole batch stack on every fill
 
+> **SUPERSEDED for the village half — see `results/2026-09-10-multifill-vanilla-parity/`.**
+> Two claims in this section are wrong for Village Names pieces, in opposite directions.
+> (a) The last-seen slot does **not** recover the index. Those repeats come from separate
+> `addComponentParts` invocations with other chests filled in between, so it read `0,0,0,1` where it
+> intended `0,1,2,3`. (b) There was no "intended quantity" to restore. Vanilla's
+> `generateStructureChestContents` is guarded by `isVecInside` **and** `getBlock != Blocks.chest` and
+> fills a structure chest exactly once, however many chunk boxes intersect the piece; the repeats
+> exist only because Village Names dropped both guards, and how many of them land depends on chunk
+> population order. Vanilla's number is 1.
+> The hilltop half stands: two deliberate call sites in one pass, genuinely two batches.
+
 The naive repair — "don't clear on a repeat fill" — is wrong, and the reason is the injection point.
 `StructureChestFillMixin` injects at `RETURN`, so by the time the second refill runs the inventory
 holds *this class's* batch 0 plus *stock's* second batch. Accumulating onto that keeps stock's
@@ -123,6 +134,12 @@ Verified by A/B on one jar with `-Dgtnhdet.chestbatch=false` as the only variabl
 
 Every change lands on a known multi-fill position and nothing else moves, which is the property that
 makes this safe to ship: it restores the intended quantity at 31 sites without re-rolling the world.
+
+That last clause is the over-read. The A/B is sound as far as it goes — the lever demonstrably moves
+nothing but multi-fill positions — but "the intended quantity" was never measured against anything,
+and the README says so itself two sections down. Re-run after the 2026-09-10 fix, the same lever
+moves **20 sites, every one of them hilltop, 0 village**, for 142 -> 249 stacks. The village share of
+169 -> 300 is withdrawn.
 
 Two caveats. A 3-fill site went 5 -> 6 stacks rather than tripling, because a 27-slot inventory
 collides once it is dense. And `consumeTable` pops a fresh table per fill while this applies the last

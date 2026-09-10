@@ -294,6 +294,19 @@ def main():
           " corpus, explained, unexplained")
     for row in per_seed:
         print("  " + ", ".join(str(x) for x in row))
+    # Every counter above is zero when either side contributes nothing inside the window, and a wall
+    # of zeros reads like a clean score. It is not a score at all: nothing was judged. Common causes
+    # are a corpus of reports whose chest search never ran and a --radius smaller than the structures.
+    if not tot["corpus_chests"] or not tot["predicted_positions"]:
+        empty = []
+        if not tot["predicted_positions"]:
+            empty.append(f"the prefilter predicted no chest positions in the window ({args[0]})")
+        if not tot["corpus_chests"]:
+            empty.append(f"the corpus holds no chests in the window ({args[1]})")
+        print(f"\nNOTHING WAS JUDGED: {'; and '.join(empty)}. The zeros above are an absent "
+              f"measurement, not a clean one — check {scope} and that the reports carry chests.",
+              file=sys.stderr)
+        return 1
     return 0
 
 

@@ -9,28 +9,12 @@ Discord: https://discord.gg/PbMWTcnZgC
 stock, rows 3-4 have the jar installed. Red marks every surface column that differs from the row
 directly above.](docs/img/launch-variance.png)
 
-Four cold JVM boots of seed `-1636594104014467454`, same walk order, GTNH 2.9.0-beta-3, five fixed
-crop windows. Rows 1–2 are stock; rows 3–4 have the jar in `mods/`. Red marks every surface column
-that differs from the launch directly above it.
-
-Over the inner 7,921 chunks of that walk, the two stock launches differ by **2,680,337 blocks**;
-the two jar launches differ by **311**. 311 is not zero — it is characterised, not waved through,
-in [results/2026-09-08-launch-variance-splash](results/2026-09-08-launch-variance-splash/README.md),
-which also carries the per-column numbers, the framing choices behind the village and deepslate
-crops, and three ways the first attempts at this image were wrong.
-
-Two caveats the picture cannot state itself. The slime island and Witchery cells are generated at
-forced coordinates by a throwaway harness jar, present identically in all four runs, because at
-stock rates they are too sparse to frame — pinning the *siting* is what leaves each structure's own
-non-determinism as the only variable; the villages are ordinary ones at stock density. And rows 1
-and 3 are not expected to match each other: adopting the jar changes generation, so it re-rolls
-seeds once per jar version.
+(Note: structures are forced above to make for a nice splash photo.)
 
 ## The fix jar
 
 **Grab the latest `gtnhdeterminism` jar from [Releases](../../releases) and drop it into `mods/` of a stock
-GTNH instance.** One jar covers the whole supported range: it picks its GregTech fix by which
-version is installed, and every other fix targets code that is unchanged across the range.
+GTNH instance.**
 
 | Pack | Status |
 |---|---|

@@ -150,6 +150,13 @@ def main():
     both = sorted(set(A) & set(B))
     print(f"chunks: A={len(A)} B={len(B)} common={len(both)} "
           f"only-A={len(set(A)-set(B))} only-B={len(set(B)-set(A))}")
+    # No common chunks means nothing was compared: an unsaved world, a wrong path, or a window that
+    # misses the generated region. "differing blocks: 0" and exit 0 is what that used to look like,
+    # which is indistinguishable from a clean A/B.
+    if not both:
+        sys.exit(f"NO COMPARISON PERFORMED: no chunks common to {a_dir} and {b_dir}"
+                 + (f" inside window {window}" if window else "")
+                 + ". Zero differing blocks over zero chunks is a failed run, not a pass.")
     pair_counts = Counter()
     chunk_counts = Counter()
     samples = defaultdict(list)

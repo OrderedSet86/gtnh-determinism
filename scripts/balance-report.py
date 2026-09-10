@@ -186,6 +186,13 @@ def main():
     reps = int(sys.argv[sys.argv.index("--reps") + 1]) if "--reps" in sys.argv else 4000
     stock, _ = load_arm(stock_dir)
     fixed, _ = load_arm(fixed_dir)
+    # An arm that globbed no reports makes every count zero, and every table then prints "0 entries
+    # with >= N total observations; 0 FAIL" under a "Total FAIL rows: 0 of 0" headline. That is the
+    # equivalence claim this report exists to make, asserted over no data.
+    if not stock or not fixed:
+        empty = [d for d, arm in ((stock_dir, stock), (fixed_dir, fixed)) if not arm]
+        sys.exit(f"NO COMPARISON PERFORMED: no seed reports loaded from {' and '.join(empty)}. "
+                 f"'0 FAIL of 0' is an untested metric, not equivalence.")
     S, F = collect(stock), collect(fixed)
     per_s, per_f = collect_per_seed(stock), collect_per_seed(fixed)
     boot = Bootstrap(per_s, per_f, reps, np.random.default_rng(20260723))
@@ -226,11 +233,19 @@ def main():
         "sample (more seeds) or cover that item via the direct-code Monte-Carlo tier.",
         f"\nTotal FAIL rows: {fail_total} of {m_total}.",
     ] + tables
+    if not m_total:
+        # "0 of 0" is the shape of the trap vein-balance.py's docstring describes: on GT 5.09.54.x the
+        # vein rows come back empty because worldgen ores carry no tile entities, and the headline
+        # then reads like a clean equivalence result over a metric that was never measured.
+        out.insert(1, "\n**NOT A RESULT: no row reached the observation threshold, so nothing was "
+                      "tested. Check the arms carry the metric at all — see the vein-row trap in "
+                      "vein-balance.py's docstring — before quoting anything below.**")
     text = "\n".join(out)
     if "--md" in sys.argv:
         Path(sys.argv[sys.argv.index("--md") + 1]).write_text(text)
     print(text)
+    return 1 if not m_total else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -83,6 +83,13 @@ def main():
         sys.exit("no seeds present in both arms")
 
     keys = sorted(set().union(*S.values()) | set().union(*F.values()))
+    # Seeds can pair up while every cache entry is dropped as other-dimension — a --dim the run never
+    # visited does exactly that. The table below is then empty and the summary reads "0 mixes tested:
+    # 0 FAIL, 0 inconclusive, 0 PASS", which is the same false pass this file's docstring exists for.
+    if not keys:
+        sys.exit(f"NO COMPARISON PERFORMED: {len(seeds)} seeds paired but no vein mixes survived the "
+                 f"dim {args.dim} filter (kept {ks}/{kf} entries, dropped {ds}/{df} as "
+                 f"other-dimension). Zero mixes tested is an untested metric, not a passing one.")
     CS = np.array([[S[s].get(k, 0) for k in keys] for s in seeds], float)
     CF = np.array([[F[s].get(k, 0) for k in keys] for s in seeds], float)
     # Exposure = regions carrying any vein, per seed. Rate is "regions of this mix per region".
@@ -126,6 +133,12 @@ def main():
         print(f"{k:<34}{int(a):>7}{int(b):>7}{r:>8.3f}  [{lo:.3f}, {hi:.3f}]{'':<3}{v}")
     print(f"\n{len(rows)} mixes tested (>= {args.min_count} observations): "
           f"{fails} FAIL, {inconc} inconclusive, {len(rows)-fails-inconc} PASS")
+    # "0 FAIL" over an empty table is not equivalence, it is an unrun test. Every mix falling under
+    # --min-count means the sample is too small to bound anything, so say so and exit non-zero.
+    if not rows:
+        print(f"NOT A RESULT: no mix reached {args.min_count} observations across "
+              f"{len(keys)} mixes and {len(seeds)} seeds — nothing was tested.", file=sys.stderr)
+        return 1
     return 1 if fails else 0
 
 
