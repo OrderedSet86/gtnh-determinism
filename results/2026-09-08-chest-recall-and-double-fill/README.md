@@ -501,6 +501,15 @@ python3 seedsearch/chest-attribution.py \
 
 **Still open**
 
+- **REGRESSION introduced by this session's double-fill fix: stage 0 now mispredicts multi-fill
+  village chests.** `refillChest` rebuilds the batch stack; `VillageChestPrefilter.predict` still
+  rolls one batch. Measured at radius 60: **9 miscategorised village chests, previously 0**, and their
+  categories match the multi-fill piece list exactly — `villageBlacksmith`, `vn_mason`, `vn_tannery`,
+  `vn_library`, `vn_taiga_house`, `vn_savanna_house`, `vn_butcher`, `vn_swamp_house`, `vn_fletcher`.
+  The world is right; the predictor is now wrong about it. Worth stating plainly how this got past:
+  the fix was verified against the world and never against the predictor, and the one precision check
+  that would have caught it ran at radius 24 against a stale oracle and read 0.
+
 - **Witchery predicts 0 chests across 45 cells** at radius 64 while the trace shows 12 Witchery
   fills in the same window. Not investigated.
 - **Count changes: only barrows is a demonstrated effect.** 24 seeds, paired permutation test —

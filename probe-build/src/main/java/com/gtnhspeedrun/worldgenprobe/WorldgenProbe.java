@@ -2304,6 +2304,17 @@ public class WorldgenProbe {
                             ores.merge(m, 1, Integer::sum);
                         } catch (Exception ignored) {}
                     } else if (te instanceof net.minecraft.inventory.IInventory) {
+                        // KNOWN GAP: this walks TILE entities, so entity-borne inventories are invisible
+                        // to every corpus, statistic and map derived from `search`. The one that matters
+                        // is EntityMinecartChest — mineshaft corridor loot. Measured on seed
+                        // -1636594104014467454 at radius 60: 154 minecart chests against 1729 tile-entity
+                        // inventories, i.e. ~8% of lootable containers absent from the search report.
+                        //
+                        // chesttrace DOES see them (itype=EntityMinecartChest) and gives position, loot
+                        // category and roll count, but no item list, so nothing anywhere records what a
+                        // mineshaft chest CONTAINS. Closing this means walking chunk entity lists for
+                        // IInventory here and emitting through the same dumpInventory, whose output must
+                        // stay byte-stable — see the note above it.
                         chests.add(dumpInventory((net.minecraft.inventory.IInventory) te, te));
                     } else if (te.getClass()
                         .getSimpleName()

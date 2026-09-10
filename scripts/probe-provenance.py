@@ -36,7 +36,12 @@ DELTA_CAP = 50
 
 # Forge typed keys: `B:key=value`, and the section headers that scope them.
 KV = re.compile(r"^\s*([BISDN]):([^=]+)=(.*)$")
-JAR_PREFIXES = ("gtnhdeterminism", "worldgenprobe")
+# gtnhsplash is a worldgen amplifier, so a run that carries it is not a stock-density world and an
+# arm that carries a different build of it is not comparable. It was absent from this tuple for the
+# 2026-09-08 splash runs, whose four worlds therefore record only the probe and fix jars; their
+# amplifier md5 (dfefe3ca0f03dc29cabb13c4703dfda5, identical in both arms) had to be checked by
+# hand. That is exactly the check this file exists to make unnecessary.
+JAR_PREFIXES = ("gtnhdeterminism", "worldgenprobe", "gtnhsplash")
 
 
 def settings(path):

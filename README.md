@@ -5,6 +5,27 @@ deterministic based on seed.
 
 Discord: https://discord.gg/PbMWTcnZgC
 
+![Four cold boots of one seed on GTNH 2.9.0-beta-3, cropped to five fixed windows. Rows 1-2 are
+stock, rows 3-4 have the jar installed. Red marks every surface column that differs from the row
+directly above.](docs/img/launch-variance.png)
+
+Four cold JVM boots of seed `-1636594104014467454`, same walk order, GTNH 2.9.0-beta-3, five fixed
+crop windows. Rows 1–2 are stock; rows 3–4 have the jar in `mods/`. Red marks every surface column
+that differs from the launch directly above it.
+
+Over the inner 7,921 chunks of that walk, the two stock launches differ by **2,680,337 blocks**;
+the two jar launches differ by **311**. 311 is not zero — it is characterised, not waved through,
+in [results/2026-09-08-launch-variance-splash](results/2026-09-08-launch-variance-splash/README.md),
+which also carries the per-column numbers, the framing choices behind the village and deepslate
+crops, and three ways the first attempts at this image were wrong.
+
+Two caveats the picture cannot state itself. The slime island and Witchery cells are generated at
+forced coordinates by a throwaway harness jar, present identically in all four runs, because at
+stock rates they are too sparse to frame — pinning the *siting* is what leaves each structure's own
+non-determinism as the only variable; the villages are ordinary ones at stock density. And rows 1
+and 3 are not expected to match each other: adopting the jar changes generation, so it re-rolls
+seeds once per jar version.
+
 ## The fix jar
 
 **Grab the latest `gtnhdeterminism` jar from [Releases](../../releases) and drop it into `mods/` of a stock
@@ -189,6 +210,14 @@ a chunk, the prefilter computes chest contents exactly for:
 It also answers village layouts, spawn point, terrain and Witchery structure cells. It does **not**
 cover vanilla `WorldGenDungeons` rooms, mineshafts or temples.
 
+**Full generation has a blind spot of its own, independent of stage 0.** The probe's chest extraction
+walks tile entities, so `EntityMinecartChest` — mineshaft corridor loot — never reaches
+`search.chunks[*].chests`, and is therefore absent from every corpus, chest statistic and routemap
+layer built on it. Measured at radius 60 on `-1636594104014467454`: 154 minecart chests against 1729
+tile-entity inventories, so roughly 8% of lootable containers are unrecorded. `-Dgtnhdet.chesttrace=true`
+sees their positions, loot category and roll count but carries no item list, so what a mineshaft chest
+CONTAINS is currently recorded nowhere. Tracked in the open-work queue in [docs/HANDOFF.md](docs/HANDOFF.md).
+
 Two limits belong with the capability:
 
 - Witchery structures generate **after** chunk decoration, and the prefilter has only virgin terrain.
@@ -204,6 +233,36 @@ the fix does not touch GregTech ore, which the previous note had assumed was the
 identity is fixed; per-block ore placement remains.
 
 **Reporting a worldgen bug?** Please include the jar version, seed, and coordinates.
+
+## Where the routemap and world bundles actually live
+
+**`../gtnh-seedlib/` — a sibling checkout of this repo**, i.e.
+`~/Dropbox/OrderedSetCode/cloned-gtnh/gtnh-seedlib` next to
+`~/Dropbox/OrderedSetCode/cloned-gtnh/gtnh-determinism`. Remote:
+`git@orderedset:OrderedSet86/gtnh-seedlib.git`.
+
+| what | where |
+|---|---|
+| routemap web viewer | `../gtnh-seedlib/routemap/` (`index.html`, `map.js`, `layers.js`, `run.sh`) |
+| per-seed world bundle | `../gtnh-seedlib/worlds/<seed>/dim{0,7,-1}/` |
+| chest loot layer | `.../dim0/loot.json` |
+| POI layer | `.../dim0/pois.json` |
+| GT vein layer | `.../dim0/veins.json` |
+| base rasters | `.../dim0/base-{blocks,biome,topo}.png`, `climate.png` |
+| pack + provenance | `../gtnh-seedlib/worlds/<seed>/meta.json` (carries the `pack` field) |
+| layer builder | `../gtnh-seedlib/tools/build_world_bundle.py` |
+
+Two traps that have cost time more than once:
+
+- **`~/.cache/gtnh-seedlib/` is NOT a checkout.** It is a directory of `.pkl` parse caches. Nothing
+  authoritative lives there.
+- **`gtnh-determinism/seedlib/`** (in THIS repo) holds only harness inputs — seed lists and
+  per-pack provenance READMEs. It is not the corpus and not the routemap. Its README links the
+  GitHub remote but not the local sibling path, which is the specific wrong turn to avoid.
+
+World bundles are built from a **full-generation radius-60 probe**, not from the stage-0 prefilter, so
+they can carry structures stage 0 cannot predict (Thaumcraft hilltop circles and barrows, vanilla
+`WorldGenDungeons` rooms).
 
 ## Repo layout
 

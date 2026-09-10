@@ -4,11 +4,15 @@
 # "verify the class landed in the jar", "copy by exact name", "md5-check the copy") are enforced
 # here so nobody has to remember them.
 #
-#   build-jar.sh <probe|fix|qol> [--deploy <server-dir> ...]
+#   build-jar.sh <probe|fix|qol|splash> [--deploy <server-dir> ...]
 #
-#     probe -> probe-build/  -> worldgenprobe-*.jar      (the measurement mod)
-#     fix   -> fix-build/    -> gtnhdeterminism-*.jar    (the determinism mod)
-#     qol   -> qol-build/    -> gtnhspeedrunqol-*.jar    (the client quality-of-life mod)
+#     probe  -> probe-build/  -> worldgenprobe-*.jar      (the measurement mod)
+#     fix    -> fix-build/    -> gtnhdeterminism-*.jar    (the determinism mod)
+#     qol    -> qol-build/    -> gtnhspeedrunqol-*.jar    (the client quality-of-life mod)
+#     splash -> splash-build/ -> gtnhsplash-*.jar         (documentation harness; forces worldgen
+#                                                          features to fixed chunks for the README
+#                                                          image. NEVER released — deliberately
+#                                                          absent from .github/workflows/release.yml)
 #
 # `build-probe.sh` is a thin back-compat wrapper for `build-jar.sh probe`.
 #
@@ -39,8 +43,12 @@ case "$PROJECT" in
     SUBDIR=qol-build; JAR_PREFIX=gtnhspeedrunqol
     RESOURCES=(mixins.gtnhspeedrunqol.json)
     ;;
+  splash)
+    SUBDIR=splash-build; JAR_PREFIX=gtnhsplash
+    RESOURCES=(mixins.gtnhsplash.json mixins.gtnhsplash.late.json)
+    ;;
   *)
-    echo "usage: build-jar.sh <probe|fix|qol> [--deploy <server-dir> ...]" >&2; exit 2
+    echo "usage: build-jar.sh <probe|fix|qol|splash> [--deploy <server-dir> ...]" >&2; exit 2
     ;;
 esac
 shift

@@ -1,0 +1,21 @@
+{
+	"modListVersion": 2,
+	"modList": [{
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "Documentation harness, NOT a shipping mod. Forces a handful of launch-varying worldgen features to attempt at fixed known chunks, so the README's launch-variance comparison image can use hardcoded crop windows. Forcing the siting is the point: it makes the siting deterministic, leaving each structure's own internal non-determinism as the only thing that can differ between two launches. Inert unless -Dsplash.enable=true is set. Never released.",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/OrderedSet86/gtnh-determinism",
+		"updateUrl": "",
+		"authorList": ["OrderedSet86"],
+		"credits": "",
+		"logoFile": "",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": [],
+		"dependencies": [],
+		"dependants": [],
+		"useDependencyInformation": false
+	}]
+}

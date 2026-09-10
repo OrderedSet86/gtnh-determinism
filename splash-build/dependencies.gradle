@@ -1,0 +1,21 @@
+// Compile-only, same policy as fix-build: the jar declares no mod dependencies and gates every
+// mod-targeting mixin on what is actually installed (see LateMixinLoader). Pins decide only what the
+// mixins can be WRITTEN against.
+//
+// Only three, because this jar forces exactly three generators. Pins copied verbatim from
+// fix-build/dependencies.gradle so the two jars are written against the same class shapes — the
+// splash mixins and the fix mixins have to coexist in one mods/ folder.
+
+dependencies {
+    // SlimeIslandGenMixin's target. fix-build redirects the `random` FIELD inside generateIsland;
+    // this jar redirects the Random.nextInt INVOKE inside generate. Different methods, no collision.
+    compileOnly('com.github.GTNewHorizons:TinkersConstruct:1.14.104-GTNH:dev')
+    // WitcheryWorldGenerator. The hook is nonInRange and ONLY nonInRange — fix-build @Overwrites
+    // generate() and routes to its own private copy, so the stock generateOverworld is unreachable
+    // whenever the fix jar is installed. See WitcheryForceMixin's javadoc.
+    compileOnly(rfg.deobf('curse.maven:witchery-69673:2234410'))
+    // Not a mixin target. Needed to read rwg.world.ChunkManagerRealistic#areBiomesViable from Scout,
+    // which reproduces RWG's village-viability test worldlessly so plots can be chosen without
+    // generating chunks.
+    compileOnly('com.github.GTNewHorizons:Realistic-World-Gen:alpha-1.5.2:dev')
+}
