@@ -105,8 +105,62 @@ public class GtnhDeterminism {
         return (Map<String, ChestGenHooks>) f.get(null);
     }
 
+    /**
+     * One line naming the jar that is about to generate this world, and every {@code gtnhdet.*} lever set on it.
+     *
+     * <p>
+     * Emitted per SERVER START rather than once per JVM, because the warm probe daemon starts many worlds in one
+     * process and each world's section of the log needs its own stamp. It runs before
+     * {@link PendingSlices#resetAtomicWindow()} so it precedes any worldgen line in the log.
+     *
+     * <p>
+     * This exists because the log-based measurements had no jar identity at all. {@code run-probe.sh} stamps
+     * {@code World/.probe-provenance.json} with jar md5s and {@code diff-region-blocks.py} prints mismatches, but
+     * {@code diff-chests.py} and {@code diff-dungeons.py} consume search reports and {@code [chesttrace]} /
+     * {@code [dungeonattempt]} logs, which carried nothing — so a table copied out of one arm could not be told
+     * apart from a table copied out of an arm built before a fix. That happened: the residual table in
+     * {@code results/2026-09-10-multifill-vanilla-parity/} was read as current when
+     * {@code results/2026-09-10-dungeon-chest-placement/}, in the same commit, had already superseded it. The
+     * repo had also already shipped an invalid A/B that compared two different jars.
+     */
+    private static void gtnhdet$logBuildStamp() {
+        // RetroFuturaGradle formats Tags.VERSION as <tag>-<commits>+<sha>[-dirty]. A clean tag build has no '+'
+        // and therefore no sha to report; say unknown rather than slicing the tag and calling it a commit.
+        final String version = Tags.VERSION;
+        final int plus = version.lastIndexOf('+');
+        final boolean dirty = version.endsWith("-dirty");
+        String sha = "unknown";
+        if (plus >= 0) {
+            sha = version.substring(plus + 1);
+            if (dirty) sha = sha.substring(0, sha.length() - "-dirty".length());
+        }
+        // Scanned, not a hand-kept list of the levers this jar happens to have today. A list drifts the moment a
+        // lever is added, and a lever missing from the stamp is worse than no stamp: it reads as a default.
+        final TreeMap<String, String> overrides = new TreeMap<>();
+        for (String key : System.getProperties()
+            .stringPropertyNames()) {
+            if (key.startsWith("gtnhdet.")) overrides.put(key, System.getProperty(key));
+        }
+        // The braces are built into the value rather than written into the format string. Log4j2 does NOT treat
+        // "{{" as an escape the way SLF4J and MessageFormat do — it scans for "{}" and takes the rest literally —
+        // so "overrides={{{}}}" renders as "overrides={{...}}" and the consumer's regex misses it.
+        final StringBuilder sb = new StringBuilder("{");
+        for (Map.Entry<String, String> e : overrides.entrySet()) {
+            if (sb.length() > 1) sb.append(", ");
+            sb.append(e.getKey())
+                .append('=')
+                .append(e.getValue());
+        }
+        sb.append('}');
+        // dirty is its own field, not just the version suffix: it means the sha does NOT identify the source that
+        // built this jar, and that caveat has to travel with any number read off this run.
+        LOG.info("[gtnhdet] version={} sha={} dirty={} overrides={}", version, sha, dirty, sb);
+    }
+
     @Mod.EventHandler
     public void serverAboutToStart(FMLServerAboutToStartEvent event) {
+        // Before anything else, so no worldgen line in this log can predate the stamp that says which jar wrote it.
+        gtnhdet$logBuildStamp();
         // A worldgen crash can leave a dungeon's atomic slice window open; never let that outlive the world.
         PendingSlices.resetAtomicWindow();
         if (lootSnapshot == null) {

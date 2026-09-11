@@ -93,6 +93,18 @@ public class LateMixinLoader implements ILateMixinLoader {
             mixins.add("worldgen.RwgDungeonAttemptMixin");
             mixins.add("worldgen.DecoBigTreeCtorMixin");
         }
+        if (loadedMods.contains("appliedenergistics2")) {
+            // Not flag-gated: this is a fix, not a diagnostic. Meteorite existence is otherwise
+            // route-dependent (2 of 38 over 25 seeds, same-order floor 0).
+            mixins.add("worldgen.Ae2MeteoriteSitingMixin");
+        }
+        // Diagnostic, not a fix: AE2 meteorites never generate in a probed world though a real client
+        // on the same seed and jar does produce them. Gated on the flag as well as the mod so a jar in
+        // mods/ without -Dgtnhdet.meteortrace applies nothing.
+        if (Boolean.getBoolean("gtnhdet.meteortrace") && loadedMods.contains("appliedenergistics2")) {
+            mixins.add("worldgen.Ae2MeteoritePlacerTraceMixin");
+            mixins.add("worldgen.Ae2MeteoriteGenTraceMixin");
+        }
         if (loadedMods.contains("etfuturum")) {
             mixins.add("worldgen.EtFuturumDeepslateMixin");
             mixins.add("worldgen.EtFuturumCaveVineGrowMixin");

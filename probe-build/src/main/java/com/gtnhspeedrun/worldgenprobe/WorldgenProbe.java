@@ -215,6 +215,32 @@ public class WorldgenProbe {
         // post-TML loot — deterministically different from every real/cold world (the 2.8.4 warm chest
         // contamination: 17 wrong chests, all inside the preload radius). Captured here (post-init, pre-server)
         // and restored around each warm recreate so preload-time table state matches a cold boot exactly.
+        // -Dprobe.wgdump=true: list every IWorldGenerator FML will call during populate.
+        //
+        // Exists because AE2 meteorites never generate here: 25 seeds warm r30, zero TileSkyChest
+        // against ~13.8 expected (ONE candidate per 707-block grid cell at chance 0.3 — not per
+        // chunk), p ~ 7e-08, and World/AE2/spawndata empty afterwards. The same seed on the same jar
+        // DOES produce a meteorite in a real client, so it is environmental to this probe rather than
+        // config or seed luck. Config, Galacticraft's generator interception and AE2's valid-block
+        // list have each been read and cleared. The one thing never checked is the simplest: whether
+        // AE2's generator is in the registry at all. This runs post-init, so it should be.
+        if (Boolean.getBoolean("probe.wgdump")) {
+            try {
+                final java.lang.reflect.Field f = cpw.mods.fml.common.registry.GameRegistry.class
+                    .getDeclaredField("worldGenerators");
+                f.setAccessible(true);
+                final java.util.Collection<?> gens = (java.util.Collection<?>) f.get(null);
+                LOG.info("[probe][wgdump] {} IWorldGenerator(s) registered with FML", gens.size());
+                for (Object g : gens) {
+                    LOG.info(
+                        "[probe][wgdump]   {}",
+                        g.getClass()
+                            .getName());
+                }
+            } catch (Throwable t) {
+                LOG.warn("[probe][wgdump] could not read GameRegistry.worldGenerators: {}", t.toString());
+            }
+        }
         try {
             lootSnapPre = captureLootTables();
             LOG.info("[probe] pre-server loot snapshot: {} categories", lootSnapPre.size());
@@ -286,6 +312,76 @@ public class WorldgenProbe {
      * lastSetSeedArg is recorded per trial so that a race between siting callers (observed near the origin)
      * is visible rather than silently making the result look flaky.
      */
+    /**
+     * {@code -Dprobe.meteortrace=true}: report AE2's own answer to "may meteorites generate in this
+     * world", for the world the walk is about to run on.
+     *
+     * <p>
+     * AE2 meteorites never appear in a probed world. Measured over 25 seeds at warm radius 30:
+     * <b>zero {@code TileSkyChest} against ~13.8 expected</b>, p ~ 7e-08, and {@code World/AE2/spawndata}
+     * empty afterwards, where AE2 records every placement. The expectation is the load-bearing part —
+     * AE2 seeds one candidate per {@code minMeteoriteDistance} grid cell (707 blocks here) at
+     * {@code meteoriteSpawnChance 0=0.3}, so a single radius-60 window expects only ~2 and zero there
+     * proves nothing. Across 25 seeds it does.
+     *
+     * <p>
+     * The same seed on the same jar yields a meteorite in a real client, so this is environmental to
+     * the probe. Already read and cleared: the AE2 config (worldgen on, presses on, dim 0 whitelisted),
+     * Galacticraft's {@code WorldUtil.otherModPreventGenerate} (its {@code findRegisteredWorldGenerator}
+     * only reads FML's generator set, it never removes), and {@code meteoriteValidBlocks} (added to a
+     * collection already holding vanilla blocks, so additive rather than a whitelist).
+     *
+     * <p>
+     * Two candidates remain and this plus {@code -Dprobe.wgdump=true} separate them. If wgdump does not
+     * list {@code appeng.worldgen.MeteoriteWorldGen}, FML never calls it. If it is listed and this logs
+     * {@code enabled=false}, the gate is {@code WorldGenRegistry.isWorldGenEnabled}, whose
+     * {@code badProviders} (by {@code WorldProvider} class) or {@code badDimensions} (by dim id) set has
+     * been populated by something. If it is listed and enabled and meteorites still never land, the
+     * refusal is inside {@code MeteoritePlacer} and that is the next cut.
+     *
+     * <p>
+     * Entirely reflective so the probe needs no AE2 on its compile classpath, and read-only — it asks
+     * AE2 a question and logs the answer.
+     */
+    private static void reportAe2MeteoriteGate(net.minecraft.world.World world) {
+        if (!Boolean.getBoolean("probe.meteortrace")) return;
+        try {
+            final Class<?> reg = Class.forName("appeng.core.features.registries.WorldGenRegistry");
+            final Object inst = reg.getField("INSTANCE")
+                .get(null);
+            final Class<?> type = Class.forName("appeng.api.features.IWorldGen$WorldGenType");
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            final Object meteorites = Enum.valueOf((Class<Enum>) type.asSubclass(Enum.class), "Meteorites");
+            final Object enabled = reg.getMethod("isWorldGenEnabled", type, Class.forName("net.minecraft.world.World"))
+                .invoke(inst, meteorites, world);
+            boolean registered = false;
+            try {
+                final java.lang.reflect.Field f = cpw.mods.fml.common.registry.GameRegistry.class
+                    .getDeclaredField("worldGenerators");
+                f.setAccessible(true);
+                for (Object g : (java.util.Collection<?>) f.get(null)) {
+                    if (g.getClass()
+                        .getName()
+                        .contains("MeteoriteWorldGen")) registered = true;
+                }
+            } catch (Throwable ignored) {}
+            LOG.info(
+                "[probe][meteortrace] dim={} provider={} seed={} isWorldGenEnabled(Meteorites)={} generatorRegistered={}",
+                world.provider.dimensionId,
+                world.provider.getClass()
+                    .getName(),
+                world.getSeed(),
+                enabled,
+                registered);
+        } catch (Throwable t) {
+            LOG.warn(
+                "[probe][meteortrace] could not query AE2: {}: {}",
+                t.getClass()
+                    .getSimpleName(),
+                t.getMessage());
+        }
+    }
+
     private void runBagPoc(WorldServer world, String out) throws Exception {
         final java.lang.reflect.Method generateLoot = Class.forName("thaumcraft.common.lib.utils.Utils")
             .getMethod("generateLoot", int.class, java.util.Random.class);
@@ -904,6 +1000,7 @@ public class WorldgenProbe {
             final WorldServer over = DimensionManager.getWorld(0);
             if (over == null || over.getSeed() != seeds[i])
                 throw new IllegalStateException("recreated overworld missing or wrong seed");
+            reportAe2MeteoriteGate(over);
             LOG.info(
                 "[probe] warm slot {}/{}: seed {} world ready in {} ms",
                 i + 1,
@@ -944,6 +1041,56 @@ public class WorldgenProbe {
      * per slot, which is exactly the population this hunter exists to find.
      */
     private static final List<java.lang.ref.WeakReference<Object>> LEAK_TRACK = new ArrayList<>();
+
+    /**
+     * Cycle AE2's {@code WorldData} singleton so the next seed does not inherit the previous one's.
+     * Disable with {@code -Dprobe.resetae2=false}.
+     *
+     * <p>
+     * {@code teardownAllWorlds} deletes the whole save folder, AE2's subdirectory included, and proves
+     * it with the stale-level.dat guard above — so disk state is already clean. AE2's problem is in
+     * MEMORY: a warm batch never restarts the server, and {@code WorldData.instance()} is a singleton
+     * created once at server start. Its spawn data therefore still lists the meteorites of every
+     * earlier seed in the batch, and {@code MeteoriteWorldGen$ExistingMeteoriteSpawn} re-places known
+     * meteorites into newly generated chunks — so seed A's craters get built into seed B's world.
+     *
+     * <p>
+     * Measured before this reset, 25 seeds warm r30: <b>28 of 43 distinct meteorite positions appeared
+     * in more than one seed</b>, one of them in seven, identically under both walk orders. Different
+     * seeds have different terrain, so that is contamination and not worldgen. A single-seed warm run
+     * was unaffected, which is what localised it to cross-seed state rather than to the drain itself.
+     *
+     * <p>
+     * Only visible since {@code probe.drainticks} started executing AE2's queued callables — before
+     * that no meteorite was ever placed, so nothing could leak. Fixing one hole exposed the next.
+     */
+    static void resetAe2WorldData() {
+        if ("false".equals(System.getProperty("probe.resetae2"))) return;
+        try {
+            final Class<?> wd = Class.forName("appeng.core.worlddata.WorldData");
+            try {
+                final Object inst = wd.getMethod("instance")
+                    .invoke(null);
+                if (inst != null) inst.getClass()
+                    .getMethod("onServerStopping")
+                    .invoke(inst);
+            } catch (Throwable t) {
+                // No instance yet, or AE2 refused to stop one: re-creating below is still correct.
+                LOG.debug("[probe] AE2 WorldData had no live instance to stop: {}", t.toString());
+            }
+            wd.getMethod("onServerAboutToStart")
+                .invoke(null);
+            LOG.info("[probe] AE2 WorldData cycled — previous seed's meteorite spawn data dropped");
+        } catch (ClassNotFoundException e) {
+            // AE2 not installed.
+        } catch (Throwable t) {
+            LOG.warn(
+                "[probe] could not cycle AE2 WorldData, meteorites may leak across seeds: {}: {}",
+                t.getClass()
+                    .getSimpleName(),
+                t.getMessage());
+        }
+    }
 
     private static void teardownAllWorlds(MinecraftServer server) throws Exception {
         final File worldDir = new File(server.getFolderName());
@@ -1612,6 +1759,7 @@ public class WorldgenProbe {
             .getSaveLoader(server.getFolderName(), true);
         if (sh.loadWorldInfo() != null)
             throw new IllegalStateException("stale level.dat survived teardown — save dir not empty");
+        resetAe2WorldData();
         final WorldSettings settings = new WorldSettings(
             seed,
             server.getGameType(),
@@ -1936,6 +2084,7 @@ public class WorldgenProbe {
             villagePieces = dumpVillagePieces(world, ents);
             LOG.info("[probe] entities: {} in window, villager lines follow in report", ents.size());
         }
+        drainDeferredWorldCallables(world);
         final String search = Boolean.getBoolean("probe.search") ? buildSearchReport(world, radius, cx, cz) : null;
         // Independent of probe.dim: the map reads biomes only, and World.getBiomeGenForCoords falls through to
         // the chunk manager for unloaded chunks, so an ordinary dim-0 run emits it without generating anything.
@@ -2157,6 +2306,87 @@ public class WorldgenProbe {
      * every IInventory tile entity's full contents (village/dungeon chests: tier-skip loot lives here). Spawn
      * point at the top because spawn-relative distance is the primary search criterion.
      */
+    /**
+     * Run the deferred world callables a mod queued during generation, before anything is snapshotted.
+     * Disable with {@code -Dprobe.drainticks=false}.
+     *
+     * <h2>Why</h2>
+     *
+     * Worldgen is not always the thing that builds a structure. AE2 meteorites are the case that
+     * exposed this: {@code MeteoriteWorldGen.generate} never touches {@code MeteoritePlacer} at all —
+     * it calls {@code TickHandler.addCallable(world, new MeteoriteSpawn(...))}, and
+     * {@code MeteoriteSpawn} is an {@code IWorldCallable} whose {@code call(World)} does the placing on
+     * a later server TICK. A real client ticks continuously so meteorites appear; this probe generates
+     * chunks flat out and shuts the server down, so the queue is still full when the world is written
+     * and nothing is ever built.
+     *
+     * <p>
+     * Measured before this drain, 25 seeds at warm radius 30: <b>zero {@code TileSkyChest} against
+     * ~13.8 expected</b>, p ~ 7e-08, {@code World/AE2/spawndata} empty, while {@code generate} ran
+     * 6000+ times per walk and its spawn-chance roll spanned [0.021, 0.955] — passing the 0.3
+     * threshold repeatedly. Everything decided correctly; nothing was ever executed.
+     *
+     * <p>
+     * <b>This is not AE2-specific.</b> Any mod that defers world work to a callable queue has been
+     * missing from every corpus, statistic and map this repo has produced. AE2 is simply the case with
+     * the highest loot value attached — meteorites carry the Calculation, Engineering, Logic and
+     * Silicon presses, which gate AE2 progression outright.
+     *
+     * <p>
+     * AE2's own {@code processQueue} is driven rather than the callables being invoked directly, so
+     * its error handling and any per-pass budget still apply; it is looped because a budgeted pass may
+     * not empty the queue. A bounded loop, and a warning if the queue is still non-empty at the end —
+     * a drain that quietly gives up would put us straight back to a silently incomplete corpus.
+     *
+     * <p>
+     * Reflective so the probe needs no AE2 on its compile classpath, and a no-op when AE2 is absent.
+     */
+    static void drainDeferredWorldCallables(net.minecraft.world.World world) {
+        if ("false".equals(System.getProperty("probe.drainticks"))) return;
+        try {
+            final Class<?> th = Class.forName("appeng.hooks.TickHandler");
+            final Object inst = th.getField("INSTANCE")
+                .get(null);
+            final java.lang.reflect.Field cqf = th.getDeclaredField("callQueue");
+            cqf.setAccessible(true);
+            final java.util.Map<?, ?> byWorld = (java.util.Map<?, ?>) cqf.get(inst);
+            final Object q = byWorld.get(world);
+            if (!(q instanceof java.util.Queue)) return;
+            final java.util.Queue<?> queue = (java.util.Queue<?>) q;
+            final int before = queue.size();
+            if (before == 0) return;
+            final java.lang.reflect.Method pq = th
+                .getDeclaredMethod("processQueue", java.util.Queue.class, net.minecraft.world.World.class);
+            pq.setAccessible(true);
+            int rounds = 0;
+            // Bounded: a callable that re-queues itself must not spin the probe forever.
+            while (!queue.isEmpty() && rounds < 4096) {
+                final int sizeBefore = queue.size();
+                pq.invoke(inst, queue, world);
+                rounds++;
+                if (queue.size() >= sizeBefore && rounds > 8) break; // making no progress
+            }
+            if (queue.isEmpty()) {
+                LOG.info("[probe] drained {} deferred AE2 world callable(s) in {} pass(es)", before, rounds);
+            } else {
+                LOG.warn(
+                    "[probe] deferred AE2 callables did NOT drain: {} queued, {} left after {} pass(es) — "
+                        + "structures built on the tick queue are MISSING from this report",
+                    before,
+                    queue.size(),
+                    rounds);
+            }
+        } catch (ClassNotFoundException e) {
+            // AE2 not installed; nothing to drain.
+        } catch (Throwable t) {
+            LOG.warn(
+                "[probe] could not drain deferred world callables: {}: {}",
+                t.getClass()
+                    .getSimpleName(),
+                t.getMessage());
+        }
+    }
+
     private static String buildSearchReport(WorldServer world, int radius, int cx, int cz) {
         final StringBuilder sb = new StringBuilder("{\n");
         final net.minecraft.util.ChunkCoordinates sp = world.getSpawnPoint();

@@ -52,4 +52,10 @@ dependencies {
     // Mixin's annotation processor resolves it at compile time. EarlyLootTables itself uses only reflection, so the
     // jar still runs on a pack without TooMuchLoot.
     compileOnly('com.github.GTNewHorizons:TooMuchLoot:4.3.0-GTNH:dev') { transitive = false }
+    // Diagnostic only (Ae2MeteoritePlacerTraceMixin): AE2 meteorites never generate in a probed world
+    // while a real client on the same seed and jar does produce them. Same reason as Et Futurum and
+    // TooMuchLoot above -- the mixin names its target as a string, but Mixin's AP resolves it at
+    // compile time, so the class must be on the classpath. transitive=false: AE2 drags a large tree
+    // and nothing here touches any of it.
+    compileOnly('com.github.GTNewHorizons:Applied-Energistics-2-Unofficial:rv3-beta-1050-GTNH:dev') { transitive = false }
 }

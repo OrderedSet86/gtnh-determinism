@@ -128,7 +128,14 @@ def main():
                         pf_src[(q[0], q[2])] = "village"
             break
 
-    def source_of(pos):
+    def source_of(pos, itype=""):
+        # AE2 meteorites are identified by CONTAINER TYPE, not by the trace: they never reach
+        # ChestGenHooks because AE2 fills the sky chest itself, so no chesttrace line names them. They
+        # are also absent from every probe run made before 2026-09-10 — `MeteoriteWorldGen` only queues
+        # an `IWorldCallable` on AE2's TickHandler and the probe exited without ticking, so nothing was
+        # placed. `probe.drainticks` now drains that queue before the snapshot.
+        if itype == "TileSkyChest":
+            return "meteorite"
         # Order matters. An exact position match — from the trace, then from stage 0 — always beats
         # the anchor proximity sweep below. Running the sweep first mislabelled 11 roguelike chests as
         # vanilla-dungeon because a dungeon happened to generate within 12 blocks of them, and their
@@ -153,7 +160,7 @@ def main():
             p = c["pos"]
             if max(abs((p[0] >> 4) - centre[0]), abs((p[2] >> 4) - centre[1])) > args.radius:
                 continue
-            rows.append((source_of(p), p, c.get("items") or [], c.get("type", "")))
+            rows.append((source_of(p, c.get("type", "")), p, c.get("items") or [], c.get("type", "")))
     rows.sort(key=lambda r: (r[1][0], r[1][2], r[1][1]))
 
     out = args.out or f"loot-fullgen-{seed}.csv"

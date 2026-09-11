@@ -188,6 +188,24 @@ Recall is unchanged, so the six were fixed rather than dropped.
 
 ### Route purity, and what is left
 
+> **SUPERSEDED from here down, except the `Open` list — see
+> `results/2026-09-10-dungeon-chest-placement/`.** Every residual figure below (29 existence + 2
+> contents at r60; 128 existence + 9 contents over 25 seeds; 125 of 131 traced differences on vanilla
+> `WorldGenDungeons`; the 37 rooms / 94 chest positions that the last section proposes a fix shape
+> for, which is the fix that was then built) was measured **before** the
+> chest-draw pin and virgin room construction that landed in the same release. Those took vanilla
+> dungeon chest existence from 92 to **13** and the total from 128 to **51**, and the largest
+> remaining class is no longer dungeons but Thaumcraft greatwood trees at 32. Generator-level, room
+> existence and chest placement are both **0 over 25 seeds and 2082 rooms**.
+>
+> The two arms also disagree on attribution — this run put 125 of 131 on vanilla dungeon, the
+> `dungeon-recon` arm 92 of 128, at the same jar state. That is unexplained and unclosed.
+>
+> The mechanism and A/B sections above this banner are unaffected: the `chestbatch` lever moves 0
+> chest existences, which is the whole point of measuring it with a lever rather than a second jar.
+> **This is the hazard the `[gtnhdet]` build stamp now exists to prevent** — these tables and the
+> superseding ones came from different jars and nothing in either log said so.
+
 Same-order noise floor first, because without it a cold-vs-cold difference cannot be attributed:
 
 | | chests | existence | contents |

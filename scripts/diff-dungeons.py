@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare vanilla WorldGenDungeons ROOMS between two probe runs, and the chests inside them.
 
-Usage: diff-dungeons.py <armA> <armB> [--verbose] [--show N]
+Usage: diff-dungeons.py <armA> <armB> [--verbose] [--show N] [--allow-jar-mismatch]
 
 Each arm is a directory of probe logs, or a glob when both arms share one directory — which is the
 warm-shard.sh layout, where every order lands in the same output dir as ``<order>-shard<i>.log``::
@@ -51,10 +51,18 @@ consistent with "one extra room" and with "same rooms, one placement slot failed
 tell them apart, which is the whole point of reading them separately here.
 """
 import argparse
+import importlib.util
 import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
+
+# Which jar wrote these logs. Imported by path because the filename is not a valid module identifier —
+# the same idiom diff-region-blocks.py uses for probe-provenance.py.
+_bspec = importlib.util.spec_from_file_location(
+    "build_stamp", Path(__file__).resolve().parent / "build-stamp.py")
+stamp = importlib.util.module_from_spec(_bspec)
+_bspec.loader.exec_module(stamp)
 
 ATTEMPT = re.compile(r"\[dungeonattempt\] seed=(-?\d+) x=(-?\d+) y=(-?\d+) z=(-?\d+) built=(\w+)")
 CHEST = re.compile(r"\[chesttrace\] seed=(-?\d+) .*?piece=(\S+) .*?abs=(-?\d+),(-?\d+),(-?\d+) cat=(\S+)")
@@ -143,8 +151,14 @@ def main():
     ap.add_argument("--show", type=int, default=6, help="example differing rooms to print per class")
     ap.add_argument("--keep-boot", action="store_true",
                     help=f"include the warm boot world (level-seed={BOOT_SEED}); excluded by default")
+    ap.add_argument("--allow-jar-mismatch", action="store_true",
+                    help="compare arms built from different jars or run with different gtnhdet.* levers")
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
+
+    # Before anything is read, so a cross-jar comparison never reaches the point of printing a verdict.
+    stamp.check(args.dirA, args.dirB, Path(args.dirA).name, Path(args.dirB).name,
+                allow_mismatch=args.allow_jar_mismatch)
 
     ba, ca, ta = scan(args.dirA, args.keep_boot)
     bb, cb, tb = scan(args.dirB, args.keep_boot)

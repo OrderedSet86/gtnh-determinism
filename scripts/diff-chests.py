@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare chest EXISTENCE and CONTENTS between two sets of probe search reports.
 
-Usage: diff-chests.py <dirA> <dirB> [--verbose]
+Usage: diff-chests.py <dirA> <dirB> [--verbose] [--allow-jar-mismatch]
 
 Each directory holds per-seed search reports written by a probe batch run with PROBE_SEARCH=true.
 Reports are matched by the seed recorded inside them, so the batches may differ in filename or
@@ -19,19 +19,37 @@ NBT-only differences are reported as a failure, not a footnote. Chest gameplay s
 enchantments, charge levels, aspect fills, bee genomes — and treating an NBT-only diff as cosmetic
 has hidden real defects in this project before.
 
+Both arms are checked against the fix jar's ``[gtnhdet]`` build stamp first (see build-stamp.py) and
+the run aborts if they came from different jars or different ``gtnhdet.*`` levers, because such a diff
+measures the jars rather than the walk order. ``--allow-jar-mismatch`` proceeds anyway, for the case
+where the lever IS what is under test.
+
 Exit status: 0 only when seeds were actually compared and every one of them matched. An empty batch,
 an empty intersection, or a batch pair that disagrees on which seeds it holds all exit non-zero — a
 run that compared nothing must never be mistaken for a run that found nothing wrong.
 """
+import importlib.util
 import json
 import sys
 from collections import Counter
 from pathlib import Path
 
+# Which jar wrote these reports. This tool consumes JSON and has no logs of its own, so the helper
+# looks for the sibling warm-shard logs; see build-stamp.py. Imported by path because the filename is
+# not a valid module identifier — the same idiom diff-region-blocks.py uses for probe-provenance.py.
+_bspec = importlib.util.spec_from_file_location(
+    "build_stamp", Path(__file__).resolve().parent / "build-stamp.py")
+stamp = importlib.util.module_from_spec(_bspec)
+_bspec.loader.exec_module(stamp)
+
 
 # Sidecars the probe writes beside the reports. Skipped by name rather than by "has no seed key", so a
 # future sidecar that happens to carry one cannot be mistaken for a report.
 SIDECARS = {"gtmats.json", "gtdims.json", "biomes.json"}
+# Per-seed sidecars, named <report>.veincache.json, so they cannot be matched exactly. They hold a
+# top-level LIST and used to crash load() outright — any warm-shard corpus that also dumped vein caches
+# was undiffable by this tool.
+SIDECAR_SUFFIXES = (".veincache.json",)
 
 
 def load(d):
@@ -44,12 +62,17 @@ def load(d):
     """
     out = {}
     for p in sorted(Path(d).glob("*.json")):
-        if p.name in SIDECARS:
+        if p.name in SIDECARS or p.name.endswith(SIDECAR_SUFFIXES):
             continue
         try:
             r = json.loads(p.read_text())
         except Exception as e:
             print(f"  ! unreadable {p.name}: {e}", file=sys.stderr)
+            continue
+        if not isinstance(r, dict):
+            # An unrecognised sidecar rather than a report. Announced, not swallowed: a report format that
+            # ever stopped being an object would otherwise vanish from the comparison in silence.
+            print(f"  ! {p.name}: top-level {type(r).__name__}, not a report object — skipped", file=sys.stderr)
             continue
         seed = r.get("seed")
         if seed is None:
@@ -79,6 +102,9 @@ def items_with_tag(chest):
 def main():
     verbose = "--verbose" in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    # Ahead of load(), so a cross-jar pair is reported as such rather than as an empty or a differing
+    # comparison. A mismatch here means the run measured the jars, not the walk order.
+    stamp.check(args[0], args[1], "A", "B", allow_mismatch="--allow-jar-mismatch" in sys.argv)
     A, B = load(args[0]), load(args[1])
 
     def sort_key(k):
