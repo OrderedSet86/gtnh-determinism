@@ -171,6 +171,19 @@ public final class GtOrePin {
             DIMS,
             AUDIT,
             ASSERT_PROBE);
+        // Which implementation is in force is not inferable from the flags: the same gtnhdet.orepin=true means
+        // "pin GregTech's own dry run" on one pack and "reconstruct the dry run first" on another. A measurement
+        // run's log has to say which, or its result cannot be attributed.
+        switch (com.gtnhspeedrun.determinism.GtOreShape.SHAPE) {
+            case VEIN_PLACEMENT -> LOG
+                .info("GT ore-vein identity pin (F4d): native implementation (GregTech provides the dry run)");
+            case FIND_STONE_TYPE -> LOG.info(
+                "GT ore-vein identity pin (F4d): BACKPORTED implementation (GregTech fuses the vein test with "
+                    + "the ore write; the dry run is reconstructed by gtnhdeterminism)");
+            default -> LOG.info(
+                "GT ore-vein identity pin (F4d): unavailable on this GregTech — F4 only, vein identity stays "
+                    + "route-dependent");
+        }
     }
 
     /**

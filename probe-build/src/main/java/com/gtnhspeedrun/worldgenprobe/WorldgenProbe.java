@@ -2534,17 +2534,6 @@ public class WorldgenProbe {
                             ores.merge(m, 1, Integer::sum);
                         } catch (Exception ignored) {}
                     } else if (te instanceof net.minecraft.inventory.IInventory) {
-                        // KNOWN GAP: this walks TILE entities, so entity-borne inventories are invisible
-                        // to every corpus, statistic and map derived from `search`. The one that matters
-                        // is EntityMinecartChest — mineshaft corridor loot. Measured on seed
-                        // -1636594104014467454 at radius 60: 154 minecart chests against 1729 tile-entity
-                        // inventories, i.e. ~8% of lootable containers absent from the search report.
-                        //
-                        // chesttrace DOES see them (itype=EntityMinecartChest) and gives position, loot
-                        // category and roll count, but no item list, so nothing anywhere records what a
-                        // mineshaft chest CONTAINS. Closing this means walking chunk entity lists for
-                        // IInventory here and emitting through the same dumpInventory, whose output must
-                        // stay byte-stable — see the note above it.
                         chests.add(dumpInventory((net.minecraft.inventory.IInventory) te, te));
                     } else if (te.getClass()
                         .getSimpleName()
@@ -2555,6 +2544,27 @@ public class WorldgenProbe {
                                 "\"" + te.getClass()
                                     .getSimpleName() + "@" + te.xCoord + "," + te.yCoord + "," + te.zCoord + "\"");
                         }
+                }
+                // Entity-borne inventories, which the tile-entity walk above cannot see. The one that matters
+                // is EntityMinecartChest — mineshaft corridor loot, measured at ~8% of lootable containers on
+                // seed -1636594104014467454 r60 (154 minecarts vs 1729 tile inventories). Until 2026-09-13 the
+                // gap was only documented here; the hammer% hunt gates on corridor steel, so the report now
+                // walks the chunk entity lists and emits through the SAME dumpInventory serializer —
+                // prefilter-vs-fullgen minecart diffs must not be able to report formatting as a finding.
+                // Deliberately EntityMinecartChest-only, not any IInventory entity: villagers implement
+                // nothing lootable and item frames/carts with other cargo have no worldgen loot to verify.
+                for (final List<?> seg : c.entityLists) {
+                    for (final Object eo : seg) {
+                        if (!(eo instanceof net.minecraft.entity.item.EntityMinecartChest)) continue;
+                        final net.minecraft.entity.item.EntityMinecartChest cart = (net.minecraft.entity.item.EntityMinecartChest) eo;
+                        chests.add(
+                            dumpInventory(
+                                cart,
+                                net.minecraft.util.MathHelper.floor_double(cart.posX),
+                                net.minecraft.util.MathHelper.floor_double(cart.posY),
+                                net.minecraft.util.MathHelper.floor_double(cart.posZ),
+                                "EntityMinecartChest"));
+                    }
                 }
                 if (!firstChunk) sb.append(",\n");
                 firstChunk = false;

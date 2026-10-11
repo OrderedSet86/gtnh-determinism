@@ -10,11 +10,14 @@ import net.minecraft.entity.passive.EntityHorse;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.gtnhspeedrun.determinism.worldgen.EntitySpawnRng;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
 /**
  * A horse's speed, jump and health are clock-random, so the same seed gives a different animal every launch.
@@ -71,13 +74,37 @@ public abstract class EntityHorseMixin {
         this.gtnhdet$spawnFork = null;
     }
 
-    /** Type and variant in onSpawnWithEgg; max health in func_110267_cL. */
+    /**
+     * Type and variant in onSpawnWithEgg (5 draws); max health in func_110267_cL (2 draws).
+     *
+     * <p>
+     * Two of the five onSpawnWithEgg draws are compared straight away with a constant, so Mobs-Info 0.6.0+
+     * rewrites them into {@code RandomComparison.nextInt} calls. A plain {@code INVOKE} selector no longer sees
+     * them, and on GTNH 2.9.0-RC-1 those two draws silently stayed on the clock-seeded entity RNG. Each draw is
+     * therefore taken in both call shapes through {@link com.gtnhspeedrun.determinism.RandomDrawPoint}, with a
+     * group that requires all seven stock draws to be covered exactly once.
+     */
+    @Group(name = "gtnhdet$horseNextInt", min = 7, max = 7)
     @Redirect(
         method = { "onSpawnWithEgg", "func_110267_cL" },
-        at = @At(value = "INVOKE", target = "Ljava/util/Random;nextInt(I)I"))
+        at = @At(value = "com.gtnhspeedrun.determinism.RandomDrawPoint", args = "shape=virtual"))
     private int gtnhdet$nextInt(Random stock, int bound) {
         return this.gtnhdet$rng()
             .nextInt(bound);
+    }
+
+    /**
+     * The rewritten form of the same draws. When the fork is not armed (breeding calls func_110267_cL through
+     * createChild), the draw goes to Mobs-Info's {@code original}, so it behaves exactly as the pack does without
+     * this mixin.
+     */
+    @Group(name = "gtnhdet$horseNextInt", min = 7, max = 7)
+    @WrapOperation(
+        method = { "onSpawnWithEgg", "func_110267_cL" },
+        at = @At(value = "com.gtnhspeedrun.determinism.RandomDrawPoint", args = "shape=comparison"))
+    private int gtnhdet$nextIntComparison(Random stock, int bound, int value, int op, Operation<Integer> original) {
+        if (this.gtnhdet$spawnFork != null) return this.gtnhdet$spawnFork.nextInt(bound);
+        return original.call(stock, bound, value, op);
     }
 
     /** Jump strength (func_110245_cM) and movement speed (func_110203_cN). */

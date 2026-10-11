@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """Compare chest EXISTENCE and CONTENTS between two sets of probe search reports.
 
-Usage: diff-chests.py <dirA> <dirB> [--verbose] [--allow-jar-mismatch]
+Usage: diff-chests.py <dirA> <dirB> [--verbose] [--allow-jar-mismatch] [--type=<container type>]
+
+``--type=EntityMinecartChest`` restricts the comparison to one container type — the mineshaft
+corridor minecarts the report walks since 2026-09-13 (probe format: entity-borne inventories are
+emitted into the same per-chunk ``chests`` array as tile entities, position floored). This is the
+mineshaft-loot validation entry point; there is deliberately no separate diff-minecarts.py, because
+a fork of this tool would re-conflate exactly the existence/contents/NBT buckets it separates.
 
 Each directory holds per-seed search reports written by a probe batch run with PROBE_SEARCH=true.
 Reports are matched by the seed recorded inside them, so the batches may differ in filename or
@@ -52,8 +58,10 @@ SIDECARS = {"gtmats.json", "gtdims.json", "biomes.json"}
 SIDECAR_SUFFIXES = (".veincache.json",)
 
 
-def load(d):
+def load(d, typ=None):
     """"seed@dim" -> {(x,y,z) -> chest dict} across every report in the directory.
+
+    ``typ`` restricts to one container type (exact match on the chest's "type" field).
 
     Keyed by dimension as well as seed since report format 6. One seed can now have both an overworld
     and a Twilight Forest report in a directory; keying on the seed alone let the second silently
@@ -86,6 +94,8 @@ def load(d):
             if not isinstance(cv, dict):
                 continue
             for c in cv.get("chests") or []:
+                if typ is not None and c.get("type") != typ:
+                    continue
                 chests[tuple(c.get("pos", []))] = c
         out[key] = chests
     return out
@@ -101,11 +111,17 @@ def items_with_tag(chest):
 
 def main():
     verbose = "--verbose" in sys.argv
+    typ = None
+    for a in sys.argv[1:]:
+        if a.startswith("--type="):
+            typ = a[len("--type="):]
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     # Ahead of load(), so a cross-jar pair is reported as such rather than as an empty or a differing
     # comparison. A mismatch here means the run measured the jars, not the walk order.
     stamp.check(args[0], args[1], "A", "B", allow_mismatch="--allow-jar-mismatch" in sys.argv)
-    A, B = load(args[0]), load(args[1])
+    if typ:
+        print(f"comparing only containers of type {typ}")
+    A, B = load(args[0], typ), load(args[1], typ)
 
     def sort_key(k):
         seed, _, dim = k.partition("@")

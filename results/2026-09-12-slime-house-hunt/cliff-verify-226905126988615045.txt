@@ -1,0 +1,72 @@
+slime block ids: [(494, 'TConstruct:liquid.slime'), (503, 'TConstruct:explosive.slime'), (504, 'TConstruct:slime.gel'), (505, 'TConstruct:slime.grass'), (506, 'TConstruct:slime.grass.tall'), (507, 'TConstruct:slime.leaves'), (508, 'TConstruct:slime.sapling'), (509, 'TConstruct:slime.channel'), (511, 'TConstruct:slime.pad'), (529, 'TConstruct:CraftedSoil')]
+brick ids: [(45, 'minecraft:brick_block'), (108, 'minecraft:brick_stairs')]
+chunks loaded in window (-47, -43, 60, 64): 25
+
+== entrance column (-710,998) ==
+  y= 40  minecraft:stone:0
+  y= 41  minecraft:stone:0
+  y= 42  minecraft:stone:0
+  y= 43  minecraft:stone:0
+  y= 44  minecraft:stone:0
+  y= 45  minecraft:stone:0
+  y= 46  minecraft:stone:0
+  y= 47  minecraft:stone:0
+  y= 48  minecraft:stone:0
+  y= 49  minecraft:stonebrick:0
+  y= 50  minecraft:log:0
+  y= 51  minecraft:log:0
+  y= 52  minecraft:log:0
+  y= 53  minecraft:log:0
+  y= 54  minecraft:log:0
+  y= 55  minecraft:log:0
+  y= 56  minecraft:log:0
+  y= 57  minecraft:log:0
+  y= 58  minecraft:log:0
+  y= 59  minecraft:log:0
+  y= 60  minecraft:log:0
+  y= 61  minecraft:log:0
+  y= 62  minecraft:log:0
+  y= 63  minecraft:log:0
+  y= 64  minecraft:log:0
+  y= 65  minecraft:log:0
+  y= 66  minecraft:log:0
+  y= 67  minecraft:log:0
+  y= 68  minecraft:log:0
+  y= 69  minecraft:log:0
+  y= 70  minecraft:log:0
+  y= 71  minecraft:log:0
+  y= 72  minecraft:log:0
+  y= 73  minecraft:log:0
+  y= 74  minecraft:log:0
+  y= 75  minecraft:log:0
+  y= 76  minecraft:log:0
+  y= 77  minecraft:log:0
+  y= 78  minecraft:log:0
+  y= 79  minecraft:log:0
+  y= 80  minecraft:log:0
+  y= 81  minecraft:log:0
+  y= 82  minecraft:log:0
+  y= 83  minecraft:log:0
+  y= 84  minecraft:log:0
+  y= 85  minecraft:log:0
+  y= 86  minecraft:log:0
+  y= 87  minecraft:log:0
+  y= 88  minecraft:log:0
+  y= 89  minecraft:log:0
+  y= 90  minecraft:log:0
+  y= 91  minecraft:log:0
+  y= 92  minecraft:log:0
+  y= 93  minecraft:log:0
+  y= 94  minecraft:log:0
+  y= 95  minecraft:log:0
+  y= 96  minecraft:log:0
+  y= 97  minecraft:log:0
+  y= 98  minecraft:log:0
+  y=104  minecraft:planks:0
+
+== island material in footprint ==
+  NONE FOUND
+
+== brick family near entrance (41x41, y 55..145) ==
+  brick blocks: 2256, y range: 55..104
+  per-y: 55:12, 56:3, 57:3, 58:3, 59:3, 60:61, 61:58, 62:58, 63:58, 64:58, 65:58, 66:58, 67:58, 68:58, 69:58, 70:58, 71:58, 72:58, 73:58, 74:58, 75:58, 76:58, 77:58, 78:58, 79:58, 80:58, 81:58, 82:58, 83:58, 84:58, 85:58, 86:58, 87:58, 88:58, 89:58, 90:58, 91:58, 92:58, 93:58, 94:34, 95:30, 96:26, 97:50, 98:3, 99:33, 100:23, 101:36, 102:14, 103:5, 104:3

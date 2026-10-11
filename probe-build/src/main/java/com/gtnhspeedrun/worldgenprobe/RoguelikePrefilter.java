@@ -86,9 +86,41 @@ final class RoguelikePrefilter {
 
         int triggerX;
         int triggerZ;
+        /**
+         * Dungeon entrance column ({@code Dungeon.pos}) — the X/Z the surface tower generates at.
+         * {@code Integer.MIN_VALUE} when the trigger rolled but no valid location was found.
+         */
+        int entranceX = Integer.MIN_VALUE;
+        int entranceZ = Integer.MIN_VALUE;
         final List<String> chests = new ArrayList<>();
         final List<int[]> enchantTables = new ArrayList<>();
+        /**
+         * Per TOOLS-type chest: {x, y, z, alumitePlate, anyPlate, hammerHead, toughRod} — the hammer%
+         * categories counted on the ItemStacks at capture time ({@link LootCounts}), TOOLS only because all
+         * tough-tier TC parts live exclusively in {@code loot_tools} chests (results/2026-08-29-tc-chest-materials).
+         */
+        final List<int[]> toolChests = new ArrayList<>();
         String tower;
+        /**
+         * Whether the resolved settings carry {@code SettingsType.LOOTRULES} in their override list, i.e.
+         * whether GTNH's {@code loot_all.json} suppression reached this dungeon.
+         *
+         * <p>
+         * This is the switch that decides whether vanilla {@code ChestGenHooks} loot can appear at all.
+         * {@code SettingsLootRules} adds a type-{@code null}, to-each, 6-draw JUNK rule, and
+         * {@code ItemJunk.getLootItem} is the mod's ONLY {@code ChestGenHooks} caller — including a
+         * {@code level == 4} branch that draws from {@code pyramidJungleChest} / {@code pyramidDesertChest}.
+         * GTNH's eight {@code dungeon_*.json} inherit {@code "overrides": ["LOOTRULES"]} from
+         * {@code loot_all.json}, so a dungeon whose biome matches a custom setting never runs that path;
+         * one that falls through to {@code SettingsResolver.base} does.
+         *
+         * <p>
+         * Recorded rather than derived from the biome on purpose: the block-level biome is not settled
+         * before generation under RWG, which is why the enchanting-table biome gate was removed as unsound
+         * (see the note above {@code Prefilter.SURFACE_Y_COLUMNS}). The resolved settings object is the
+         * gate itself, so reading it sidesteps the question entirely.
+         */
+        Boolean lootRulesSuppressed;
         String error;
     }
 
@@ -169,26 +201,64 @@ final class RoguelikePrefilter {
     private static final class CapturingDungeon extends Dungeon {
 
         greymerk.roguelike.dungeon.settings.ISettings captured;
+        int capturedX;
+        int capturedZ;
+        boolean placed;
+        /**
+         * Place-only mode: record the resolved settings and entrance and SKIP construction. Siting
+         * (generateNear's attempt loop + validLocation) and settings resolution have already happened by
+         * the time generate() is entered, and they are all a coincidence scan needs — the ~260 ms room/
+         * loot build would only be thrown away. Chests and enchant tables are not populated in this mode.
+         */
+        final boolean placeOnly;
 
-        CapturingDungeon(IWorldEditor editor) {
+        CapturingDungeon(IWorldEditor editor, boolean placeOnly) {
             super(editor);
+            this.placeOnly = placeOnly;
         }
 
         @Override
         public void generate(greymerk.roguelike.dungeon.settings.ISettings settings, int x, int z) {
             captured = settings;
-            super.generate(settings, x, z);
+            capturedX = x;
+            capturedZ = z;
+            placed = true;
+            if (!placeOnly) super.generate(settings, x, z);
         }
     }
 
     static Result generate(World world, long seed, int cx, int cz) {
+        return generate(world, seed, cx, cz, false);
+    }
+
+    static Result generate(World world, long seed, int cx, int cz, boolean placeOnly) {
         final Result r = new Result();
         r.triggerX = cx;
         r.triggerZ = cz;
         try {
             final IWorldEditor editor = new WorldEditor(world);
-            final CapturingDungeon dungeon = new CapturingDungeon(editor);
+            final CapturingDungeon dungeon = new CapturingDungeon(editor, placeOnly);
             dungeon.spawnInChunk(new Random(chunkSeed(seed, cx, cz)), cx, cz);
+            if (dungeon.placed) {
+                // generate()'s x/z args ARE Dungeon.pos (it sets pos = (inX, 50, inZ)); captured here so
+                // place-only mode, which never runs the body, still reports the entrance column.
+                r.entranceX = dungeon.capturedX;
+                r.entranceZ = dungeon.capturedZ;
+            }
+            if (dungeon.captured != null) {
+                final java.util.List<greymerk.roguelike.dungeon.settings.SettingsType> ov = dungeon.captured
+                    .getOverrides();
+                r.lootRulesSuppressed = ov != null
+                    && ov.contains(greymerk.roguelike.dungeon.settings.SettingsType.LOOTRULES);
+            }
+            if (placeOnly) {
+                if (dungeon.captured != null && dungeon.captured.getTower() != null) {
+                    final greymerk.roguelike.dungeon.towers.Tower tw = dungeon.captured.getTower()
+                        .getTower();
+                    r.tower = tw == null ? null : tw.name();
+                }
+                return r;
+            }
             if (dungeon.captured != null && dungeon.captured.getTower() != null) {
                 final greymerk.roguelike.dungeon.towers.Tower tw = dungeon.captured.getTower()
                     .getTower();
@@ -204,6 +274,14 @@ final class RoguelikePrefilter {
                 final String typed = "{\"ttype\": \"" + chest.getType()
                     .name() + "\", " + dump.substring(dump.indexOf('{') + 1);
                 r.chests.add(typed);
+                if ("TOOLS".equals(
+                    chest.getType()
+                        .name())) {
+                    final int[] c = LootCounts.count(te);
+                    r.toolChests.add(
+                        new int[] { te.xCoord, te.yCoord, te.zCoord, c[LootCounts.ALUMITE_PLATE],
+                            c[LootCounts.ANY_PLATE], c[LootCounts.HAMMER_HEAD], c[LootCounts.TOUGH_ROD] });
+                }
             }
             // Exact enchant-room signal: the ENCHANTING_TABLE blocks the dungeon actually wrote, read
             // back from the F5 editor overlay's capture maps (live writes + buffered writes). Chest

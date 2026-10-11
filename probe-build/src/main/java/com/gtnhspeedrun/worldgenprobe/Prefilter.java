@@ -61,6 +61,17 @@ import net.minecraft.world.storage.ISaveHandler;
  * [-Dprobe.prefilter.selftest=false (cross-check world.getBlock against the digest)]
  * [-Dprobe.prefilter.dungeon=N (Roguelike trigger scan radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.gate.dungeon=false (kill seeds with no dungeon trigger in range)]
+ * [-Dprobe.prefilter.slimehouse=N (TiC slime island x Roguelike tower coincidence scan, radius in chunks
+ * around the ORIGIN; -1 off. .band=128 caps the estimated island yCenter; .rarity=8000 is the fallback
+ * when TCon's PHConstruct is absent)]
+ * [-Dprobe.prefilter.gate.slimehouse=band|house (kill seeds without a band island / without a HOUSE
+ * tower entrance under an island ellipse; kill rows carry the counts and any non-HOUSE hits)]
+ * [-Dprobe.prefilter.cliffhouse=R (Roguelike HOUSE towers on virgin plateau edges: place-only dungeons for
+ * triggers in R chunks around origin, score = entrance floor minus min topSolid within +/-16 blocks)]
+ * [-Dprobe.prefilter.gate.cliffhouse=D (kill seeds whose best HOUSE drop is below D)]
+ * [-Dprobe.prefilter.gate.cliffstair=L (kill seeds whose best HOUSE front-staircase length is below L)]
+ * [-Dprobe.prefilter.gate.cliffvis=V (kill seeds whose best staircase has fewer than V visible brick blocks —
+ * the 3-wide curtain above the virgin surface, i.e. staircase-off-a-cliff, not hugging a slope)]
  * [-Dprobe.prefilter.witchery=N (Witchery candidate-cell scan radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.stronghold=N (stronghold radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.oil=N (BuildCraft oil scan radius in chunks around predicted spawn; -1 off)]
@@ -70,6 +81,40 @@ import net.minecraft.world.storage.ISaveHandler;
  * [-Dprobe.prefilter.biomeregion.humidity=14 (crop humidity bonus a chunk needs to count as humid)]
  * [-Dprobe.prefilter.biomeregion.confirm=-1 (Tier B chunk budget per seed; -1 = whole window/exact, 0 = off)]
  * [-Dprobe.prefilter.gate.biomeregion=SIDE[,MAXGAP] (kill seeds without such a region)]
+ *
+ * Hammer%-hunt modules (2026-09-13):
+ * [-Dprobe.prefilter.mineshaft=N (mineshaft trigger scan radius in chunks around the ORIGIN; -1 off.
+ * Triggers are pure arithmetic; starts are dispatched pre-chunkgen like villages)]
+ * [-Dprobe.prefilter.gate.mineshafttrig=Rg (kill seeds with no mineshaft trigger within Rg chunks of origin)]
+ * [-Dprobe.prefilter.gate.roguetrig=Rg (kill seeds with no Roguelike trigger within Rg chunks of origin —
+ * the worldless pre-gate; the spawn-centred dungeon stage still re-checks exactly)]
+ * [-Dprobe.prefilter.mineshaftloot=true (replay corridor minecart-chest loot per populate window against the
+ * overlay; needs mineshaft radius >= 0. Chest contents/counts are exact under the fix jar's F10 fork;
+ * existence rides the MineshaftCorridorChestMixin pin — see MineshaftPrefilter)]
+ * [-Dprobe.prefilter.gate.steel=N[,DIST] (kill seeds whose Block of Steel total — predicted village chests
+ * plus mineshaft minecarts within DIST blocks of spawn, default 320 — is below N. Kill rows carry the
+ * counts so bars tune without re-sweeping)]
+ * [-Dprobe.prefilter.gate.toolloot=alumite=A,plate=P,hammer=H,rod=R[,dist=D] (kill seeds whose Roguelike
+ * TOOLS-chest aggregate within D blocks of spawn, default 320, misses any minimum: Alumite Large Plates,
+ * total Large Plates, Hammer Heads, Tough Rods. Alumite = Obzinite; server strings say Alumite)]
+ *
+ * Meteor-crater hunt module (2026-09-13):
+ * [-Dprobe.prefilter.meteor=C (AE2 meteorite scan, C grid cells — minMeteoriteDistance, 707 here — around
+ * the origin cell; -1 off. Candidates are pure (seed, cell) arithmetic through the real
+ * Platform.seedFromGrid; terrain runs only past the size gate — see MeteorPrefilter)]
+ * [-Dprobe.prefilter.gate.meteorsize=7.8 (candidate filter, not a seed kill: skip terrain for size rolls
+ * below this; 0 emits every cell)]
+ * [-Dprobe.prefilter.gate.meteorrelief=20 (mark candidates whose 3x3-chunk relief above the impact surface
+ * is below this as reject=flat, skipping the volume disc)]
+ * [-Dprobe.prefilter.meteor.volradius=96 (volume-scoring disc radius in blocks around the impact)]
+ * [-Dprobe.prefilter.gate.meteorproxy=P (analytic noise screen: reject candidates whose rNoise ring proxy
+ * relief is below P, BEFORE any chunk generates. 0 = annotate only. Calibrate on known hits first —
+ * the proxy skips biome blending, so its scale is not the digest relief scale)]
+ * [-Dprobe.prefilter.gate.meteorbiome=tok1,tok2 (worldless ring gate: reject candidates unless the impact
+ * or an 8-point ring at 56 blocks lies in a biome whose normalized name contains a token — e.g.
+ * snowforest,coldplains,coldforest,temperateforest for RWG's clamp-150/155 wall terrain; empty = off)]
+ * [-Dprobe.prefilter.gate.meteorvol=V (kill seeds whose best carved volume is below V; kill rows carry the
+ * candidates so bars tune without re-sweeping)]
  *
  * Block reads (2026-08-29): {@link VirginChunkProvider} backs the world, so {@code world.getBlock} and
  * {@code getBlockMetadata} answer virgin terrain. That is what {@code TerrainOracle} falls through to for a
@@ -273,6 +318,7 @@ public final class Prefilter {
 
         private Map<Long, int[]> overlay;
         private Map<Long, net.minecraft.tileentity.TileEntity> overlayTe;
+        private List<Entity> overlayEntities;
 
         private static long okey(int x, int y, int z) {
             return ((long) (x + 30_000_000) << 36) | ((long) (z + 30_000_000) << 8) | (y & 0xFF);
@@ -281,6 +327,16 @@ public final class Prefilter {
         void beginOverlay() {
             overlay = new java.util.HashMap<>();
             overlayTe = new java.util.HashMap<>();
+            overlayEntities = new ArrayList<>();
+        }
+
+        /**
+         * Entities spawned while the overlay was live, in spawn order. Read BEFORE {@link #endOverlay()}. This
+         * is how mineshaft corridor loot becomes visible at all: it lives in {@code EntityMinecartChest}, not a
+         * tile entity, and {@link #spawnEntityInWorld} used to drop it on the floor.
+         */
+        List<Entity> overlayEntities() {
+            return overlayEntities == null ? java.util.Collections.emptyList() : overlayEntities;
         }
 
         /** The block writes the overlay has captured so far. Read BEFORE {@link #endOverlay()}. */
@@ -301,6 +357,7 @@ public final class Prefilter {
             final Map<Long, net.minecraft.tileentity.TileEntity> te = overlayTe;
             overlay = null;
             overlayTe = null;
+            overlayEntities = null;
             return te == null ? java.util.Collections.emptyMap() : te;
         }
 
@@ -339,9 +396,15 @@ public final class Prefilter {
 
         @Override
         public boolean spawnEntityInWorld(Entity e) {
-            // Coven circles spawn witches. Nothing here consumes entities, and adding them would need the entity
-            // lists a worldless World does not maintain.
-            return overlay != null || super.spawnEntityInWorld(e);
+            // During an overlay the entity is CAPTURED, not dropped: mineshaft corridor loot is an
+            // EntityMinecartChest, and swallowing it silently was exactly how ~8% of lootable containers stayed
+            // invisible to every prefilter row (see the KNOWN GAP note in WorldgenProbe.buildSearchReport).
+            // Outside an overlay the old refusal stands — a worldless World maintains no entity lists.
+            if (overlay != null) {
+                overlayEntities.add(e);
+                return true;
+            }
+            return super.spawnEntityInWorld(e);
         }
 
         private boolean refuseWrite(String what, int x, int y, int z) {
@@ -723,6 +786,11 @@ public final class Prefilter {
             fRand = findField(genCls, "rand");
             fTestHeight = findField(genCls, "testHeight");
             fBaseBiome = findField(biomeArrayType, "baseBiome");
+        }
+
+        /** The reflected ChunkGeneratorRealistic — MeteorPrefilter's analytic screen reads its noise fields. */
+        Object generator() {
+            return gen;
         }
 
         Cols columns(int cx, int cz) throws Exception {
@@ -1223,6 +1291,33 @@ public final class Prefilter {
             .toString();
     }
 
+    /** Roguelike's {@code WorldEditor.validGroundBlock} material rules, applied to a virgin block. */
+    private static boolean gtnhdet$roguelikeGround(net.minecraft.block.Block b) {
+        if (b == null || b == net.minecraft.init.Blocks.air) return false;
+        final net.minecraft.block.material.Material m = b.getMaterial();
+        return m != net.minecraft.block.material.Material.grass && m != net.minecraft.block.material.Material.snow
+            && m != net.minecraft.block.material.Material.plants
+            && m != net.minecraft.block.material.Material.leaves
+            && m != net.minecraft.block.material.Material.wood
+            && m != net.minecraft.block.material.Material.cactus
+            && m != net.minecraft.block.material.Material.gourd
+            && m != net.minecraft.block.material.Material.water;
+    }
+
+    /**
+     * TCon's live {@code PHConstruct.islandRarity} (config-loaded: GTNH ships 8000, TCon default 1450),
+     * falling back to {@code -Dprobe.prefilter.slimehouse.rarity} when TCon is absent from the pack.
+     */
+    private static int slimeIslandRarity() {
+        try {
+            return Class.forName("tconstruct.util.config.PHConstruct")
+                .getField("islandRarity")
+                .getInt(null);
+        } catch (Throwable absent) {
+            return Integer.getInteger("probe.prefilter.slimehouse.rarity", 8000);
+        }
+    }
+
     private static RoguelikePrefilter.Result generateDungeonTimed(World world, long seed, int[] t) {
         final long tGen = Timing.start();
         final long cg0 = Timing.nanos("chunkgen");
@@ -1232,7 +1327,8 @@ public final class Prefilter {
         return r;
     }
 
-    private static List<String> villageStarts(Object gen, World world, List<int[]> cells) throws Exception {
+    private static List<String> villageStarts(Object gen, World world, List<int[]> cells, List<int[]> steelOut)
+        throws Exception {
         final Map<?, ?> structureMap = (Map<?, ?>) STRUCTURE_MAP.get(gen);
         structureMap.clear();
         STRUCTURE_DATA.set(gen, null); // else func_143027_a reuses the previous seed's NBT cache
@@ -1280,6 +1376,11 @@ public final class Prefilter {
                             cbb,
                             cbb.minY)) {
                             (p.reason == null ? chests : chestsUnpredicted).add(chestJson(p));
+                            // Steel for the hammer% gate, collected while the rolled counts are in hand.
+                            // Chest XZ is exact (Y is not, and the gate never uses it).
+                            if (steelOut != null && p.counts != null && p.counts[LootCounts.STEEL] > 0) {
+                                steelOut.add(new int[] { p.x, p.z, p.counts[LootCounts.STEEL] });
+                            }
                         }
                     }
                     java.util.Collections.sort(chests);
@@ -1319,6 +1420,13 @@ public final class Prefilter {
             }
         }
         return out;
+    }
+
+    private static final java.util.Set<String> WARNED_ONCE = new java.util.HashSet<>();
+
+    /** A misconfiguration that silently degrades a gate must be said once, not per seed and not never. */
+    private static synchronized void warnOnce(String msg) {
+        if (WARNED_ONCE.add(msg)) WorldgenProbe.LOG.warn("[prefilter] {}", msg);
     }
 
     private static boolean biomeRegionCostWarned;
@@ -1447,11 +1555,46 @@ public final class Prefilter {
         sb.append("{\"seed\": ")
             .append(seed);
 
+        // --- Hammer% worldless pre-gates (-Dprobe.prefilter.mineshaft=R chunks around the ORIGIN; -1 off).
+        // Mineshaft and Roguelike triggers are pure (seed, chunk) arithmetic — no chunk generation, no
+        // generator state — so they sit before everything and kill for effectively nothing. Origin-centred
+        // with slack, exactly like tier 1: spawn is median ~104 blocks from origin (p90 478), and the gated
+        // stages below re-check every distance against the predicted spawn exactly.
+        final int mineshaftRadius = Integer.getInteger("probe.prefilter.mineshaft", -1);
+        List<int[]> mineshaftTriggers = java.util.Collections.emptyList();
+        if (mineshaftRadius >= 0 && MineshaftPrefilter.resolve() == null && MineshaftPrefilter.arithmetic()) {
+            final long tMsTrig = Timing.start();
+            mineshaftTriggers = MineshaftPrefilter.triggers(seed, 0, 0, mineshaftRadius);
+            Timing.add("mineshaft.trig", tMsTrig);
+            final int gateMsTrig = Integer.getInteger("probe.prefilter.gate.mineshafttrig", -1);
+            if (gateMsTrig >= 0) {
+                boolean ok = false;
+                for (final int[] t : mineshaftTriggers) {
+                    if (Math.max(Math.abs(t[0]), Math.abs(t[1])) <= gateMsTrig) {
+                        ok = true;
+                        break;
+                    }
+                }
+                if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"mineshafttrig\"}";
+            }
+        }
+        final int gateRogueTrig = Integer.getInteger("probe.prefilter.gate.roguetrig", -1);
+        if (gateRogueTrig >= 0 && RoguelikePrefilter.available()) {
+            final long tRogueTrig = Timing.start();
+            final boolean ok = !RoguelikePrefilter.triggers(world, 0, 0, gateRogueTrig)
+                .isEmpty();
+            Timing.add("roguetrig", tRogueTrig);
+            if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"roguetrig\"}";
+        }
+
         // --- villages: ask the REAL village generator (incl. InitMapGenEvent replacements like
         // VillageNames' MapGenVillageVN) — zero reimplementation drift; spacing/salt/biome gates are whatever
         // the pack actually runs.
         final List<int[]> villages = new ArrayList<>();
         final List<String> starts = new ArrayList<>();
+        // Predicted village chests holding Block of Steel: {chestX, chestZ, steel}. Filled by villageStarts
+        // while the Predicted objects are in hand, distance-filtered by the steel gate once spawn is known.
+        final List<int[]> villageSteel = new ArrayList<>();
         final boolean pieces = !"false".equals(System.getProperty("probe.prefilter.pieces"));
         // staged kill gates: each stage only runs if the previous one kept the seed, so a gated
         // million-seed sweep pays pieces/terrain cost only for survivors (the funnel in one pass)
@@ -1496,7 +1639,7 @@ public final class Prefilter {
             }
             if (pieces && !villages.isEmpty()) {
                 final long tStarts = Timing.start();
-                starts.addAll(villageStarts(gen, world, villages));
+                starts.addAll(villageStarts(gen, world, villages, villageSteel));
                 Timing.add("villageStarts", tStarts);
             }
             if (gatePieces != null) {
@@ -1531,6 +1674,67 @@ public final class Prefilter {
                 .append("]");
         }
 
+        // --- Mineshaft starts. Must run BEFORE any chunk generation for the same reason the village pass
+        // does: provideChunk runs RWG's OWN mineshaft mapgen, which registers starts into the shared
+        // "Mineshaft" per-world storage that func_143027_a would reload into this pass's structureMap.
+        // Start construction is rand-only (StructureMineshaftStart / markAvailableHeight make no world
+        // reads), so this generates zero chunks. The loot sim runs later, once spawn is known.
+        List<MineshaftPrefilter.Start> msStarts = java.util.Collections.emptyList();
+        if (mineshaftRadius >= 0 && MineshaftPrefilter.resolve() == null) {
+            try {
+                final long tMsStarts = Timing.start();
+                final List<int[]> msCells = MineshaftPrefilter.arithmetic() ? mineshaftTriggers
+                    : MineshaftPrefilter.latticeCells(0, 0, mineshaftRadius);
+                msStarts = MineshaftPrefilter.starts(world, seed, msCells);
+                Timing.add("mineshaft.starts", tMsStarts);
+                sb.append(", \"mineshaft_triggers\": [");
+                for (int i = 0; i < mineshaftTriggers.size(); i++) {
+                    if (i > 0) sb.append(", ");
+                    sb.append("[")
+                        .append(mineshaftTriggers.get(i)[0])
+                        .append(", ")
+                        .append(mineshaftTriggers.get(i)[1])
+                        .append("]");
+                }
+                sb.append("], \"mineshaft_starts\": [");
+                for (int i = 0; i < msStarts.size(); i++) {
+                    final MineshaftPrefilter.Start s = msStarts.get(i);
+                    if (i > 0) sb.append(", ");
+                    sb.append("{\"c\": [")
+                        .append(s.cx)
+                        .append(", ")
+                        .append(s.cz)
+                        .append("], \"bbox\": [")
+                        .append(s.bbox[0])
+                        .append(", ")
+                        .append(s.bbox[1])
+                        .append(", ")
+                        .append(s.bbox[2])
+                        .append(", ")
+                        .append(s.bbox[3])
+                        .append(", ")
+                        .append(s.bbox[4])
+                        .append(", ")
+                        .append(s.bbox[5])
+                        .append("], \"pieces\": ")
+                        .append(s.pieces)
+                        .append(", \"corridors\": ")
+                        .append(s.corridors)
+                        .append(", \"chest_candidates\": ")
+                        .append(s.chestCandidates)
+                        .append("}");
+                }
+                sb.append("]");
+            } catch (Throwable t) {
+                WorldgenProbe.LOG.warn("[prefilter] mineshaft starts failed for {}: {}", seed, t.toString());
+                sb.append(", \"mineshaft_error\": \"")
+                    .append(
+                        t.toString()
+                            .replace("\"", "'"))
+                    .append("\"");
+            }
+        }
+
         // --- biome histogram on a 16-block grid over the origin window (31x31 samples = radius-15-chunk proxy)
         final Map<String, Integer> biomes = new LinkedHashMap<>();
         for (int bx = -240; bx <= 240; bx += 16) {
@@ -1553,6 +1757,466 @@ public final class Prefilter {
                 .append(e.getValue());
         }
         sb.append("}");
+
+        // --- Slime-island x Roguelike-tower coincidence (-Dprobe.prefilter.slimehouse=R chunks around the
+        // origin; -1 off). Finds TiC slime islands whose body dips into Tower.getBaseCoord's 128->60 live
+        // ground scan AND a Roguelike dungeon entrance column under the island ellipse — the "brick house on
+        // a slime island" shot (HOUSE tower = forest settings; ThemeHouse primary walls are BRICK; slime dirt
+        // is Material.ground, so the tower's base scan accepts it while the fix jar's virgin validLocation
+        // vetted the real terrain 50+ blocks below). Island rolls are pure (seed, chunk) arithmetic: FML
+        // reseeds per IWorldGenerator (RoguelikePrefilter.chunkSeed), and with the fix jar's
+        // SlimeIslandGenMixin the generateIsland draws are xRange=nextInt(13)+20,
+        // yCenter=50+getHeightValue+nextInt(50), zRange=nextInt(13)+20, after generate()'s nextInt(rarity)
+        // gate. Live getHeightValue is approximated by virgin topSolid+1 — a floor, since decoration only
+        // adds — so the yCenter estimate reads low and the band keep is conservative; full-gen verification
+        // culls canopy-raised false keeps. Placed after the village pass (RwgTerrain and dungeon
+        // construction generate chunks, which would poison the village cell scan) and before the terrain
+        // stage so the kill gates spare everything downstream. Dungeon writes land in prefilter chunks like
+        // the late dungeon stage's do; a sweep normally runs this stage with terrain=-1.
+        final int slimeRadius = Integer.getInteger("probe.prefilter.slimehouse", -1);
+        if (slimeRadius >= 0 && RoguelikePrefilter.available()) {
+            final long tSlime = Timing.start();
+            try {
+                final int rarity = slimeIslandRarity();
+                final int bandMax = Integer.getInteger("probe.prefilter.slimehouse.band", 128);
+                final String slimeGate = System.getProperty("probe.prefilter.gate.slimehouse", "");
+                // fmlRandom prologue hoisted per seed; `>> 2 + 1L` is Forge's precedence quirk (= >> 3),
+                // written Forge's way so nobody "corrects" it into a different world.
+                final Random fml = new Random(seed);
+                final long fmlXSeed = fml.nextLong() >> 2 + 1L;
+                final long fmlZSeed = fml.nextLong() >> 2 + 1L;
+                final Random islRoll = new Random(0);
+                final List<int[]> islands = new ArrayList<>(); // {cx, cz, xRange, zRange, r50}
+                for (int cx2 = -slimeRadius; cx2 <= slimeRadius; cx2++) {
+                    for (int cz2 = -slimeRadius; cz2 <= slimeRadius; cz2++) {
+                        islRoll.setSeed((fmlXSeed * cx2 + fmlZSeed * cz2) ^ seed);
+                        if (islRoll.nextInt(rarity) != 0) continue;
+                        final int xr = islRoll.nextInt(13) + 20;
+                        final int r50 = islRoll.nextInt(50);
+                        final int zr = islRoll.nextInt(13) + 20;
+                        islands.add(new int[] { cx2, cz2, xr, zr, r50 });
+                    }
+                }
+                // Y-band: island body spans [yCenter, yCenter+12]; the tower scan starts at 128, so any
+                // yCenter <= bandMax(128) puts slime dirt in the scan's path (on top of the island for
+                // yCenter < 116, carved into its top above that).
+                RwgTerrain terraSlime = null;
+                final List<int[]> band = new ArrayList<>(); // {island..., h, yEst}
+                for (final int[] isl : islands) {
+                    // r50 pre-cut before paying a chunk gen for the height: dungeon-viable land sits at
+                    // h >= ~55 (validLocation's ground scan floors at lowerLimit 60; 5 blocks of slack for
+                    // island-corner vs tower-column relief), so islands whose 50+55+1+r50 already exceeds
+                    // the band can never yield a hit. Cuts ~half the RwgTerrain reads.
+                    if (50 + 55 + 1 + isl[4] > bandMax) continue;
+                    if (terraSlime == null) terraSlime = new RwgTerrain(world);
+                    final int h = terraSlime.columns(isl[0], isl[1]).topSolid[0];
+                    final int yEst = 50 + h + 1 + isl[4];
+                    if (yEst <= bandMax) band.add(new int[] { isl[0], isl[1], isl[2], isl[3], h, yEst });
+                }
+                sb.append(", \"slime_islands\": ")
+                    .append(islands.size())
+                    .append(", \"slime_band\": ")
+                    .append(band.size());
+                // band island coords for arithmetic golden-checks and near-miss calibration:
+                // [chunkX, chunkZ, xRange, zRange, virginTopSolid, yCenterEst]
+                sb.append(", \"slime_band_islands\": [");
+                for (int i = 0; i < band.size(); i++) {
+                    final int[] b2 = band.get(i);
+                    if (i > 0) sb.append(", ");
+                    sb.append("[")
+                        .append(b2[0])
+                        .append(", ")
+                        .append(b2[1])
+                        .append(", ")
+                        .append(b2[2])
+                        .append(", ")
+                        .append(b2[3])
+                        .append(", ")
+                        .append(b2[4])
+                        .append(", ")
+                        .append(b2[5])
+                        .append("]");
+                }
+                sb.append("]");
+                if (band.isEmpty() && !slimeGate.isEmpty()) {
+                    return "{\"seed\": " + seed + ", \"kill\": \"slimeband\", \"islands\": " + islands.size() + "}";
+                }
+                // Triggers near each band island; construct each at most once; entrance vs ellipse.
+                final Map<Long, RoguelikePrefilter.Result> built = new LinkedHashMap<>();
+                final List<String> towerHits = new ArrayList<>();
+                int houseHits = 0;
+                for (final int[] bi : band) {
+                    final int x0 = bi[0] * 16, z0 = bi[1] * 16;
+                    final double exc = x0 + bi[2] / 2.0, ezc = z0 + bi[3] / 2.0;
+                    // generateNear reach (100) + island semi-axis + slack for the 16-block trigger cell
+                    final double reach = 100 + Math.max(bi[2], bi[3]) / 2.0 + 12;
+                    for (final int[] t : RoguelikePrefilter.triggers(world, bi[0], bi[1], 9)) {
+                        if (Math.hypot(t[0] * 16 + 4 - exc, t[1] * 16 + 4 - ezc) > reach) continue;
+                        final Long tk = ((long) t[0] << 32) | (t[1] & 0xFFFFFFFFL);
+                        RoguelikePrefilter.Result r = built.get(tk);
+                        if (r == null) {
+                            // place-only: siting + settings resolution without the ~260 ms room/loot build
+                            final long tGen = Timing.start();
+                            r = RoguelikePrefilter.generate(world, seed, t[0], t[1], true);
+                            Timing.add("slimehouse.place", tGen);
+                            built.put(tk, r);
+                        }
+                        if (r.entranceX == Integer.MIN_VALUE || r.tower == null) continue;
+                        // Ellipse2D(0,0,xr,zr).contains(dx,dz) normalized: q < 1 is inside; the bottom-erosion
+                        // pass thins the rim, so prefer low q when ranking hits.
+                        final double nx = (r.entranceX - x0) / (double) bi[2] - 0.5;
+                        final double nz = (r.entranceZ - z0) / (double) bi[3] - 0.5;
+                        final double q = 4 * (nx * nx + nz * nz);
+                        if (q > 1.0) continue;
+                        if ("HOUSE".equals(r.tower)) houseHits++;
+                        towerHits.add(
+                            "{\"tower\": \"" + r.tower
+                                + "\", \"entrance\": ["
+                                + r.entranceX
+                                + ", "
+                                + r.entranceZ
+                                + "], \"island_chunk\": ["
+                                + bi[0]
+                                + ", "
+                                + bi[1]
+                                + "], \"island_wh\": ["
+                                + bi[2]
+                                + ", "
+                                + bi[3]
+                                + "], \"h\": "
+                                + bi[4]
+                                + ", \"ycenter_est\": "
+                                + bi[5]
+                                + ", \"q\": "
+                                + (Math.round(q * 100) / 100.0)
+                                + ", \"trigger\": ["
+                                + t[0]
+                                + ", "
+                                + t[1]
+                                + "]}");
+                    }
+                }
+                sb.append(", \"slime_tower_hits\": [")
+                    .append(String.join(", ", towerHits))
+                    .append("]");
+                if ("house".equals(slimeGate) && houseHits == 0) {
+                    return "{\"seed\": " + seed
+                        + ", \"kill\": \"slimehouse\", \"islands\": "
+                        + islands.size()
+                        + ", \"band\": "
+                        + band.size()
+                        + ", \"hits\": ["
+                        + String.join(", ", towerHits)
+                        + "]}";
+                }
+            } catch (Throwable t) {
+                WorldgenProbe.LOG.warn("[prefilter] slimehouse eval failed for {}: {}", seed, t.toString());
+                sb.append(", \"slimehouse_error\": \"")
+                    .append(
+                        t.toString()
+                            .replace("\"", "'"))
+                    .append("\"");
+            } finally {
+                Timing.add("slimehouse", tSlime);
+            }
+        }
+
+        // --- AE2 meteor crater scan (-Dprobe.prefilter.meteor=C grid cells around the origin cell; -1 off).
+        // The candidate lattice is pure (seed, cell) arithmetic through the real Platform.seedFromGrid, so
+        // the size gate costs nothing; terrain only runs for near-max rolls, and the volume disc only for
+        // rolls that also cleared the relief gate. Sits with the other chunk-generating stages, after the
+        // village and mineshaft start passes for the same poisoning reason they document.
+        final int meteorCells = Integer.getInteger("probe.prefilter.meteor", -1);
+        if (meteorCells >= 0) {
+            final long tMeteor = Timing.start();
+            try {
+                final String why = MeteorPrefilter.resolve();
+                if (why != null) {
+                    sb.append(", \"meteor_error\": \"")
+                        .append(why.replace("\"", "'"))
+                        .append("\"");
+                } else {
+                    final double gateSize = Double
+                        .parseDouble(System.getProperty("probe.prefilter.gate.meteorsize", "7.8"));
+                    final int gateRelief = Integer.getInteger("probe.prefilter.gate.meteorrelief", 20);
+                    final long gateVol = Long.getLong("probe.prefilter.gate.meteorvol", -1L);
+                    final int volRadius = Integer.getInteger("probe.prefilter.meteor.volradius", 96);
+                    final List<MeteorPrefilter.Candidate> cands = MeteorPrefilter.candidates(seed, meteorCells);
+                    RwgTerrain terraMeteor = null;
+                    final List<String> rows = new ArrayList<>();
+                    double bestSize = 0;
+                    long bestVol = -1;
+                    final String biomeGate = System.getProperty("probe.prefilter.gate.meteorbiome", "");
+                    final String[] biomeTokens = biomeGate.toLowerCase()
+                        .replaceAll("[^a-z0-9,]", "")
+                        .split(",");
+                    // analytic noise screen: 0 = annotate only (calibration), >0 kills below the proxy bar
+                    final int gateProxy = Integer.getInteger("probe.prefilter.gate.meteorproxy", 0);
+                    MeteorPrefilter.AnalyticScreen screenMeteor = null;
+                    for (final MeteorPrefilter.Candidate c : cands) {
+                        if (c.size > bestSize) bestSize = c.size;
+                        if (c.size < gateSize) continue;
+                        if (terraMeteor == null) terraMeteor = new RwgTerrain(world);
+                        if (screenMeteor == null) {
+                            screenMeteor = new MeteorPrefilter.AnalyticScreen(world, terraMeteor);
+                            final String dump = System.getProperty("probe.prefilter.meteor.dumprwg");
+                            if (dump != null && !new java.io.File(dump).exists()) {
+                                MeteorPrefilter.dumpRwg(world, terraMeteor, dump);
+                            }
+                        }
+                        screenMeteor.screen(c);
+                        if (gateProxy > 0 && c.proxyRelief < gateProxy) c.reject = "proxy";
+                        // both-flanks gate: walls on opposing bearings (mountain-flanked channel class)
+                        final int gateOpposed = Integer.getInteger("probe.prefilter.gate.meteoropposed", 0);
+                        if (c.reject == null && gateOpposed > 0 && c.proxyOpposed < gateOpposed) {
+                            c.reject = "onesided";
+                        }
+                        // worldless biome ring gate before any chunkgen; also stamps c.biome for tuning
+                        if (c.reject == null && !MeteorPrefilter.biomePass(world, c, biomeTokens)
+                            && !biomeGate.isEmpty()) {
+                            c.reject = "biome";
+                        }
+                        if (c.reject == null) {
+                            MeteorPrefilter.site(c, terraMeteor, world, gateRelief);
+                        }
+                        if (c.reject == null) {
+                            MeteorPrefilter.score(c, terraMeteor, volRadius);
+                            if (c.volume > bestVol) bestVol = c.volume;
+                        }
+                        rows.add(
+                            "{\"cell\": [" + c.gx
+                                + ", "
+                                + c.gz
+                                + "], \"x\": "
+                                + c.x
+                                + ", \"z\": "
+                                + c.z
+                                + ", \"dist\": "
+                                + (int) Math.hypot(c.x, c.z)
+                                + ", \"size\": "
+                                + (Math.round(c.size * 1000) / 1000.0)
+                                + ", \"y\": "
+                                + c.y
+                                + ", \"surface\": "
+                                + c.surface
+                                + ", \"burial\": "
+                                + c.burial
+                                + ", \"relief\": "
+                                + c.relief
+                                + ", \"volume\": "
+                                + c.volume
+                                + ", \"maxbite\": "
+                                + c.maxbite
+                                + ", \"enclosure\": "
+                                + c.enclosure
+                                + ", \"proxyrelief\": "
+                                + c.proxyRelief
+                                + ", \"proxyopposed\": "
+                                + c.proxyOpposed
+                                + (c.biome == null ? "" : ", \"biome\": \"" + c.biome.replace("\"", "'") + "\"")
+                                + ", \"lava\": "
+                                + c.lava
+                                + ", \"surface_branch\": "
+                                + c.surfaceBranch
+                                + (c.reject == null ? "" : ", \"reject\": \"" + c.reject + "\"")
+                                + "}");
+                    }
+                    sb.append(", \"meteor_cells\": ")
+                        .append(cands.size())
+                        .append(", \"meteor_grid\": ")
+                        .append(MeteorPrefilter.cellSize())
+                        .append(", \"meteorites\": [")
+                        .append(String.join(", ", rows))
+                        .append("]");
+                    if (gateVol >= 0 && bestVol < gateVol) {
+                        return "{\"seed\": " + seed
+                            + ", \"kill\": \"meteorvol\", \"best_size\": "
+                            + (Math.round(bestSize * 1000) / 1000.0)
+                            + ", \"best_vol\": "
+                            + bestVol
+                            + ", \"candidates\": ["
+                            + String.join(", ", rows)
+                            + "]}";
+                    }
+                }
+            } catch (Throwable t) {
+                WorldgenProbe.LOG.warn("[prefilter] meteor eval failed for {}: {}", seed, t.toString());
+                sb.append(", \"meteor_error\": \"")
+                    .append(
+                        t.toString()
+                            .replace("\"", "'"))
+                    .append("\"");
+            } finally {
+                Timing.add("meteor", tMeteor);
+            }
+        }
+
+        // --- Cliff-house scan (-Dprobe.prefilter.cliffhouse=R chunks around origin; -1 off). Finds Roguelike
+        // HOUSE towers (brick house, forest settings) whose entrance sits on a plateau edge over a deep drop —
+        // the seed-pure "tallest brick house": the fix jar's virgin overlay means the tower footing is a
+        // function of terrain alone, and HouseTower pours brick porch columns and a recursive brick step
+        // curtain down to y=60 plus granite supports fillDown'd to the first opaque block, all exposed on a
+        // cliff face. validLocation forces a locally flat 9x9 pad, so the drop lives 5-16 blocks out from the
+        // entrance; score = est. floor (virgin topSolid+1 at entrance) minus min topSolid within +/-16 blocks.
+        // Placement is place-only (settings + entrance, no construction). Triggers whose provider biome shows
+        // no FOREST type within 64 blocks are skipped — HOUSE comes from SettingsForestTheme, and the
+        // provider lookup is the same one the fix jar's WorldEditorMixin.getBiome uses.
+        // Gate: -Dprobe.prefilter.gate.cliffhouse=D kills seeds whose best HOUSE drop is below D.
+        final int cliffRadius = Integer.getInteger("probe.prefilter.cliffhouse", -1);
+        if (cliffRadius >= 0 && RoguelikePrefilter.available()) {
+            final long tCliff = Timing.start();
+            try {
+                final int gateDrop = Integer.getInteger("probe.prefilter.gate.cliffhouse", -1);
+                final int gateStair = Integer.getInteger("probe.prefilter.gate.cliffstair", -1);
+                final int gateVis = Integer.getInteger("probe.prefilter.gate.cliffvis", -1);
+                final List<String> houses = new ArrayList<>();
+                int bestDrop = Integer.MIN_VALUE;
+                int bestStair = Integer.MIN_VALUE;
+                int bestStairVis = Integer.MIN_VALUE;
+                RwgTerrain terraCliff = null;
+                for (final int[] t : RoguelikePrefilter.triggers(world, 0, 0, cliffRadius)) {
+                    final int tx = t[0] * 16 + 4, tz = t[1] * 16 + 4;
+                    boolean forestNear = false;
+                    for (final int[] d : new int[][] { { 0, 0 }, { 64, 0 }, { -64, 0 }, { 0, 64 }, { 0, -64 } }) {
+                        final net.minecraft.world.biome.BiomeGenBase b = world.getWorldChunkManager()
+                            .getBiomeGenAt(tx + d[0], tz + d[1]);
+                        if (b != null
+                            && java.util.Arrays.asList(net.minecraftforge.common.BiomeDictionary.getTypesForBiome(b))
+                                .contains(net.minecraftforge.common.BiomeDictionary.Type.FOREST)) {
+                            forestNear = true;
+                            break;
+                        }
+                    }
+                    if (!forestNear) continue;
+                    final long tPlace = Timing.start();
+                    final RoguelikePrefilter.Result r = RoguelikePrefilter.generate(world, seed, t[0], t[1], true);
+                    Timing.add("cliffhouse.place", tPlace);
+                    if (!"HOUSE".equals(r.tower) || r.entranceX == Integer.MIN_VALUE) continue;
+                    if (terraCliff == null) terraCliff = new RwgTerrain(world);
+                    final int ex = r.entranceX, ez = r.entranceZ;
+                    // min over all columns AND min over DRY columns. Sea level is ~63, so the deepest
+                    // drops are river/ocean floors — and that is fine for the "most bricks" metric:
+                    // porch/step columns pour through water to y=60 and the granite supports fillDown to
+                    // the seabed, so a wet drop is strictly more structure. drop stays wet-inclusive;
+                    // min_dry is emitted for anyone ranking dry cliff faces instead.
+                    int floorEst = Integer.MIN_VALUE, minSurf = Integer.MAX_VALUE, minDry = Integer.MAX_VALUE;
+                    for (int cx2 = (ex - 16) >> 4; cx2 <= (ex + 16) >> 4; cx2++) {
+                        for (int cz2 = (ez - 16) >> 4; cz2 <= (ez + 16) >> 4; cz2++) {
+                            final RwgTerrain.Cols cols = terraCliff.columns(cx2, cz2);
+                            for (int lx = 0; lx < 16; lx++) {
+                                for (int lz = 0; lz < 16; lz++) {
+                                    final int wx = cx2 * 16 + lx, wz = cz2 * 16 + lz;
+                                    if (Math.abs(wx - ex) > 16 || Math.abs(wz - ez) > 16) continue;
+                                    final int idx = (lx << 4) | lz;
+                                    final int s = cols.topSolid[idx];
+                                    if (wx == ex && wz == ez) floorEst = s + 1;
+                                    if (s < minSurf) minSurf = s;
+                                    if (!cols.water[idx] && s < minDry) minDry = s;
+                                }
+                            }
+                        }
+                    }
+                    // Exposed front staircase, replicating HouseTower geometry against virgin terrain —
+                    // the iconic look people hunt for. dir = Cardinal.directions[(base+2)%4] where base is
+                    // getBaseCoord's Y (adjusted ground + 1, min 64); the door sits at entrance +
+                    // left(dir)*6 + reverse(dir)*6 (ground-truthed on seed 226905126988615045: door found
+                    // at the predicted column). step() builds step k at door + reverse(dir)*(2+k),
+                    // y = floor-1-k, and stops when the probe one ahead and below (reverse*(3+k),
+                    // floor-2-k) hits validGroundBlock or y <= 60. validGroundBlock skips grass/plant/
+                    // snow/water materials, so probes descend through water to the seabed.
+                    // Exact Tower.getBaseCoord replica against the virgin world (world.getBlock IS virgin
+                    // terrain here, the same blocks TerrainOracle serves the fix jar): scan 128->60 for the
+                    // first validGroundBlock, +1, floor 14 above the dungeon (y=50) at minimum. The earlier
+                    // digest-based estimate mis-derived base by 1 on some surfaces, and base%4 picks the
+                    // door DIRECTION, so +-1 swings the staircase 90 degrees (measured: seed
+                    // -7347640923000673639 door predicted W, generated S).
+                    int scanY = 128;
+                    while (scanY > 60 && !gtnhdet$roguelikeGround(world.getBlock(ex, scanY, ez))) scanY--;
+                    final int base = Math.max(scanY + 1, 64);
+                    final int floorY = base + 1;
+                    final int drop = floorY - minSurf;
+                    if (drop > bestDrop) bestDrop = drop;
+                    final int dirIdx = (base + 2) % 4;
+                    final int[][] VEC = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } }; // N E S W
+                    final int[] rev = { -VEC[dirIdx][0], -VEC[dirIdx][1] };
+                    final int[] left = VEC[(dirIdx + 3) % 4];
+                    final int doorX = ex + left[0] * 6 + rev[0] * 6, doorZ = ez + left[1] * 6 + rev[1] * 6;
+                    int stairLen = 0;
+                    int stairVis = 0;
+                    for (int k = 0; k < 45; k++) {
+                        final int py = floorY - 2 - k;
+                        if (py <= 60) break;
+                        final int px = doorX + rev[0] * (3 + k), pz = doorZ + rev[1] * (3 + k);
+                        if (gtnhdet$roguelikeGround(world.getBlock(px, py, pz))) break;
+                        stairLen = k + 1;
+                        // visible curtain: the built step sits one block back (rev*(2+k)) at y=floorY-1-k,
+                        // 3 wide, on a brick column poured down to y=60. Count the blocks above the raw
+                        // virgin surface (grass top included — buried brick is invisible; water is
+                        // see-through, so seabed is the floor of visibility).
+                        final int sx = doorX + rev[0] * (2 + k), sz = doorZ + rev[1] * (2 + k);
+                        final RwgTerrain.Cols sc = terraCliff.columns(sx >> 4, sz >> 4);
+                        final int sts = sc.topSolid[((sx & 15) << 4) | (sz & 15)];
+                        final int visTop = floorY - 1 - k;
+                        final int visBottom = Math.max(60, sts + 1);
+                        if (visTop >= visBottom) stairVis += 3 * (visTop - visBottom + 1);
+                    }
+                    if (stairLen > bestStair) bestStair = stairLen;
+                    if (stairVis > bestStairVis) bestStairVis = stairVis;
+                    houses.add(
+                        "{\"entrance\": [" + ex
+                            + ", "
+                            + ez
+                            + "], \"floor_est\": "
+                            + floorY
+                            + ", \"min_surf\": "
+                            + minSurf
+                            + ", \"min_dry\": "
+                            + (minDry == Integer.MAX_VALUE ? -1 : minDry)
+                            + ", \"drop\": "
+                            + drop
+                            + ", \"stair_len\": "
+                            + stairLen
+                            + ", \"stair_vis\": "
+                            + stairVis
+                            + ", \"stair_dir\": \""
+                            + new String[] { "N", "E", "S", "W" }[(dirIdx + 2) % 4]
+                            + "\", \"door\": ["
+                            + doorX
+                            + ", "
+                            + doorZ
+                            + "], \"trigger\": ["
+                            + t[0]
+                            + ", "
+                            + t[1]
+                            + "]}");
+                }
+                sb.append(", \"cliff_houses\": [")
+                    .append(String.join(", ", houses))
+                    .append("]");
+                if ((gateDrop >= 0 && bestDrop < gateDrop) || (gateStair >= 0 && bestStair < gateStair)
+                    || (gateVis >= 0 && bestStairVis < gateVis)) {
+                    return "{\"seed\": " + seed
+                        + ", \"kill\": \"cliffhouse\", \"best_drop\": "
+                        + (bestDrop == Integer.MIN_VALUE ? -999 : bestDrop)
+                        + ", \"best_stair\": "
+                        + (bestStair == Integer.MIN_VALUE ? -999 : bestStair)
+                        + ", \"best_vis\": "
+                        + (bestStairVis == Integer.MIN_VALUE ? -999 : bestStairVis)
+                        + ", \"houses\": "
+                        + houses.size()
+                        + "}";
+                }
+            } catch (Throwable t) {
+                WorldgenProbe.LOG.warn("[prefilter] cliffhouse eval failed for {}: {}", seed, t.toString());
+                sb.append(", \"cliffhouse_error\": \"")
+                    .append(
+                        t.toString()
+                            .replace("\"", "'"))
+                    .append("\"");
+            } finally {
+                Timing.add("cliffhouse", tCliff);
+            }
+        }
 
         // --- terrain columns + spawn prediction (worldless RWG; -Dprobe.prefilter.terrain=-1 disables,
         // N = digest radius in chunks around the predicted spawn; default 4)
@@ -1832,6 +2496,101 @@ public final class Prefilter {
             if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"villagepiece\"}";
         }
 
+        // --- Hammer% steel stage: Block of Steel aggregated over predicted village chests and mineshaft
+        // corridor minecarts within DIST blocks of the predicted spawn. The sim pays terrain only for starts
+        // whose bbox comes within range, and the kill row carries every count so the gate bar can be tuned
+        // from sweep output without re-sweeping (the slimehouse kill-row trick).
+        final boolean mineshaftLoot = Boolean.getBoolean("probe.prefilter.mineshaftloot");
+        final String steelGateSpec = System.getProperty("probe.prefilter.gate.steel");
+        if (mineshaftLoot || (steelGateSpec != null && !steelGateSpec.isEmpty() && !"false".equals(steelGateSpec))) {
+            final long tSteel = Timing.start();
+            int gateSteelN = -1;
+            int steelDist = 320;
+            if (steelGateSpec != null && !steelGateSpec.isEmpty() && !"false".equals(steelGateSpec)) {
+                final String[] p = steelGateSpec.split(",");
+                gateSteelN = Integer.parseInt(p[0].trim());
+                if (p.length > 1) steelDist = Integer.parseInt(p[1].trim());
+            }
+            if (gateSteelN >= 0 && !CHESTS_ENABLED) {
+                warnOnce(
+                    "gate.steel runs without -Dprobe.prefilter.chests=true — village chests are not predicted, "
+                        + "so the blacksmith half of the total is silently zero");
+            }
+            if (gateSteelN >= 0 && !mineshaftLoot) {
+                warnOnce(
+                    "gate.steel runs without -Dprobe.prefilter.mineshaftloot=true — corridor minecarts are not "
+                        + "simulated, so the mineshaft half of the total is silently zero");
+            }
+            int blacksmithSteel = 0;
+            for (final int[] c : villageSteel) {
+                if (Math.hypot(c[0] - spawnX, c[1] - spawnZ) <= steelDist) blacksmithSteel += c[2];
+            }
+            int mineshaftSteel = 0;
+            final List<String> msJson = new ArrayList<>();
+            if (mineshaftLoot && world instanceof SeedProbeWorld) {
+                final long cg0 = Timing.nanos("chunkgen");
+                for (final MineshaftPrefilter.Start s : msStarts) {
+                    // Chests live inside the start bbox, so a bbox whose XZ rectangle is entirely beyond the
+                    // distance cannot contribute; skipping it skips its whole terrain bill. Applied whether or
+                    // not the gate is set: an ungated calibration run that simulated every start in the r45
+                    // scan window measured 2.6 s/seed of chunkgen for loot the hunt never reads.
+                    final double dx = Math.max(0, Math.max(s.bbox[0] - spawnX, spawnX - s.bbox[3]));
+                    final double dz = Math.max(0, Math.max(s.bbox[2] - spawnZ, spawnZ - s.bbox[5]));
+                    if (Math.hypot(dx, dz) > steelDist) continue;
+                    final MineshaftPrefilter.SimResult r = MineshaftPrefilter.simulate((SeedProbeWorld) world, seed, s);
+                    int startSteel = 0;
+                    for (final int[] cs : r.chestSteel) {
+                        if (Math.hypot(cs[0] - spawnX, cs[2] - spawnZ) <= steelDist) mineshaftSteel += cs[3];
+                        startSteel += cs[3];
+                    }
+                    final StringBuilder m = new StringBuilder(128);
+                    m.append("{\"c\": [")
+                        .append(s.cx)
+                        .append(", ")
+                        .append(s.cz)
+                        .append("], \"windows\": ")
+                        .append(r.windows)
+                        .append(", \"removed\": ")
+                        .append(r.componentsRemoved)
+                        .append(", \"steel\": ")
+                        .append(startSteel)
+                        .append(", \"chests\": [")
+                        .append(String.join(", ", r.chests))
+                        .append("]");
+                    if (r.error != null) {
+                        m.append(", \"error\": \"")
+                            .append(r.error.replace("\"", "'"))
+                            .append("\"");
+                    }
+                    m.append("}");
+                    msJson.add(m.toString());
+                }
+                if (Timing.ON) Timing.addRaw("mineshaft.chunkgen", Timing.nanos("chunkgen") - cg0);
+            }
+            final int steelTotal = blacksmithSteel + mineshaftSteel;
+            sb.append(", \"mineshafts\": [")
+                .append(String.join(", ", msJson))
+                .append("], \"blacksmith_steel\": ")
+                .append(blacksmithSteel)
+                .append(", \"mineshaft_steel\": ")
+                .append(mineshaftSteel)
+                .append(", \"steel_total\": ")
+                .append(steelTotal);
+            Timing.add("mineshaft.sim", tSteel);
+            if (gateSteelN >= 0 && steelTotal < gateSteelN) {
+                return "{\"seed\": " + seed
+                    + ", \"kill\": \"steel\", \"blacksmith_steel\": "
+                    + blacksmithSteel
+                    + ", \"mineshaft_steel\": "
+                    + mineshaftSteel
+                    + ", \"steel_total\": "
+                    + steelTotal
+                    + ", \"mineshaft_starts\": "
+                    + msStarts.size()
+                    + "}";
+            }
+        }
+
         // --- Witchery candidate cells. Pure arithmetic plus a biome lookup: the region formula reads no blocks
         // and the handler shuffle is a function of the FML chunk seed, so this costs nothing terrain-wise.
         final int witcheryRadius = Integer.getInteger("probe.prefilter.witchery", -1);
@@ -1949,6 +2708,83 @@ public final class Prefilter {
                     }
                     if (!pass) return "{\"seed\": " + seed + ", \"kill\": \"enchant\"}";
                 }
+                // --- Hammer% tool-loot gate: TOOLS-chest category counts aggregated over EVERY dungeon whose
+                // loot can sit within dist of spawn (trigger within dist+160 — generateNear's reach), then one
+                // verdict. Unlike the enchant gate there is no early exit on the first hit: the criteria sum
+                // across dungeons, so all in-range ones must generate first. Constructed Results go into
+                // `ready` so the emission loop below never generates the same dungeon twice.
+                final String toolGateSpec = System.getProperty("probe.prefilter.gate.toolloot");
+                if (toolGateSpec != null && !toolGateSpec.isEmpty() && !"false".equals(toolGateSpec)) {
+                    int wantAlumite = 0, wantPlate = 0, wantHammer = 0, wantRod = 0, toolDist = 320;
+                    for (final String kv : toolGateSpec.split(",")) {
+                        final String[] p = kv.split("=");
+                        if (p.length != 2) continue;
+                        final int v = Integer.parseInt(p[1].trim());
+                        switch (p[0].trim()) {
+                            case "alumite":
+                                wantAlumite = v;
+                                break;
+                            case "plate":
+                                wantPlate = v;
+                                break;
+                            case "hammer":
+                                wantHammer = v;
+                                break;
+                            case "rod":
+                                wantRod = v;
+                                break;
+                            case "dist":
+                                toolDist = v;
+                                break;
+                            default:
+                                warnOnce("gate.toolloot: unknown key '" + p[0].trim() + "' ignored");
+                        }
+                    }
+                    final int[] agg = new int[LootCounts.N];
+                    int dungeonsBuilt = 0;
+                    for (final int[] t : triggers) {
+                        if (Math.hypot(t[0] * 16 + 8 - spawnX, t[1] * 16 + 8 - spawnZ) > toolDist + 160) continue;
+                        final Long tk = ((long) t[0] << 32) | (t[1] & 0xFFFFFFFFL);
+                        RoguelikePrefilter.Result r = ready.get(tk);
+                        if (r == null) {
+                            r = generateDungeonTimed(world, seed, t);
+                            ready.put(tk, r);
+                        }
+                        dungeonsBuilt++;
+                        for (final int[] tc : r.toolChests) {
+                            if (Math.hypot(tc[0] - spawnX, tc[2] - spawnZ) > toolDist) continue;
+                            agg[LootCounts.ALUMITE_PLATE] += tc[3];
+                            agg[LootCounts.ANY_PLATE] += tc[4];
+                            agg[LootCounts.HAMMER_HEAD] += tc[5];
+                            agg[LootCounts.TOUGH_ROD] += tc[6];
+                        }
+                    }
+                    sb.append(", \"tools_agg\": {\"alumite_plate\": ")
+                        .append(agg[LootCounts.ALUMITE_PLATE])
+                        .append(", \"plate\": ")
+                        .append(agg[LootCounts.ANY_PLATE])
+                        .append(", \"hammer_head\": ")
+                        .append(agg[LootCounts.HAMMER_HEAD])
+                        .append(", \"tough_rod\": ")
+                        .append(agg[LootCounts.TOUGH_ROD])
+                        .append("}");
+                    if (agg[LootCounts.ALUMITE_PLATE] < wantAlumite || agg[LootCounts.ANY_PLATE] < wantPlate
+                        || agg[LootCounts.HAMMER_HEAD] < wantHammer
+                        || agg[LootCounts.TOUGH_ROD] < wantRod) {
+                        return "{\"seed\": " + seed
+                            + ", \"kill\": \"toolloot\", \"alumite_plate\": "
+                            + agg[LootCounts.ALUMITE_PLATE]
+                            + ", \"plate\": "
+                            + agg[LootCounts.ANY_PLATE]
+                            + ", \"hammer_head\": "
+                            + agg[LootCounts.HAMMER_HEAD]
+                            + ", \"tough_rod\": "
+                            + agg[LootCounts.TOUGH_ROD]
+                            + ", \"dungeons\": "
+                            + dungeonsBuilt
+                            + "}";
+                    }
+                }
                 final List<String> dungeons = new ArrayList<>();
                 for (final int[] t : triggers) {
                     final Long tk = ((long) t[0] << 32) | (t[1] & 0xFFFFFFFFL);
@@ -1966,6 +2802,13 @@ public final class Prefilter {
                         d.append(", \"tower\": \"")
                             .append(r.tower)
                             .append("\"");
+                    }
+                    // Whether GTNH's loot_all.json LOOTRULES suppression reached this dungeon; false means
+                    // the built-in JUNK rule ran, which is the only route to vanilla ChestGenHooks loot
+                    // (and so to the level-4 pyramidJungleChest / pyramidDesertChest draw).
+                    if (r.lootRulesSuppressed != null) {
+                        d.append(", \"lootrules_suppressed\": ")
+                            .append(r.lootRulesSuppressed.booleanValue());
                     }
                     if (!r.enchantTables.isEmpty()) {
                         final List<String> ts = new ArrayList<>();

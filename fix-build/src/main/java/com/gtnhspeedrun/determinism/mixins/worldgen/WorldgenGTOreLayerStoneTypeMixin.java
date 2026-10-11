@@ -36,8 +36,12 @@ import gregtech.api.objects.XSTR;
  * from stock in exactly the dimension-restricted cases the gate exists for.
  *
  * <p>
- * Applied only when {@code gregtech.api.enums.StoneType} is on the classpath; see LateMixinLoader. The class does
- * not exist before 5.09.54.x, so on older packs this mixin cannot be loaded at all and the pre-54 one runs instead.
+ * Applied only when {@code WorldgenGTOreLayer} names {@code resolveVeinPlacement}, i.e. GT 5.09.54.02 and later;
+ * see {@link com.gtnhspeedrun.determinism.GtOreShape}. Until 0.14.0 the gate was
+ * {@code hasClass("gregtech.api.enums.StoneType")}, on the belief that the class did not exist before 5.09.54.x.
+ * It exists from 5.09.52.31, so every pack in the 5.09.52.31 .. 5.09.54.01 band — including GTNH 2.9.0-beta-1 —
+ * was handed this mixin, whose descriptor matches nothing there, and crashed at init. That band now gets
+ * {@link WorldgenGTOreLayerFindStoneTypeMixin}.
  *
  * <p>
  * <b>Scope: {@link GtOrePin#appliesTo(World)}</b> — the same dimension whitelist and the same
@@ -69,7 +73,8 @@ public class WorldgenGTOreLayerStoneTypeMixin {
         at = @At(
             value = "INVOKE",
             target = "Lgregtech/api/enums/StoneType;findStoneType(Lnet/minecraft/world/World;III)Lgregtech/api/enums/StoneType;"),
-        require = 2)
+        require = 2,
+        allow = 2)
     private static StoneType gtnhdet$virginStoneType(World world, int x, int y, int z) {
         if (!GtOrePin.appliesTo(world)) return StoneType.findStoneType(world, x, y, z);
         // N0: this redirect binds at require = 2, i.e. ONLY the two clipping branches, so reaching it from a

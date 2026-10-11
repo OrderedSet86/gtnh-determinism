@@ -1,6 +1,6 @@
 # gtnh-determinism
 
-Speedrun mod for GT: New Horizons 2.7.4 through 2.9.0-beta-3. Makes worldgen fully
+Speedrun mod for GT: New Horizons 2.7.4 through 2.9.0-RC-2. Makes worldgen fully
 deterministic based on seed.
 
 Discord: https://discord.gg/PbMWTcnZgC
@@ -22,6 +22,7 @@ GTNH instance.**
 | 2.8.0 – 2.8.4 | Expected to work; last tested at 2.8.4 |
 | 2.9.0-nightly / daily | Tested at `daily-2026-08-28+707` |
 | 2.9.0-beta-3 | Tested. Same veins as daily-707 from the same seed, and the loot tables are unchanged |
+| 2.9.0-RC-1, RC-2, daily | Needs 0.14.0: 0.13.0 crashes at startup because of a Mobs-Info 0.6.0 class transformer. Tested on RC-1, RC-2 and the 2026-10-11 daily: ore veins, chests and horses are route-stable, and identical across beta-3, RC-1, RC-2 and the daily from the same seed. Workaround for 0.13.0: add `-Dmobsinfo.disableRandomComparisonTransformer=true` to the Java arguments |
 
 | Target | What was wrong | What the jar fixes |
 |---|---|---|
@@ -55,10 +56,16 @@ classes** across **12 mods, Forge/FML and vanilla Minecraft**, plus two reflecti
 mixins. Re-derive with `grep -rl '@Mixin' fix-build/src/main/java | wc -l` (subtract the diagnostics
 below) and by counting distinct `@Mixin` targets.
 
-Some fixes need more than one mixin. GregTech carries four: two are alternatives with exactly one
-binding per GT version (the vein-reroll probe moved class between 5.09.51 and 5.09.54), and two more
-pin the vein-identity decision to the oreseed and virginise the reads it still makes — those two always
-bind. The Vis Amulet needs an init-time pin and a per-chest derivation; the passive-mob spawn fix takes
+Some fixes need more than one mixin. GregTech carries the most, because it rewrote its ore worldgen
+twice and the fix has to bind to whichever shape is installed. Three are alternatives with exactly one
+binding per pack — the vein-reroll probe moved from `Block.isReplaceableOreGen` to
+`StoneType.findStoneType` at 5.09.52.31, and `executeWorldgenChunkified` was split into overloads at
+5.09.54.02 — chosen by probing the installed bytecode, never a version string (the rewrite landed via a
+`-pre` branch, so the shapes interleave by tag number). Pinning the vein-identity decision to the
+oreseed then takes two more mixins on 5.09.54.02+, where GregTech supplies its own dry run, and three on
+5.09.52.31–5.09.54.01, where it does not and one has to be reconstructed. Packs older than 5.09.52.31
+get the reroll fix only: there the vein test is fused with the ore write, and nothing separable is left
+to pin. The Vis Amulet needs an init-time pin and a per-chest derivation; the passive-mob spawn fix takes
 one mixin each for the shared spawner, sheep, ocelots and horses; the spawn-preload split needs three —
 one to apply TooMuchLoot early on a dedicated server, a second doing the same for singleplayer because
 `IntegratedServer` overrides `loadAllWorlds` without calling `super` and Mixin does not follow an
@@ -247,6 +254,46 @@ Two traps that have cost time more than once:
 World bundles are built from a **full-generation radius-60 probe**, not from the stage-0 prefilter, so
 they can carry structures stage 0 cannot predict (Thaumcraft hilltop circles and barrows, vanilla
 `WorldGenDungeons` rooms).
+
+## Generating a route map
+
+One command, on Windows, macOS or Linux:
+
+```bash
+scripts/routemap.py --seed <seed> --instance <prism-instance-name>
+scripts/routemap.py --list          # which GTNH instances Prism knows about
+scripts/routemap.py                 # no arguments: a window instead of a CLI
+```
+
+It builds a headless server out of the player's **own Prism instance** rather than downloading the
+620 MB server pack — about 13 MB of network (`minecraft_server.jar`, Forge universal, the SERVER-side
+mods; all 14 launch libraries come out of Prism's own cache). That also means the bundle is generated
+against exactly the mod set the player will load, and it reaches daily and beta packs, whose server
+zips exist only as GitHub Actions artifacts behind an `actions:read` token.
+
+Bundles land in `<instance>/routemap/<seed>/`, next to the world they describe and reachable from
+Prism's own "Open Folder". The assembled server is transient: ~550 MB while it runs, deleted
+afterwards, leaving a ~13 MB scaffolding cache. `--keep-server` trades that disk back for skipping
+the rebuild. Nothing else in the instance is ever written to.
+
+- `scripts/routemap-bootstrap.py` — Prism discovery, JRE selection, server assembly. Prunes only
+  the mods DreamAssemblerXXL's per-release manifest identifies as CLIENT, since those abort a
+  headless boot; everything else travels, including mods the manifest does not list, because the
+  player is mapping their own world and full generation records whatever actually generates.
+  Matching is by mod identity rather than exact filename, so a point-release difference between
+  the manifest and the instance does not silently drop a required mod.
+- `scripts/make-routemap.py` — the driver, and the thing to run instead of retyping the
+  fifteen-argument bake command. One cold boot per dimension, then the stage-0 prefilter, then
+  `vein-csv.py` / `fullgen-loot-csv.py`, then `build_world_bundle.py` **once** with every dimension,
+  so its carry-forward merge is never exercised and nobody hand-merges `meta.json`.
+- `scripts/build-routemap-zip.py` — the distributable. Deliberately not PyInstaller: a one-file
+  bootloader unpacks to temp and executes, which is what antivirus heuristics fire on. The Windows
+  zip vendors python.org's embeddable build instead, so nothing shipped is a packed binary.
+
+The driver fails loudly on the degradations that used to pass silently: overworld palette coverage
+below 95% (level.dat not matching the region files), region files still at their empty 8192-byte
+size, an empty loot table at a radius that cannot be empty, and chests that all read source
+`fullgen`, which means the `gtnhdet.*trace` lines never reached the run log.
 
 ## Repo layout
 

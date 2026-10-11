@@ -1,0 +1,27 @@
+seed 1126213577304310162 (-350, -131): never attempted in probe window, skipped
+seed 2625637189804015902 (-276, -452): crater missed (pred buried, probe carves) — known direction
+seed 3752993469746227798 (-130, 184): crater missed (pred buried, probe carves) — known direction
+seed 3082456280801511001 (296, -427): never attempted in probe window, skipped
+seed 3082456280801511001 (158, 216): never attempted in probe window, skipped
+seed -1547075775450912749 (267, -149): crater missed (pred buried, probe carves) — known direction
+seed 3890891439340340931 (-424, -424): never attempted in probe window, skipped
+seed 3890891439340340931 (-397, 114): never attempted in probe window, skipped
+seed 3890891439340340931 (430, 310): never attempted in probe window, skipped
+seed 1744954895826343365: not in probe log, skipped
+seed 1737255237482619955: not in probe log, skipped
+seed -3100449432874196163: not in probe log, skipped
+seed -4087773316135833129: not in probe log, skipped
+seed -12272948533989394: not in probe log, skipped
+seed 3860977344019539013: not in probe log, skipped
+seed -84188693065407686: not in probe log, skipped
+seed -3476812217956763265: not in probe log, skipped
+seed -2234740630037627974: not in probe log, skipped
+seed 2980224990281768677: not in probe log, skipped
+seed 1552428311884349388: not in probe log, skipped
+seed -1183062918028613390: not in probe log, skipped
+seed 4362062684652989129: not in probe log, skipped
+seed -382935516509680741: not in probe log, skipped
+
+14 in-window candidates over 11 seeds
+existence 14/14   landing-y 10/10   size 10/10
+crater verdict: 7 match, 3 missed (known direction), 0 FALSE positives

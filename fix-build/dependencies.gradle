@@ -9,8 +9,16 @@
 // TiC SlimeIslandGen and ProjectRed TileLily are bytecode-identical across the whole range, and all ten Roguelike
 // targets differ only by a credits string, ldc->ldc_w, and a newer javac's synthetic enum $values().
 //
-// The one target that did change is GregTech's, which is why two GT mixins exist. See WorldgenGTOreLayerMixin
-// (<= 5.09.51.482) and WorldgenGTOreLayerStoneTypeMixin (>= 5.09.54.x).
+// The one target that did change is GregTech's, which is why THREE alternative GT ore mixins exist:
+// WorldgenGTOreLayerMixin (<= 5.09.52.30), WorldgenGTOreLayerFindStoneTypeMixin (5.09.52.31 .. 5.09.54.01) and
+// WorldgenGTOreLayerStoneTypeMixin (>= 5.09.54.02). LateMixinLoader picks between them by probing bytecode; see
+// GtOreShape for why a version-string comparison cannot work here (the rewrite landed on a -pre branch, so the
+// shapes interleave by tag number).
+//
+// The middle band also needs GtOreFusedWorldgen, which calls executeWorldgenChunkified REFLECTIVELY. That is not
+// laziness: on that band the method takes (World, Random, String, int x4, IChunkProvider x2) and the GTWorldgen
+// superclass still declares it, whereas at this pin the overload is gone from both. No compile-time type names
+// the method, and moving the pin backwards would break every 5.09.54+ mixin.
 
 dependencies {
     compileOnly('thaumcraft:Thaumcraft:1.7.10-4.2.3.5:dev')
@@ -19,8 +27,11 @@ dependencies {
     // ships the baubles.api package in; the standalone Baubles artifact is not on the GTNH maven.
     compileOnly('com.github.GTNewHorizons:Baubles-Expanded:2.2.22-GTNH:dev') { transitive = false }
     compileOnly('com.github.GTNewHorizons:TinkersConstruct:1.14.104-GTNH:dev')
-    // Pinned to the 5.09.54.x line because WorldgenGTOreLayerStoneTypeMixin needs gregtech.api.enums.StoneType,
-    // which does not exist before it. 54.x replaced the ore API wholesale — IOreMaterial instead of the mPrimaryMeta
+    // Pinned to the 5.09.54.x line because WorldgenGTOreLayerStoneTypeMixin is written against the split
+    // executeWorldgenChunkified and the OreManager methods F4d targets, which do not exist before 5.09.54.02.
+    // (An earlier note here said the pin was needed for gregtech.api.enums.StoneType "which does not exist
+    // before it" — that was false, StoneType exists from 5.09.52.31, and believing it is what crashed 2.9.0-beta-1
+    // at init. See GtOreShape.) 54.x replaced the ore API wholesale — IOreMaterial instead of the mPrimaryMeta
     // shorts, veinHeight instead of mMinY/mMaxY, no TileEntityOres.setOreBlock, and the vein-reroll probe moved from
     // Block.isReplaceableOreGen to StoneType.findStoneType. The pre-54 mixin still compiles against this pin: it
     // names only WorldgenGTOreLayer (present in both lines) and matches executeWorldgenChunkified by name, and its

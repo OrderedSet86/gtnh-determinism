@@ -258,6 +258,11 @@ final class VillageChestPrefilter {
         String category;
         String itemsJson;
         /**
+         * {@link LootCounts} categories over the rolled inventory, so a caller can gate on item classes
+         * without re-parsing {@link #itemsJson}. Null when the contents were refused (see {@link #reason}).
+         */
+        int[] counts;
+        /**
          * Null when {@link #itemsJson} is a real prediction. Otherwise the chest EXISTS at this position and its
          * contents are refused, with this as the reason.
          *
@@ -343,6 +348,7 @@ final class VillageChestPrefilter {
                                 wy,
                                 wz,
                                 s.type == null || s.type.isEmpty() ? "TileEntityChest" : s.type);
+                            np.counts = LootCounts.count(nchest);
                             out.add(np);
                             continue;
                         } catch (Throwable ignored) {}
@@ -422,6 +428,7 @@ final class VillageChestPrefilter {
             p.category = s.category;
             p.itemsJson = WorldgenProbe
                 .dumpInventory(chest, wx, p.y, wz, s.type == null || s.type.isEmpty() ? "TileEntityChest" : s.type);
+            p.counts = LootCounts.count(chest);
             out.add(p);
         }
         return out;

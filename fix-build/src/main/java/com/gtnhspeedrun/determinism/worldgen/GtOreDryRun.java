@@ -9,6 +9,14 @@ package com.gtnhspeedrun.determinism.worldgen;
  * where ore physically lands, a far larger behavioural change than this fix intends.
  *
  * <p>
+ * <b>Two different things open this scope, depending on which GregTech is installed, and they are mutually
+ * exclusive.</b> On 5.09.54.02+ GregTech has its own dry run and this scope simply marks it, as described below.
+ * On 5.09.52.31 through 5.09.54.01 there is no dry run at all — the accept test is fused with the ore write — so
+ * {@code GTWorldGenContainerDryRunMixin} reconstructs one and opens this scope around it, and the meaning widens:
+ * inside it, {@code OreManagerDryRunSuppressMixin} also suppresses the block writes. LateMixinLoader offers only
+ * one of the two sets, so a given pack has exactly one producer of this flag.
+ *
+ * <p>
  * The scope is opened by a {@code @Redirect} wrapping the inner {@code canSetOreForWorldGen} call inside
  * {@code OreManager.canSetOreForWorldGenOrAlreadySet}, in a try/finally. That site is chosen deliberately: it
  * has exactly ONE caller in the whole GregTech tree ({@code WorldgenGTOreLayer.placeOre}, inside its

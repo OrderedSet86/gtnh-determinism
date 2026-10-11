@@ -1,0 +1,26 @@
+# Top-5 verification: beta3 warm daemon, targeted r12, meteortrace, 2026-09-13
+# probe jar f3007ec0ed7ed1a456d3107efbfdf818, fix jar 108ec34f184694941452620f5b0a1a57
+[11:06:32] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -491,88,1281 -> true skyMode=49 crater=true decay=true size=7.923162280057157
+[11:06:47] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -1094,77,989 -> true skyMode=463 crater=true decay=true size=7.832962745736618
+[11:07:05] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at 1930,105,549 -> true skyMode=1823 crater=true decay=true size=7.911213200668475
+[11:07:21] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at 1739,83,-143 -> true skyMode=587 crater=true decay=true size=7.854048279292799
+[11:07:38] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -534,113,990 -> true skyMode=2602 crater=true decay=true size=7.865572076082378
+
+# TileSkyChest per probed world:
+1679783095927474686  [-1094, 77, 989]
+2302133856128621797  [-534, 113, 990]
+4717997228783405311  [-491, 88, 1281]
+4857082301537480989  [1930, 105, 549]
+-5198606018767845758 [1739, 83, -143]
+
+# Sweep 2 top-2 verification (main.9 daemon, meteortrace):
+[13:21:35] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at 1284,98,1935 -> true skyMode=3647 crater=true decay=true size=6.5083958846891115
+[13:21:57] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -367,68,81 -> true skyMode=629 crater=true decay=true size=5.469662807598496
+[13:21:57] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at 279,78,-1006 -> true skyMode=1395 crater=true decay=true size=7.984137611674842
+
+# Volume-ranked pipeline podium (2026-09-13): daemon meteortrace
+[19:57:05] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at 237,67,2016 -> true skyMode=118 crater=true decay=true size=6.5208628552435
+[19:53:03] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -207,98,-174 -> true skyMode=4033 crater=true decay=true size=7.36975831793649
+[19:53:21] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -273,53,-336 -> true skyMode=0 crater=false decay=false size=6.61148184203745
+[19:53:21] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -975,83,1034 -> true skyMode=2615 crater=true decay=true size=7.824509475492398
+[19:53:39] [Server thread/INFO] [gtnhdeterminism]: [meteortrace] spawnMeteoriteCenter at -376,64,186 -> true skyMode=144 crater=true decay=true size=6.616899850797953
