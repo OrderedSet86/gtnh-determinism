@@ -151,10 +151,18 @@ public final class ChestLootExport {
     // ---------------------------------------------------------------- Roguelike Dungeons
 
     /**
-     * Reads {@code config/roguelike_dungeons/settings/loot_*.json}. Each file holds {@code loot_rules}, and each rule
-     * gives a chest type, the dungeon levels it applies to, how many items are drawn, and a weighted pool. One row is
-     * written per level per pool entry, so a rule covering five levels produces five copies — that keeps the level
-     * column filterable rather than requiring the reader to expand a list.
+     * Reads every {@code *.json} under {@code config/roguelike_dungeons/settings}. Each file may hold
+     * {@code loot_rules}, and each rule gives a chest type, the dungeon levels it applies to, how many items are
+     * drawn, and a weighted pool. One row is written per level per pool entry, so a rule covering five levels
+     * produces five copies — that keeps the level column filterable rather than requiring the reader to expand a
+     * list.
+     *
+     * <p>
+     * The glob was {@code loot_*.json} until 2026-09-19, which silently dropped the inline {@code loot_rules} the
+     * eight {@code dungeon_*.json} carry (biome filler: leaves, vine, sand, snowball, snow, ice, web, tallgrass,
+     * BoP gems). That is 1010 distinct (id, meta) against 1033 for the full directory, and the 23 missing items
+     * account for ~5.7M stack occurrences over a 5000-seed corpus — which attribution then charged to village and
+     * igloo chest hooks that share those items, inventing hook draws that never happened.
      */
     public static void captureRoguelike(File configDir) {
         if (dir() == null) return;
@@ -167,10 +175,7 @@ public final class ChestLootExport {
         if (files == null) return;
         final List<File> sorted = new ArrayList<>();
         for (File f : files) if (f.getName()
-            .startsWith("loot_")
-            && f.getName()
-                .endsWith(".json"))
-            sorted.add(f);
+            .endsWith(".json")) sorted.add(f);
         Collections.sort(sorted);
         int rows = 0, tables = 0;
         for (File f : sorted) {

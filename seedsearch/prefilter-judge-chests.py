@@ -25,9 +25,10 @@ iterated predictions only, so a corpus chest with no prediction was never visite
 invisible. Measured on beta-3 seed -1636594104014467454 at radius 24, precision read clean while 127
 of 229 corpus chests were unaccounted for.
 
-The corpus carries chests from EVERY source (mineshaft, vanilla dungeon, Thaumcraft hilltop circles,
-...), while the prefilter only ever claims villages, roguelike dungeons, strongholds and Witchery
-cells. So a low recall number is expected and is not by itself a defect — see SOURCE_GROUPS in
+The corpus carries chests from EVERY source (vanilla dungeon, Thaumcraft hilltop circles, ...),
+while the prefilter only ever claims villages, roguelike dungeons, strongholds, Witchery cells and
+(since the hammer% work) mineshaft corridor minecarts — note the minecart predictions are
+distance-capped around spawn by the steel gate's DIST, so pass a matching --radius. So a low recall number is expected and is not by itself a defect — see SOURCE_GROUPS in
 loot-score.py for what stage 0 declares it cannot see. What the number is for is spotting the chests
 that fall outside BOTH the predictions and the declared blind spots. Use chest-attribution.py to
 split the unexplained list; this script's job is to produce it honestly.
@@ -96,7 +97,7 @@ def load_prefilter(path):
                 byxz[(pos[0], pos[2])].append(
                     ("village-unpredicted", u.get("category"), None, u.get("reason")))
         for key, source in (("dungeons", "roguelike"), ("strongholds", "stronghold"),
-                            ("witchery_cells", "witchery")):
+                            ("witchery_cells", "witchery"), ("mineshafts", "mineshaft")):
             for st in d.get(key) or []:
                 for c in st.get("chests") or []:
                     chest = c.get("chest", c)

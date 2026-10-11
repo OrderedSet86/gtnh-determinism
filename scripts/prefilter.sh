@@ -127,6 +127,30 @@ GATES=""
 [ -n "${PREFILTER_GATE_VILLAGEPIECE:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.villagepiece=$PREFILTER_GATE_VILLAGEPIECE"
 [ -n "${PREFILTER_GATE_WITCHCIRCLE:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.witcherycircle=$PREFILTER_GATE_WITCHCIRCLE"
 [ -n "${PREFILTER_GATE_ENCHANT:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.enchant=$PREFILTER_GATE_ENCHANT"
+#   Hammer%-hunt knobs (2026-09-13):
+#   PREFILTER_MINESHAFT          N: mineshaft trigger/start scan radius in chunks around origin (-1 off)
+#   PREFILTER_MINESHAFTLOOT      true: replay corridor minecart-chest loot (needs PREFILTER_MINESHAFT)
+#   PREFILTER_GATE_MINESHAFTTRIG Rg: kill unless a mineshaft trigger lies within Rg chunks of origin
+#   PREFILTER_GATE_ROGUETRIG     Rg: kill unless a Roguelike trigger lies within Rg chunks of origin
+#   PREFILTER_GATE_STEEL         N[,DIST]: kill unless blacksmith+minecart Block of Steel within DIST
+#                                blocks of spawn totals >= N (default DIST 320)
+#   PREFILTER_GATE_TOOLLOOT      alumite=A,plate=P,hammer=H,rod=R[,dist=D]: kill unless the Roguelike
+#                                TOOLS-chest aggregate within D blocks of spawn meets every minimum
+[ -n "${PREFILTER_MINESHAFT:-}" ] && GATES="$GATES -Dprobe.prefilter.mineshaft=$PREFILTER_MINESHAFT"
+[ -n "${PREFILTER_MINESHAFTLOOT:-}" ] && GATES="$GATES -Dprobe.prefilter.mineshaftloot=$PREFILTER_MINESHAFTLOOT"
+[ -n "${PREFILTER_GATE_MINESHAFTTRIG:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.mineshafttrig=$PREFILTER_GATE_MINESHAFTTRIG"
+[ -n "${PREFILTER_GATE_ROGUETRIG:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.roguetrig=$PREFILTER_GATE_ROGUETRIG"
+[ -n "${PREFILTER_GATE_STEEL:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.steel=$PREFILTER_GATE_STEEL"
+[ -n "${PREFILTER_GATE_TOOLLOOT:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.toolloot=$PREFILTER_GATE_TOOLLOOT"
+#   Meteor-crater-hunt knobs (2026-09-13):
+#   PREFILTER_METEOR             C: AE2 meteorite scan radius in 707-block grid cells around origin (-1 off)
+#   PREFILTER_GATE_METEORSIZE    S: candidate filter — skip terrain for size rolls below S (default 7.8)
+#   PREFILTER_GATE_METEORRELIEF  H: mark candidates with < H blocks of 3x3-chunk relief reject=flat (default 20)
+#   PREFILTER_GATE_METEORVOL     V: kill seeds whose best predicted carved volume is below V
+[ -n "${PREFILTER_METEOR:-}" ] && GATES="$GATES -Dprobe.prefilter.meteor=$PREFILTER_METEOR"
+[ -n "${PREFILTER_GATE_METEORSIZE:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.meteorsize=$PREFILTER_GATE_METEORSIZE"
+[ -n "${PREFILTER_GATE_METEORRELIEF:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.meteorrelief=$PREFILTER_GATE_METEORRELIEF"
+[ -n "${PREFILTER_GATE_METEORVOL:-}" ] && GATES="$GATES -Dprobe.prefilter.gate.meteorvol=$PREFILTER_GATE_METEORVOL"
 
 "$JAVA_BIN" $JAVA_ARGS \
   -Xmx6G -Xms6G \

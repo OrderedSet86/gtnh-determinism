@@ -59,19 +59,42 @@ SOURCE_GROUPS = [
      "generates (3 per world, no biome gate under RWG) but the first ring sits ~640-1150 blocks out."),
     ("vanilla WorldGenDungeons", lambda s, c: c == "dungeonChest",
      "existence is now seed-pure (2026-09-08: attempt coordinates forked + scan on virgin terrain,"
-     " rows vs spiral 69/69, 0 diffs at radius 30). Still unscoreable at stage 0 for a different"
-     " reason: stage 0 does not enumerate dungeon-room positions. The old note here blamed the"
-     " GregTech ore live-terrain read; that was never the whole story and the fix does not touch it."),
+     " rows vs spiral 69/69, 0 diffs at radius 30). The ROOM itself is still unscoreable at stage 0:"
+     " stage 0 does not enumerate dungeon-room positions. But the TABLE is reachable and IS scored,"
+     " by the same ItemJunk path as the pyramid tables below — ItemJunk draws from dungeonChest on"
+     " roguelike levels 1-4 (the `level > 0` gate), so a dungeonChest-only item can reach a chest"
+     " stage 0 predicts exactly. Measured: dungeonChest-exclusive items appear at levels 1-4 and"
+     " never at level 0. The old note here blamed the GregTech ore live-terrain read; that was never"
+     " the whole story and the fix does not touch it."),
     ("mineshaft", lambda s, c: c.startswith("mineshaft"),
      "chest presence is a 1-in-100 draw inside addComponentParts; needs a replay against a"
      " write-absorbing world."),
-    ("pyramid / igloo", lambda s, c: c.startswith("pyramid") or c.startswith("igloo"),
-     "DEAD in this pack: RWG never constructs MapGenScatteredFeature."),
+    ("pyramid", lambda s, c: c.startswith("pyramid"),
+     "The STRUCTURE is dead in this pack: RWG never constructs MapGenScatteredFeature. The TABLE is"
+     " NOT dead. greymerk.roguelike.treasure.loot.provider.ItemJunk is the roguelike mod's only"
+     " ChestGenHooks caller, and it carries a hardcoded `level == 4` branch that draws one item from"
+     " pyramidJungleChest or pyramidDesertChest (coin flip). It fires only where GTNH's"
+     " loot_all.json `overrides: [LOOTRULES]` did NOT reach — i.e. dungeons whose biome matches no"
+     " dungeon_*.json and so fall through to SettingsResolver.base, which keeps SettingsLootRules"
+     " and its 6-draw JUNK rule. Measured over 5000 seeds: 36 pyramidJungleChest and 17"
+     " pyramidDesertChest occurrences, ALL at y in {7,9,10,11} (level 4), 0 of 193022 candidate"
+     " chests at y>=19. Stage 0 predicts these exactly, like any other roguelike chest content."
+     " See results/2026-09-19-roguelike-pyramid-loot-path/."),
+    ("igloo", lambda s, c: c.startswith("igloo"),
+     "DEAD in this pack: RWG never constructs MapGenScatteredFeature, and unlike the pyramid tables"
+     " nothing draws from iglooChest either — ItemJunk names only pyramidJungleChest,"
+     " pyramidDesertChest and dungeonChest. Corpus hits that look like igloo draws are a false"
+     " positive of category attribution: iglooChest's only item not shared with another category and"
+     " not in the roguelike config is minecraft:stone_axe, which ItemTool.java:73 hardcodes."
+     " (minecraft:iron_shovel at ItemTool.java:88 is the same trap for vn_toolsmith.)"),
 ]
 
 # Groups nothing in the overworld can ever put in a chest, so a value-table entry reachable only from
 # these is unscoreable by any seed search, not merely by stage 0.
-UNREACHABLE_GROUPS = {"chest1-4", "pyramid / igloo", "roguelike REWARD"}
+#
+# "pyramid" was in this set until 2026-09-19 and was wrong: the structure is dead but the table is
+# live via ItemJunk on roguelike level 4. Do not re-add it without re-reading that group's note.
+UNREACHABLE_GROUPS = {"chest1-4", "igloo", "roguelike REWARD"}
 
 
 def analyse_loot_tables(path, values):
@@ -462,6 +485,14 @@ def main():
             # in the settings JSON), so the table analysis is a model and the corpus is evidence.
             # Measured: of 27 items the model called unreachable, 2 — Platinum Ingot and Zero Point
             # Module — turned up in real roguelike chests.
+            #
+            # 2026-09-19: that pair is no longer a mystery this guard has to absorb. Both come from
+            # the pyramid tables, which ItemJunk draws from on roguelike level 4 — see the "pyramid"
+            # entry in SOURCE_GROUPS. The group is now classified reachable, so those two fall out
+            # of `stuck` by the group test rather than by having been observed. The guard stays
+            # because the argument above is still true in general: the export models the settings
+            # JSON, and any provider resolving at runtime can put an item in a chest the model did
+            # not predict. Treat a hit here as a lead on an unmodelled path, not as noise.
             if groups and groups <= UNREACHABLE_GROUPS and key not in all_qty:
                 stuck[frozenset(groups)].append((values[key], display.get(key, key)))
         if stuck:

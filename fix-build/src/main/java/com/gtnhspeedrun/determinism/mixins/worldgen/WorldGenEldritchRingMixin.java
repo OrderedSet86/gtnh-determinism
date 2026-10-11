@@ -54,10 +54,19 @@ public abstract class WorldGenEldritchRingMixin {
      * banners present in one walk order, absent in the other). Answer bound-10 rolls from a position-pure fork
      * instead; all other bounds (the cosmetic 1-in-4 obsidian rolls) pass through — their variance is contained to
      * the ring's cosmetic pattern.
+     *
+     * <p>
+     * Selected as stock draw 1 of the method's two {@code nextInt} sites (0 is the cosmetic {@code nextInt(4) != 0},
+     * 1 is the stored {@code nextInt(10)}), with {@code require = 1}. This used to take every {@code nextInt} site
+     * and check the bound. Mobs-Info 0.6.0+ rewrites the cosmetic roll into a {@code RandomComparison.nextInt} call.
+     * That is harmless to this handler, which passes it through anyway, but "every site" has no count to check, so
+     * a future rewrite of the spawner roll would have unpinned it with no error. The bound check stays as a second
+     * guard. See {@link com.gtnhspeedrun.determinism.RandomDrawPoint}.
      */
     @Redirect(
         method = { "func_76484_a", "generate" },
-        at = @At(value = "INVOKE", target = "Ljava/util/Random;nextInt(I)I"))
+        at = @At(value = "com.gtnhspeedrun.determinism.RandomDrawPoint", args = "shape=virtual", ordinal = 1),
+        require = 1)
     private int gtnhdet$positionPureSpawnerRoll(java.util.Random rand, int bound, World world, java.util.Random rand2,
         int i, int j, int k) {
         if (bound == 10) {

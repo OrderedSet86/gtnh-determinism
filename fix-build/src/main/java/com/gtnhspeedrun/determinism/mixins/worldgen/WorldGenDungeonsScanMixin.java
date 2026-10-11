@@ -67,7 +67,7 @@ public abstract class WorldGenDungeonsScanMixin {
      */
     @Redirect(
         method = "generate",
-        at = @At(value = "INVOKE", target = "Ljava/util/Random;nextInt(I)I", ordinal = 0),
+        at = @At(value = "com.gtnhspeedrun.determinism.RandomDrawPoint", args = "shape=virtual", ordinal = 0),
         require = 1)
     private int gtnhdet$forkedExtentX(Random rand, int bound, World world, Random r2, int x, int y, int z) {
         return gtnhdet$ENABLED ? gtnhdet$extentFork(world, x, y, z).nextInt(bound) : rand.nextInt(bound);
@@ -75,7 +75,7 @@ public abstract class WorldGenDungeonsScanMixin {
 
     @Redirect(
         method = "generate",
-        at = @At(value = "INVOKE", target = "Ljava/util/Random;nextInt(I)I", ordinal = 1),
+        at = @At(value = "com.gtnhspeedrun.determinism.RandomDrawPoint", args = "shape=virtual", ordinal = 1),
         require = 1)
     private int gtnhdet$forkedExtentZ(Random rand, int bound, World world, Random r2, int x, int y, int z) {
         if (!gtnhdet$ENABLED) return rand.nextInt(bound);
@@ -424,16 +424,26 @@ public abstract class WorldGenDungeonsScanMixin {
      */
     @Redirect(
         method = "generate",
-        at = @At(value = "INVOKE", target = "Ljava/util/Random;nextInt(I)I", ordinal = 3),
+        at = @At(value = "com.gtnhspeedrun.determinism.RandomDrawPoint", args = "shape=virtual", ordinal = 3),
         require = 1)
     private int gtnhdet$forkedChestX(Random rand, int bound, World world, Random r2, int x, int y, int z) {
         return gtnhdet$CHEST ? gtnhdet$chestDraw(rand, bound, world, x, y, z) : rand.nextInt(bound);
     }
 
-    /** Chest Z offset; ordinal 4 because the wall loop's {@code nextInt(4)} mossy roll is ordinal 2. */
+    /**
+     * Chest Z offset; stock ordinal 4 because the wall loop's {@code nextInt(4)} mossy roll is ordinal 2.
+     *
+     * <p>
+     * That mossy roll is {@code nextInt(4) != 0}, so Mobs-Info 0.6.0+ rewrites it into a
+     * {@code RandomComparison.nextInt} call. A plain {@code INVOKE} selector then saw chest X at ordinal 2 and
+     * chest Z at ordinal 3: ordinal 4 found nothing and GTNH 2.9.0-RC-1 crashed at init, and ordinal 3 would
+     * have forked chest Z in chest X's place. All four draws here are selected by STOCK ordinal through
+     * {@link com.gtnhspeedrun.determinism.RandomDrawPoint}. None of them is a comparison, so each takes only
+     * the {@code virtual} shape, and {@code require = 1} still fails loudly if that ever changes.
+     */
     @Redirect(
         method = "generate",
-        at = @At(value = "INVOKE", target = "Ljava/util/Random;nextInt(I)I", ordinal = 4),
+        at = @At(value = "com.gtnhspeedrun.determinism.RandomDrawPoint", args = "shape=virtual", ordinal = 4),
         require = 1)
     private int gtnhdet$forkedChestZ(Random rand, int bound, World world, Random r2, int x, int y, int z) {
         return gtnhdet$CHEST ? gtnhdet$chestDraw(rand, bound, world, x, y, z) : rand.nextInt(bound);

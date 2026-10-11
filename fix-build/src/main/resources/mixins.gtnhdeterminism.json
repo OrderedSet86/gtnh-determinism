@@ -17,7 +17,9 @@
     "worldgen.EntitySheepMixin",
     "worldgen.EntityOcelotMixin",
     "worldgen.EntityHorseMixin",
-    "worldgen.WorldGenDungeonsScanMixin"
+    "worldgen.WorldGenDungeonsScanMixin",
+    "worldgen.MineshaftCorridorChestMixin",
+    "worldgen.MineshaftLiquidTraceMixin"
   ],
   "client": [
     "worldgen.IntegratedServerLootMixin"

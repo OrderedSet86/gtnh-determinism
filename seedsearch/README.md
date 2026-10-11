@@ -33,6 +33,13 @@ generating a chunk. A thing can be deterministic and still unpredictable from a 
 | source | deterministic? | stage 0 | evidence / why |
 | --- | --- | --- | --- |
 | **Roguelike dungeon chests** | yes | **exact** — position, items, damage, count, slot, NBT | 108/108 on seed -777 vs a full-gen radius-15 run, 0 predicted-but-absent |
+
+> **The source census under-reads these.** Prediction is exact because stage 0 replays the real
+> generator, but the census that maps an item back to the table it came from does not model
+> `ItemJunk`, which is the roguelike mod's only `ChestGenHooks` caller. It draws from `dungeonChest`
+> on levels 1-4 and from `pyramidJungleChest` / `pyramidDesertChest` on level 4, so items the value
+> table believes are reachable only from a dead structure do turn up in predicted chests. Corrected
+> in `loot-score.py` on 2026-09-19; see `results/2026-09-19-roguelike-pyramid-loot-path/`.
 | **Village piece chests** | yes | **contents exact, XZ exact, Y not predicted** | 95/95 across 7 seeds, contents and NBT |
 | Village layout / pieces / villagers | yes | exact | 79/79 piece-exact over 99 corpus seeds |
 | Spawn point, terrain digest, biomes | yes | exact | 99/99 spawns exact |
