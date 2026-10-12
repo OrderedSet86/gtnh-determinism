@@ -20,9 +20,9 @@ GTNH instance.**
 |---|---|
 | 2.7.4 | Tested. Launch pair byte-identical |
 | 2.8.0 – 2.8.4 | Expected to work; last tested at 2.8.4 |
-| 2.9.0-nightly / daily | Tested at `daily-2026-08-28+707` |
+| 2.9.0-nightly / daily | Works on 0.14.0+ (tested on 2026-10-11 daily) |
 | 2.9.0-beta-3 | Tested. Same veins as daily-707 from the same seed, and the loot tables are unchanged |
-| 2.9.0-RC-1, RC-2, daily | Needs 0.14.0: 0.13.0 crashes at startup because of a Mobs-Info 0.6.0 class transformer. Tested on RC-1, RC-2 and the 2026-10-11 daily: ore veins, chests and horses are route-stable, and identical across beta-3, RC-1, RC-2 and the daily from the same seed. Workaround for 0.13.0: add `-Dmobsinfo.disableRandomComparisonTransformer=true` to the Java arguments |
+| 2.9.0-RC-1, RC-2 | Works on 0.14.0+ (tested on RC-1 and RC-2) |
 
 | Target | What was wrong | What the jar fixes |
 |---|---|---|
@@ -51,8 +51,8 @@ GTNH instance.**
 | Minecraft (passive mobs) | `SpawnerAnimals.performWorldGenSpawning` picks the *species* off `world.rand` while every other draw in the method uses the populate-seeded `Random` — the same shadowing shape as the TiC slime bug. Which animals a seed starts with, and therefore the first leather, wool and food on the route, was clock-random | Species drawn from the populate Random. Sheep fleece colour and ocelot kittens, which are rolled later off `worldObj.rand`, derive from world seed + spawn position |
 | Minecraft (horses) | `EntityHorse` rolls type, coat variant, max health, jump strength and movement speed off the clock-seeded `Entity.rand`. Speed spans 0.1125–0.3375, so the same seed gave a horse up to **three times faster** depending on the launch, and donkey-versus-horse — portable storage or not — was a coin flip | All five derived from world seed + spawn position. Variation is preserved, not flattened: 87 distinct speeds and 87 distinct jump strengths across 95 horses on one seed. Horse *breeding* keeps the stock RNG — the fork is armed only while `onSpawnWithEgg` runs |
 
-Scope, counted from source: **47 mixin classes** rewiring **74 target
-classes** across **12 mods, Forge/FML and vanilla Minecraft**, plus two reflection patches that are not
+Scope, counted from source: **59 mixin classes** rewiring **81 target
+classes** across **13 mods, Forge/FML and vanilla Minecraft**, plus two reflection patches that are not
 mixins. Re-derive with `grep -rl '@Mixin' fix-build/src/main/java | wc -l` (subtract the diagnostics
 below) and by counting distinct `@Mixin` targets.
 
@@ -72,9 +72,11 @@ one to apply TooMuchLoot early on a dedicated server, a second doing the same fo
 `@Inject` into an override, and a third to suppress TooMuchLoot's own later run; and structure chest
 contents need five — capture the table, capture the piece two ways, fence off chunk population, refill
 the chest.
-Three further diagnostic mixins ship inert behind `-Dgtnhdet.traceseg` and are not counted here.
+Seven diagnostic mixins are not counted here: three behind `-Dgtnhdet.traceseg`, two behind
+`-Dgtnhdet.meteortrace`, one behind `-Dgtnhdet.tracegennear` and one behind `-Dgtnhdet.mineshafttrace`.
+Each calls the stock method unchanged and logs only when its flag is set.
 
-Twelve mixins patch Minecraft or Forge itself rather than a mod — ten vanilla classes plus Forge's
+Sixteen mixins patch Minecraft or Forge itself: fourteen vanilla classes and Forge's
 `ChestGenHooks`. Most use default `remap` and are registered in the early mixin config rather than
 through the late loader, because their targets load before the late loader runs.
 

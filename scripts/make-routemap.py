@@ -75,7 +75,6 @@ TRACE_FLAGS = (
     "dungeontrace",
     "hilltoptrace",
     "meteortrace",
-    "mineshafttrace",
     "moundtrace",
     "witchtrace",
 )

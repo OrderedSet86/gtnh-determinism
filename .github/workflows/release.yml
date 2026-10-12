@@ -70,8 +70,8 @@ jobs:
         with:
           repository: OrderedSet86/gtnh-seedlib
           path: .seedlib
-          # Only routemap/ and tools/ are needed and neither is LFS-tracked; lfs: true would drag
-          # down ~264 MB of seed-corpus tarballs this does not touch.
+          # Only routemap/, tools/ and browser/lootscore.py are needed and none is LFS-tracked;
+          # lfs: true would drag down ~264 MB of seed-corpus tarballs this does not touch.
           lfs: false
 
       - uses: actions/setup-python@v5
@@ -94,4 +94,4 @@ jobs:
           gh release create "v${{ inputs.version }}" dist/*.jar dist/*.zip \
             --title "gtnhdeterminism ${{ inputs.version }}" \
             ${{ inputs.prerelease && '--prerelease' || '' }} \
-            --notes "Community testing jar gtnhdeterminism-${{ inputs.version }}.jar makes world generation a pure function of the seed (install in mods/). gtnhspeedrunqol-${{ inputs.version }}.jar is an independent client-side quality-of-life jar; install it alone or alongside, it changes nothing the game simulates. worldgenprobe-${{ inputs.version }}.jar is the headless worldgen test harness, not needed for normal play. GTNH-Routemap-windows.zip / -unix.zip generate an interactive map of your own seed: unzip and run it, no Java or Python install needed."
+            --notes "Community testing jar gtnhdeterminism-${{ inputs.version }}.jar makes world generation a pure function of the seed (install in mods/). gtnhspeedrunqol-${{ inputs.version }}.jar is an independent client-side quality-of-life jar; install it alone or alongside, it changes nothing the game simulates. worldgenprobe-${{ inputs.version }}.jar is the headless worldgen test harness, not needed for normal play. GTNH-Routemap-windows.zip / -unix.zip generate an interactive map of your own seed: unzip and run it. No Java install needed; Windows needs nothing else, macOS and Linux need python3 with numpy and pillow (pip install numpy pillow)."
