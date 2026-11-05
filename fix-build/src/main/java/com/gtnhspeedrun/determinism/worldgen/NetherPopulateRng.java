@@ -28,8 +28,8 @@ import org.apache.logging.log4j.Logger;
  * <p>
  * Matching on declared TYPE avoids the question entirely, and it is sound here because {@code ChunkProviderHell}
  * declares exactly one {@code Random} and exactly one {@code World}. If a coremod ever adds a second of either —
- * ArchaicFix already mixes into this class — the lookup throws rather than guessing, on the same reasoning as
- * {@link OracleRngGuard}: a guess that happens to be wrong would move Nether decoration with no log line.
+ * ArchaicFix already mixes into this class — the lookup throws rather than guessing: a guess that happens
+ * to be wrong would move Nether decoration with no log line.
  */
 public final class NetherPopulateRng {
 

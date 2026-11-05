@@ -114,8 +114,8 @@ public final class GtOrePin {
      * <p>
      * The Nether was added 2026-09-07 on the same evidence shape as the other two: rows vs spiral goes
      * 413/1806 to 0/1806 with zero differing geometry, against a 0/1813 same-order floor, and the totality
-     * audit goes 1,287 disagreeing oreseeds to 0. Independent of {@link OracleRngGuard} — re-measured with
-     * {@code -Dgtnhdet.oracleguard=false} and still 0/1809. See
+     * audit goes 1,287 disagreeing oreseeds to 0. Independent of the former live-provider RNG guard —
+     * re-measured with that guard disabled and still 0/1809. See
      * results/2026-09-07-nether-orevein-determinism.
      *
      * <p>

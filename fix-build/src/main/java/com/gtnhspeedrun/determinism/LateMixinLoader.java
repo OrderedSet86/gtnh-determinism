@@ -11,7 +11,6 @@ import com.gtnewhorizon.gtnhmixins.ILateMixinLoader;
 import com.gtnewhorizon.gtnhmixins.LateMixin;
 import com.gtnhspeedrun.determinism.worldgen.GtOrePin;
 import com.gtnhspeedrun.determinism.worldgen.NetherPopulateRng;
-import com.gtnhspeedrun.determinism.worldgen.OracleRngGuard;
 
 @LateMixin
 public class LateMixinLoader implements ILateMixinLoader {
@@ -130,6 +129,15 @@ public class LateMixinLoader implements ILateMixinLoader {
             mixins.add("worldgen.RwgDungeonAttemptMixin");
             mixins.add("worldgen.DecoBigTreeCtorMixin");
         }
+        if (loadedMods.contains("rwg2")) {
+            mixins.add("worldgen.Rwg2DecoForkMixin");
+            mixins.add("worldgen.Rwg2DungeonAttemptMixin");
+            mixins.add("worldgen.Rwg2BigTreeCtorMixin");
+            mixins.add("worldgen.Rwg2WorldSavedDataMixin");
+            if (loadedMods.contains("witchery")) {
+                mixins.add("worldgen.Rwg2WitcheryFoundationMixin");
+            }
+        }
         if (loadedMods.contains("appliedenergistics2")) {
             // Not flag-gated: this is a fix, not a diagnostic. Meteorite existence is otherwise
             // route-dependent (2 of 38 over 25 seeds, same-order floor 0).
@@ -202,7 +210,6 @@ public class LateMixinLoader implements ILateMixinLoader {
         LOG.info("{} worldgen mixins selected for this pack: {}", mixins.size(), mixins);
         GtOrePin.logState();
         NetherPopulateRng.logState();
-        OracleRngGuard.logState();
         return mixins;
     }
 }

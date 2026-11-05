@@ -49,6 +49,8 @@ dependencies {
     // alpha-1.5.2 is what 2.9/daily ship. 2.7.4-2.8.4 shipped alpha-1.5.0, whose dev artifact is purged from the
     // maven; all 29 deco classes RwgDecoForkMixin targets exist in both.
     compileOnly('com.github.GTNewHorizons:Realistic-World-Gen:alpha-1.5.2:dev')
+    // RWG2 is a separate mod/namespace, not a drop-in replacement for legacy RWG's mixin targets.
+    compileOnly('com.github.GTNewHorizons:Realistic-World-Gen-2:2.0.6:dev') { transitive = false }
     compileOnly('com.github.GTNewHorizons:ProjectRed:4.12.43-GTNH:dev')
     compileOnly('com.github.GTNewHorizons:MrTJPCore:1.3.7:dev')
     compileOnly('com.github.GTNewHorizons:ForestryMC:4.11.37:dev')
