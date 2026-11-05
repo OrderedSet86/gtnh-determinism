@@ -14,12 +14,11 @@ import java.util.Random;
 import net.minecraft.entity.Entity;
 import net.minecraft.profiler.Profiler;
 import net.minecraft.world.World;
-import net.minecraft.world.WorldProviderSurface;
+import net.minecraft.world.WorldProvider;
 import net.minecraft.world.WorldSettings;
 import net.minecraft.world.WorldType;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.IChunkProvider;
-import net.minecraft.world.gen.structure.MapGenVillage;
 import net.minecraft.world.storage.ISaveHandler;
 
 /**
@@ -52,15 +51,21 @@ import net.minecraft.world.storage.ISaveHandler;
  *
  * Usage: -Dprobe.prefilter=@seeds.txt | seed1,seed2,... | random:COUNT[:RNGSEED]
  * -Dprobe.prefilter.out=out.jsonl
+ * [-Dprobe.prefilter.worldtype=RWG2_CONTINENTS (Smooth default; RWG2 = RC1; RWG = legacy)]
+ * Every JSON row, including early kills, records the selected canonical world_type.
  * [-Dprobe.prefilter.radius=64 (chunks around origin for village cells)]
  * [-Dprobe.prefilter.pieces=true (full village piece layouts)]
- * [-Dprobe.prefilter.terrain=4 (digest radius in chunks around predicted spawn; -1 disables terrain+spawn)]
+ * [-Dprobe.prefilter.terrain=4 (digest radius around predicted spawn; -1 omits digest and legacy spawn)]
  * [-Dprobe.prefilter.chunkcache=256 (LRU size of the virgin-terrain chunk cache)]
  * [-Dprobe.prefilter.strictworld=true (throw on a live world write instead of logging)]
- * [-Dprobe.prefilter.digestviaprovider=true (terrain digest source; false = the old hand-rolled path)]
+ * [-Dprobe.prefilter.digestviaprovider=true (real virgin provider; false = legacy RWG hand-rolled path only)]
  * [-Dprobe.prefilter.selftest=false (cross-check world.getBlock against the digest)]
  * [-Dprobe.prefilter.dungeon=N (Roguelike trigger scan radius in chunks around predicted spawn; -1 off)]
  * [-Dprobe.prefilter.gate.dungeon=false (kill seeds with no dungeon trigger in range)]
+ * [-Dprobe.prefilter.vanilladungeon=N (RWG2 vanilla chest-chunk window around predicted spawn; -1 off)]
+ * [-Dprobe.prefilter.requireitems=[SOURCE/]mod:item@META=COUNT;... (AND; enabled dungeon sources only)]
+ * [-Dprobe.prefilter.lootdistance=N (inclusive horizontal blocks from predicted spawn; required with items)]
+ * Vanilla/exact-item scans compute predicted spawn even with terrain=-1; never substitute origin.
  * [-Dprobe.prefilter.slimehouse=N (TiC slime island x Roguelike tower coincidence scan, radius in chunks
  * around the ORIGIN; -1 off. .band=128 caps the estimated island yCenter; .rarity=8000 is the fallback
  * when TCon's PHConstruct is absent)]
@@ -210,7 +215,7 @@ public final class Prefilter {
                 new NullSaveHandler(),
                 "prefilter",
                 new WorldSettings(seed, WorldSettings.GameType.SURVIVAL, true, false, type),
-                new WorldProviderSurface(),
+                WorldProvider.getProviderForDimension(0),
                 new Profiler());
         }
 
@@ -228,6 +233,16 @@ public final class Prefilter {
 
         VirginChunkProvider virginProvider() {
             return virgin;
+        }
+
+        public boolean vanillaScanActive;
+        public long vanillaOracleReads;
+        int vanillaChestWrites;
+
+        /** Called only by the harness oracle mixin; bypass own room writes, not terrain/caves. */
+        public net.minecraft.block.Block vanillaVirginBlock(int x, int y, int z) {
+            vanillaOracleReads++;
+            return super.getBlock(x, y, z);
         }
 
         @Override
@@ -257,6 +272,8 @@ public final class Prefilter {
         @Override
         public boolean setBlock(int x, int y, int z, net.minecraft.block.Block block, int meta, int flags) {
             if (overlay == null) return refuseWrite("setBlock", x, y, z);
+            overlayRevision++;
+            if (vanillaScanActive && block == net.minecraft.init.Blocks.chest) vanillaChestWrites++;
             final long k = okey(x, y, z);
             overlay.put(k, new int[] { net.minecraft.block.Block.getIdFromBlock(block), meta });
             // The real World builds the tile entity as part of the write; generation code then asks for it back
@@ -284,6 +301,7 @@ public final class Prefilter {
             if (overlay == null) return refuseWrite("setBlockMetadataWithNotify", x, y, z);
             final int[] w = overlay.get(okey(x, y, z));
             if (w == null) return false;
+            overlayRevision++;
             w[1] = meta;
             return true;
         }
@@ -294,6 +312,7 @@ public final class Prefilter {
                 refuseWrite("setTileEntity", x, y, z);
                 return;
             }
+            overlayRevision++;
             if (te != null) {
                 te.setWorldObj(this);
                 te.xCoord = x;
@@ -319,12 +338,14 @@ public final class Prefilter {
         private Map<Long, int[]> overlay;
         private Map<Long, net.minecraft.tileentity.TileEntity> overlayTe;
         private List<Entity> overlayEntities;
+        long overlayRevision;
 
         private static long okey(int x, int y, int z) {
             return ((long) (x + 30_000_000) << 36) | ((long) (z + 30_000_000) << 8) | (y & 0xFF);
         }
 
         void beginOverlay() {
+            overlayRevision = 0;
             overlay = new java.util.HashMap<>();
             overlayTe = new java.util.HashMap<>();
             overlayEntities = new ArrayList<>();
@@ -388,6 +409,7 @@ public final class Prefilter {
         @Override
         public void removeTileEntity(int x, int y, int z) {
             if (overlay != null) {
+                overlayRevision++;
                 overlayTe.remove(okey(x, y, z));
                 return;
             }
@@ -401,6 +423,7 @@ public final class Prefilter {
             // invisible to every prefilter row (see the KNOWN GAP note in WorldgenProbe.buildSearchReport).
             // Outside an overlay the old refusal stands — a worldless World maintains no entity lists.
             if (overlay != null) {
+                overlayRevision++;
                 overlayEntities.add(e);
                 return true;
             }
@@ -494,15 +517,13 @@ public final class Prefilter {
             return ((long) cx << 32) ^ (cz & 0xffffffffL);
         }
 
-        /** Package-private: {@link BiomeRegionPrefilter} calls getNewNoise on this same instance. */
+        /** The selected world's real provider dispatch, including the RWG2 continents flag. */
         IChunkProvider generator() {
             if (gen == null) {
-                try {
-                    gen = (IChunkProvider) Class.forName("rwg.world.ChunkGeneratorRealistic")
-                        .getConstructor(World.class, long.class)
-                        .newInstance(world, world.getSeed());
-                } catch (Exception e) {
-                    throw new IllegalStateException("prefilter: cannot build RWG chunk generator", e);
+                gen = world.provider.createChunkGenerator();
+                if (gen == null) {
+                    throw new IllegalStateException(
+                        "prefilter: no chunk generator for " + world.getWorldInfo().getTerrainType().getWorldTypeName());
                 }
             }
             return gen;
@@ -641,10 +662,6 @@ public final class Prefilter {
         }
     }
 
-    private static final int VILLAGE_DIST = 24; // RWG: MapGenVillage distance=24
-    private static final int VILLAGE_SEP = 8; // vanilla field_82666_h
-    private static final int VILLAGE_SALT = 10387312;
-
     private static Object VILLAGE_GEN;
     private static java.lang.reflect.Method CAN_SPAWN;
     private static java.lang.reflect.Method GENERATE; // func_151539_a — the REAL per-chunk entry point
@@ -654,18 +671,13 @@ public final class Prefilter {
     private static Field STRUCTURE_DATA; // field_143029_e — per-world NBT cache, must reset per seed
     private static Field START_COMPONENTS; // field_75075_a
 
-    /**
-     * The generator the pack actually uses: vanilla MapGenVillage(size=0,distance=24 — RWG's config) run
-     * through the real InitMapGenEvent dispatch so mod replacements (VillageNames) apply. Built once.
-     */
-    private static synchronized Object villageGenerator() throws Exception {
-        if (VILLAGE_GEN == null) {
-            final Map<String, String> m = new java.util.HashMap<>();
-            m.put("size", "0");
-            m.put("distance", String.valueOf(VILLAGE_DIST));
-            VILLAGE_GEN = net.minecraftforge.event.terraingen.TerrainGen.getModdedMapGen(
-                new MapGenVillage(m),
-                net.minecraftforge.event.terraingen.InitMapGenEvent.EventType.VILLAGE);
+    /** Use the selected generator's configured, Forge-replaced village mapgen, never a second default. */
+    private static synchronized Object villageGenerator(World world) throws Exception {
+        final Object terrain = ((SeedProbeWorld) world).virginProvider().generator();
+        final Object village = findField(terrain.getClass(), "villageGenerator").get(terrain);
+        if (village == null) throw new IllegalStateException("prefilter: selected generator has no village mapgen");
+        if (VILLAGE_GEN != village) {
+            VILLAGE_GEN = village;
             // runtime classes carry SRG names; MCP names are the dev-environment fallback
             CAN_SPAWN = findMethod(
                 VILLAGE_GEN.getClass(),
@@ -691,23 +703,24 @@ public final class Prefilter {
         return VILLAGE_GEN;
     }
 
+    /** RWG2 guards its mapgen calls with live config, even though the generator fields still exist. */
+    private static boolean structureEnabled(World world, String flag) {
+        if (!world.getWorldChunkManager().getClass().getName().startsWith("rwg2.")) return true;
+        try {
+            return Class.forName("rwg2.config.ConfigRWG").getField(flag).getBoolean(null);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("prefilter: cannot read RWG2 structure config " + flag, e);
+        }
+    }
+
     /**
-     * Worldless RWG terrain columns + vanilla spawn walk. ChunkGeneratorRealistic's terrain path
-     * (generateTerrain → replaceBlocksForBiome) touches the world only via getSeed()/getWorldChunkManager(),
-     * both of which SeedProbeWorld serves; we replicate provideChunk's exact sequence — per-chunk
-     * rand.setSeed(cx*0x4f9939f508 + cz*0x1ef1565bd5), generateTerrain, baseBiome fill, replaceBlocksForBiome —
-     * and skip only the per-biome generateMapGen hook (sole override: tropical-island volcanics, mid-ocean, never
-     * spawnable) and the structure/lighting tail. Reflection by PLAIN names: mod classes are not SRG-renamed.
+     * Virgin terrain columns from the selected world's complete provideChunk path. The default uses no
+     * legacy generator reflection; RWG2's continent flag, volcanoes, rivers and biome painting therefore
+     * remain part of the result. The optional hand-rolled digest is restricted to legacy RWG.
      *
-     * Spawn = WorldServer.createSpawnPosition replica: RWG's chunk manager overrides findBiomePosition to null
-     * and getBiomesToSpawnIn to empty (zero RNG draws, bytecode-verified on the shipped 1.5.0 jar), so the walk
-     * is new Random(worldSeed) stepping i += nextInt(64)-nextInt(64) (then z likewise) from (0,0), ≤1000 iters,
-     * y=64 — with the ACCEPT TEST of BiomesOPlenty's WorldProviderSurfaceBOP (which replaces the dim-0
-     * provider): top block must be sand or stone (see bopCanSpawn). Top-block replica: climb from y=63 while
-     * the block above is air-material, exactly like the provider's getTopBlockCoord.
-     * KNOWN APPROXIMATION: the real walk reads live chunks, which can already be populated when the walk
-     * revisits a completed 2x2 neighborhood (decoration on the column can flip the test) — the golden test
-     * quantifies the miss rate vs corpus spawns.
+     * Spawn prediction keeps vanilla's seed-based findBiomePosition/random walk and dispatches the installed
+     * dimension-zero provider's actual acceptance test. It reads virgin chunks, not populated ones: decoration
+     * encountered during a real spawn walk can still change its answer.
      */
     static final class RwgTerrain {
 
@@ -764,10 +777,25 @@ public final class Prefilter {
 
         RwgTerrain(World world) throws Exception {
             this.world = world;
-            final Class<?> genCls = Class.forName("rwg.world.ChunkGeneratorRealistic");
-            gen = genCls.getConstructor(World.class, long.class)
-                .newInstance(world, world.getSeed());
+            gen = world instanceof SeedProbeWorld ? ((SeedProbeWorld) world).virginProvider().generator()
+                : world.provider.createChunkGenerator();
             cmr = world.getWorldChunkManager();
+            if (VIA_PROVIDER) {
+                caves = null;
+                mGenTerrain = null;
+                mReplace = null;
+                biomeArrayType = null;
+                fRand = null;
+                fTestHeight = null;
+                fBaseBiome = null;
+                return;
+            }
+            final Class<?> genCls = gen.getClass();
+            if (!"rwg.world.ChunkGeneratorRealistic".equals(genCls.getName())) {
+                throw new IllegalArgumentException(
+                    "probe.prefilter.digestviaprovider=false supports legacy RWG only; use the default true for "
+                        + world.getWorldInfo().getTerrainType().getWorldTypeName());
+            }
             // provideChunk runs the caves pass on the raw block array BEFORE the chunk is built — cave mouths
             // carve away surface grass, which flips getTopBlock and therefore the spawn walk. Same dispatch RWG
             // uses; the IChunkProvider param is unused by vanilla caves.
@@ -929,23 +957,14 @@ public final class Prefilter {
             return b == null || b.getMaterial() == net.minecraft.block.material.Material.air;
         }
 
-        net.minecraft.block.Block topBlock(int x, int z) throws Exception {
-            final Cols c = columns(x >> 4, z >> 4);
-            return c.top[((x & 15) << 4) | (z & 15)];
-        }
-
         int chunksGenerated() {
             return cache.size();
         }
     }
 
-    /** WorldProviderSurfaceBOP.canCoordinateBeSpawn, replicated over worldless columns (see call site). */
-    private static boolean bopCanSpawn(World world, RwgTerrain terra, int x, int z) throws Exception {
-        final net.minecraft.block.Block top = terra.topBlock(x, z);
-        if (top == net.minecraft.init.Blocks.sand || top == net.minecraft.init.Blocks.stone) return true;
-        return top == net.minecraft.init.Blocks.snow_layer && world.getWorldChunkManager()
-            .getBiomesToSpawnIn()
-            .contains(world.getBiomeGenForCoords(x, z));
+    /** Dispatch the installed dimension-zero provider's actual spawn acceptance test on virgin terrain. */
+    private static boolean canSpawn(World world, int x, int z) {
+        return world.provider.canCoordinateBeSpawn(x, z);
     }
 
     /** Package-private: {@link BiomeRegionPrefilter} reaches RWG's noise methods through it. */
@@ -1327,7 +1346,7 @@ public final class Prefilter {
         return r;
     }
 
-    private static List<String> villageStarts(Object gen, World world, List<int[]> cells, List<int[]> steelOut)
+    private static List<String> villageStarts(Object gen, World world, List<int[]> cells, List<int[]> steelOut, List<List<?>> villageComponents)
         throws Exception {
         final Map<?, ?> structureMap = (Map<?, ?>) STRUCTURE_MAP.get(gen);
         structureMap.clear();
@@ -1349,6 +1368,7 @@ public final class Prefilter {
                 }
                 final boolean sizeable = (Boolean) IS_SIZEABLE.invoke(start);
                 final List<?> comps = (List<?>) START_COMPONENTS.get(start);
+                if (villageComponents != null && sizeable) villageComponents.add(new ArrayList<>(comps));
                 final List<String> parts = new ArrayList<>();
                 for (final Object comp : comps) {
                     parts.add(
@@ -1409,6 +1429,7 @@ public final class Prefilter {
                 sb.append("}");
                 out.add(sb.toString());
             } catch (Exception ex) {
+                if (villageComponents != null) throw ex;
                 out.add(
                     "{\"c\": [" + cx
                         + ", "
@@ -1468,11 +1489,26 @@ public final class Prefilter {
     }
 
     public static void run(String spec, String outPath) throws Exception {
-        final WorldType rwg = findWorldType("rwg");
+        final WorldType rwg = findWorldType(System.getProperty("probe.prefilter.worldtype", "RWG2_CONTINENTS"));
+        VanillaDungeonPrefilter.validateSettings(rwg.getWorldTypeName());
+        GateCapture.validateSettings(rwg.getWorldTypeName());
+        if (!"RWG".equalsIgnoreCase(rwg.getWorldTypeName())
+            && !Boolean.parseBoolean(System.getProperty("probe.prefilter.digestviaprovider", "true"))) {
+            throw new IllegalArgumentException(
+                "probe.prefilter.digestviaprovider=false supports legacy RWG only; leave it true for "
+                    + rwg.getWorldTypeName());
+        }
+        if (!"RWG".equalsIgnoreCase(rwg.getWorldTypeName())
+            && System.getProperty("probe.prefilter.meteor.dumprwg") != null) {
+            throw new IllegalArgumentException(
+                "probe.prefilter.meteor.dumprwg is a legacy RWG standalone-model export; "
+                    + "RWG2 meteor gates themselves use real virgin terrain");
+        }
         final int radiusChunks = Integer.getInteger("probe.prefilter.radius", 64);
         final List<Long> seeds = parseSpec(spec);
-        WorldgenProbe.LOG
-            .info("[prefilter] {} seeds, village radius {} chunks, out {}", seeds.size(), radiusChunks, outPath);
+        WorldgenProbe.LOG.info(
+            "[prefilter] {} seeds, worldtype {}, village radius {} chunks, out {}",
+            seeds.size(), rwg.getWorldTypeName(), radiusChunks, outPath);
 
         // World construction swaps Forge's static (s_savehandler, s_mapStorage) cache — save/restore so the
         // running server's future getMapStorage calls are unaffected (harness-speed.md C.1).
@@ -1504,11 +1540,13 @@ public final class Prefilter {
                 if (tier1 < 0) BiomeTable.dumpOnce(tableDir, world.getWorldChunkManager());
                 if (tier1 < 0) OreVeinTableDump.dumpOnce(tableDir, seed);
                 final long tSeed = Timing.start();
-                w.write(
-                    SURFACE_Y != null ? evaluateSurfaceY(world, seed)
-                        : tier1 >= 0 ? evaluateTier1(world, seed, tier1) : evaluate(world, seed, radiusChunks));
+                final String row = SURFACE_Y != null ? evaluateSurfaceY(world, seed)
+                    : tier1 >= 0 ? evaluateTier1(world, seed, tier1) : evaluate(world, seed, radiusChunks);
+                w.write("{\"world_type\": \"" + rwg.getWorldTypeName().toUpperCase(java.util.Locale.ROOT) + "\", ");
+                w.write(row, 1, row.length() - 1);
                 Timing.add("seed.total", tSeed);
                 w.write("\n");
+                w.flush(); // Publish each complete JSONL record before beginning another seed.
                 done++;
                 if (done % 500 == 0) {
                     final double sps = done / ((System.nanoTime() - t0) / 1e9);
@@ -1561,10 +1599,12 @@ public final class Prefilter {
         // with slack, exactly like tier 1: spawn is median ~104 blocks from origin (p90 478), and the gated
         // stages below re-check every distance against the predicted spawn exactly.
         final int mineshaftRadius = Integer.getInteger("probe.prefilter.mineshaft", -1);
+        final boolean mineshaftsEnabled = structureEnabled(world, "generateMineshafts");
         List<int[]> mineshaftTriggers = java.util.Collections.emptyList();
         if (mineshaftRadius >= 0 && MineshaftPrefilter.resolve() == null && MineshaftPrefilter.arithmetic()) {
             final long tMsTrig = Timing.start();
-            mineshaftTriggers = MineshaftPrefilter.triggers(seed, 0, 0, mineshaftRadius);
+            mineshaftTriggers = mineshaftsEnabled ? MineshaftPrefilter.triggers(seed, 0, 0, mineshaftRadius)
+                : java.util.Collections.emptyList();
             Timing.add("mineshaft.trig", tMsTrig);
             final int gateMsTrig = Integer.getInteger("probe.prefilter.gate.mineshafttrig", -1);
             if (gateMsTrig >= 0) {
@@ -1595,13 +1635,17 @@ public final class Prefilter {
         // Predicted village chests holding Block of Steel: {chestX, chestZ, steel}. Filled by villageStarts
         // while the Predicted objects are in hand, distance-filtered by the steel gate once spawn is known.
         final List<int[]> villageSteel = new ArrayList<>();
+        final ObsidianParts obsidianParts = GateCapture.partsRequested() ? new ObsidianParts(
+            Integer.getInteger("probe.prefilter.dungeon", -1) >= 0,
+            Integer.getInteger("probe.prefilter.vanilladungeon", -1) >= 0) : null;
+        final List<List<?>> villageComponents = obsidianParts == null ? null : new ArrayList<>();
         final boolean pieces = !"false".equals(System.getProperty("probe.prefilter.pieces"));
         // staged kill gates: each stage only runs if the previous one kept the seed, so a gated
         // million-seed sweep pays pieces/terrain cost only for survivors (the funnel in one pass)
         final int gateVillageDist = Integer.getInteger("probe.prefilter.gate.villagedist", -1);
         final String gatePieces = System.getProperty("probe.prefilter.gate.pieces");
         try {
-            final Object gen = villageGenerator();
+            final Object gen = villageGenerator(world);
             WORLD_OBJ.set(gen, world);
             // Village starts must be read before any chunk is generated. provideChunk runs RWG's OWN village
             // map-gen, which registers starts into the shared "Village" MapGenStructureData in
@@ -1619,9 +1663,10 @@ public final class Prefilter {
                 }
             }
             final long tCells = Timing.start();
+            final boolean villagesEnabled = structureEnabled(world, "generateVillages");
             for (int cx2 = -radiusChunks; cx2 <= radiusChunks; cx2++) {
                 for (int cz2 = -radiusChunks; cz2 <= radiusChunks; cz2++) {
-                    if ((Boolean) CAN_SPAWN.invoke(gen, cx2, cz2)) {
+                    if (villagesEnabled && (Boolean) CAN_SPAWN.invoke(gen, cx2, cz2)) {
                         villages.add(new int[] { cx2, cz2 });
                     }
                 }
@@ -1637,9 +1682,9 @@ public final class Prefilter {
                 }
                 if (!ok) return "{\"seed\": " + seed + ", \"kill\": \"village\"}";
             }
-            if (pieces && !villages.isEmpty()) {
+            if ((pieces || obsidianParts != null) && !villages.isEmpty()) {
                 final long tStarts = Timing.start();
-                starts.addAll(villageStarts(gen, world, villages, villageSteel));
+                starts.addAll(villageStarts(gen, world, villages, villageSteel, villageComponents));
                 Timing.add("villageStarts", tStarts);
             }
             if (gatePieces != null) {
@@ -1657,6 +1702,7 @@ public final class Prefilter {
             }
         } catch (Exception e) {
             WorldgenProbe.LOG.warn("[prefilter] village eval failed for {}: {}", seed, e.toString());
+            if (obsidianParts != null) obsidianParts.fail("Village layout capture: " + e);
         }
         sb.append(", \"villages\": [");
         for (int i = 0; i < villages.size(); i++) {
@@ -1683,8 +1729,9 @@ public final class Prefilter {
         if (mineshaftRadius >= 0 && MineshaftPrefilter.resolve() == null) {
             try {
                 final long tMsStarts = Timing.start();
-                final List<int[]> msCells = MineshaftPrefilter.arithmetic() ? mineshaftTriggers
-                    : MineshaftPrefilter.latticeCells(0, 0, mineshaftRadius);
+                final List<int[]> msCells = !mineshaftsEnabled ? java.util.Collections.emptyList()
+                    : MineshaftPrefilter.arithmetic() ? mineshaftTriggers
+                        : MineshaftPrefilter.latticeCells(0, 0, mineshaftRadius);
                 msStarts = MineshaftPrefilter.starts(world, seed, msCells);
                 Timing.add("mineshaft.starts", tMsStarts);
                 sb.append(", \"mineshaft_triggers\": [");
@@ -2218,11 +2265,14 @@ public final class Prefilter {
             }
         }
 
-        // --- terrain columns + spawn prediction (worldless RWG; -Dprobe.prefilter.terrain=-1 disables,
-        // N = digest radius in chunks around the predicted spawn; default 4)
+        // The new loot stages need an actual predicted reference even when the terrain digest is off.
         final int terrainRadius = Integer.getInteger("probe.prefilter.terrain", 4);
-        // Hoisted: the dungeon stage below scans around the predicted spawn, and defaults to the origin when
-        // the terrain stage is disabled or failed rather than silently scanning somewhere arbitrary.
+        final int vanillaRadius = Integer.getInteger("probe.prefilter.vanilladungeon", -1);
+        final String exactItemSpec = System.getProperty("probe.prefilter.requireitems");
+        final boolean needsSpawn = vanillaRadius >= 0 || exactItemSpec != null
+            || GateCapture.headsRequired() > 0 || (obsidianParts != null && Integer.getInteger("probe.prefilter.dungeon", -1) >= 0);
+        boolean spawnPredicted = false;
+        // Preserve the legacy origin fallback only for callers that did not request the new stages.
         int spawnX = 0, spawnZ = 0;
         // Hoisted for the DEFERRED terrain digest. The digest was 155 ms/seed — 37% of a 416 ms seed — and
         // it ran before every kill gate despite being a pure output field: nothing downstream reads it, so
@@ -2231,10 +2281,10 @@ public final class Prefilter {
         // original offset and field order stays byte-identical to the corpora already on disk.
         RwgTerrain terra = null;
         int scx0 = 0, scz0 = 0, terrainAt = -1;
-        if (terrainRadius >= 0) {
+        if (terrainRadius >= 0 || needsSpawn) {
             try {
                 final long tTerra = Timing.start();
-                terra = new RwgTerrain(world);
+                if (terrainRadius >= 0) terra = new RwgTerrain(world);
                 Timing.add("RwgTerrain.ctor", tTerra);
                 // vanilla WorldServer.createSpawnPosition replica (see RwgTerrain javadoc). The
                 // findBiomePosition call is the REAL one for draw-parity insurance — RWG returns null
@@ -2253,14 +2303,11 @@ public final class Prefilter {
                     sx = cp.chunkPosX;
                     sz = cp.chunkPosZ;
                 }
-                // the accept test is NOT vanilla's grass check: BiomesOPlenty replaces the dim-0 provider
-                // (WorldProviderSurfaceBOP, bytecode-verified from the shipped 2.1.0.2308 jar) — top block must
-                // be sand or stone, or snow_layer in a getBiomesToSpawnIn biome (empty list on RWG, so never);
-                // its extra "water nearby" loop re-reads the same top block 45 times, i.e. a no-op given the
-                // top-block climb can only end on a non-air block. Hence: beach/desert/bare-rock spawns.
+                // The dimension-zero provider is installed by the pack (normally BOP, not vanilla).
+                // Dispatch it directly rather than duplicating its top-block and liquid checks.
                 int iters = 0;
                 final long tSpawn = Timing.start();
-                while (!bopCanSpawn(world, terra, sx, sz)) {
+                while (!canSpawn(world, sx, sz)) {
                     sx += spawnRand.nextInt(64) - spawnRand.nextInt(64);
                     sz += spawnRand.nextInt(64) - spawnRand.nextInt(64);
                     if (++iters == 1000) break;
@@ -2268,6 +2315,7 @@ public final class Prefilter {
                 Timing.add("spawn.walk", tSpawn);
                 spawnX = sx;
                 spawnZ = sz;
+                spawnPredicted = true;
                 sb.append(", \"spawn\": [")
                     .append(sx)
                     .append(", 64, ")
@@ -2312,7 +2360,7 @@ public final class Prefilter {
 
                 scx0 = scx;
                 scz0 = scz;
-                terrainAt = sb.length();
+                if (terrainRadius >= 0) terrainAt = sb.length();
             } catch (Throwable t) {
                 WorldgenProbe.LOG.warn("[prefilter] terrain/spawn eval failed for {}: {}", seed, t.toString());
                 terra = null;
@@ -2322,6 +2370,14 @@ public final class Prefilter {
                             .replace("\"", "'"))
                     .append("\"");
             }
+        }
+        if (needsSpawn) {
+            if (!spawnPredicted) {
+                return sb.append(", \"kill\": \"spawn\", \"spawn_error\": \"No predicted spawn; origin is not a distance reference\"}")
+                    .toString();
+            }
+            sb.append(", \"spawn_reference\": {\"kind\": \"predicted_spawn\", \"verified\": false, \"terrain\": \"virgin_prepopulation\", \"x\": ")
+                .append(spawnX).append(", \"z\": ").append(spawnZ).append("}");
         }
 
         // ===== deferred terrain digest, invoked below every gate. Kept as a local class so the body is
@@ -2676,6 +2732,17 @@ public final class Prefilter {
         // the expensive terminal stage and only runs for seeds that have a trigger in range.
         // -Dprobe.prefilter.dungeon=N enables it, N = scan radius in chunks around the predicted spawn.
         final int dungeonRadius = Integer.getInteger("probe.prefilter.dungeon", -1);
+        final WitherHeads witherHeads = GateCapture.headsRequired() > 0 ? new WitherHeads(GateCapture.headsRequired()) : null;
+        if (dungeonRadius >= 0 && !RoguelikePrefilter.available()) {
+            if (witherHeads != null) witherHeads.fail("Enabled Roguelike source unavailable");
+            if (obsidianParts != null) obsidianParts.fail("Enabled Roguelike source unavailable");
+        }
+        final ExactLoot exactLoot = exactItemSpec == null ? null : new ExactLoot(
+            exactItemSpec, Integer.getInteger("probe.prefilter.lootdistance", -1), spawnX, spawnZ,
+            dungeonRadius >= 0, vanillaRadius >= 0);
+        if (exactLoot != null && dungeonRadius >= 0 && !RoguelikePrefilter.available()) {
+            exactLoot.fail("Enabled Roguelike source is unavailable");
+        }
         if (dungeonRadius >= 0 && RoguelikePrefilter.available()) {
             try {
                 final int scx = spawnX >> 4, scz = spawnZ >> 4;
@@ -2700,6 +2767,7 @@ public final class Prefilter {
                     for (final int[] t : triggers) {
                         if (Math.hypot(t[0] * 16 + 8 - spawnX, t[1] * 16 + 8 - spawnZ) > want + 160) continue;
                         final RoguelikePrefilter.Result r = generateDungeonTimed(world, seed, t);
+                        if (r.error != null && (witherHeads != null || obsidianParts != null)) throw new IllegalStateException(r.error);
                         ready.put(((long) t[0] << 32) | (t[1] & 0xFFFFFFFFL), r);
                         for (final int[] p : r.enchantTables) {
                             if (Math.hypot(p[0] - spawnX, p[2] - spawnZ) <= want) pass = true;
@@ -2750,6 +2818,7 @@ public final class Prefilter {
                             r = generateDungeonTimed(world, seed, t);
                             ready.put(tk, r);
                         }
+                        if (r.error != null && (witherHeads != null || obsidianParts != null)) throw new IllegalStateException(r.error);
                         dungeonsBuilt++;
                         for (final int[] tc : r.toolChests) {
                             if (Math.hypot(tc[0] - spawnX, tc[2] - spawnZ) > toolDist) continue;
@@ -2790,6 +2859,18 @@ public final class Prefilter {
                     final Long tk = ((long) t[0] << 32) | (t[1] & 0xFFFFFFFFL);
                     final RoguelikePrefilter.Result r = ready.containsKey(tk) ? ready.get(tk)
                         : generateDungeonTimed(world, seed, t);
+                    if (exactLoot != null) {
+                        for (final ExactLoot.Chest chest : r.exactChests) exactLoot.add(chest);
+                        if (r.error != null) exactLoot.fail(r.error);
+                    }
+                    if (witherHeads != null) {
+                        witherHeads.add(r.skulls);
+                        if (r.error != null) witherHeads.fail(r.error);
+                    }
+                    if (obsidianParts != null) {
+                        for (final ExactLoot.Chest chest : r.exactChests) obsidianParts.add(chest);
+                        if (r.error != null) obsidianParts.fail(r.error);
+                    }
                     final StringBuilder d = new StringBuilder(128);
                     d.append("{\"trigger\": [")
                         .append(r.triggerX)
@@ -2828,8 +2909,14 @@ public final class Prefilter {
                 sb.append(", \"dungeons\": [")
                     .append(String.join(", ", dungeons))
                     .append("]");
+                if (exactLoot != null) exactLoot.finish("roguelike");
+                if (witherHeads != null) witherHeads.finish();
+                if (obsidianParts != null) obsidianParts.finish("roguelike");
             } catch (Throwable t) {
                 WorldgenProbe.LOG.warn("[prefilter] dungeon eval failed for {}: {}", seed, t.toString());
+                if (witherHeads != null) witherHeads.fail(t.toString());
+                if (obsidianParts != null) obsidianParts.fail(t.toString());
+                if (exactLoot != null) exactLoot.fail(t.toString());
                 sb.append(", \"dungeon_error\": \"")
                     .append(
                         t.toString()
@@ -2838,6 +2925,59 @@ public final class Prefilter {
             } finally {
                 RoguelikePrefilter.resetSliceWindow();
             }
+        }
+
+        if (witherHeads != null) {
+            sb.append(", \"wither_heads\": ").append(witherHeads.json());
+            if (!witherHeads.passed()) return sb.append(", \"kill\": ")
+                .append(ExactLoot.quote(witherHeads.complete() ? "witherheads" : "witherheads_incomplete")).append('}').toString();
+        }
+
+        // A source-scoped boots miss can stop here. A generic item that vanilla might supply cannot.
+        if (exactLoot != null && exactLoot.provenMissing()) {
+            return sb.append(", \"item_requirements\": ").append(exactLoot.json())
+                .append(", \"kill\": \"items\"}").toString();
+        }
+        if (vanillaRadius >= 0) {
+            final long started = Timing.start();
+            final VanillaDungeonPrefilter.Result result = VanillaDungeonPrefilter
+                .scan((SeedProbeWorld) world, spawnX >> 4, spawnZ >> 4, vanillaRadius);
+            Timing.add("vanilla_dungeons", started);
+            sb.append(", \"vanilla_dungeons\": ").append(result.json(spawnX >> 4, spawnZ >> 4, vanillaRadius));
+            if (obsidianParts != null) {
+                for (final ExactLoot.Chest chest : result.exactChests) obsidianParts.add(chest);
+                if (result.complete) obsidianParts.finish("vanilla");
+                else obsidianParts.fail(result.error == null ? "Incomplete vanilla dungeon scan" : result.error);
+            }
+            if (exactLoot != null) {
+                for (final ExactLoot.Chest chest : result.exactChests) exactLoot.add(chest);
+                if (result.complete) exactLoot.finish("vanilla");
+                else exactLoot.fail(result.error == null ? "Incomplete vanilla dungeon scan" : result.error);
+            }
+            if (!result.complete) {
+                if (exactLoot != null) sb.append(", \"item_requirements\": ").append(exactLoot.json());
+                return sb.append(", \"vanilla_dungeon_error\": ")
+                    .append(ExactLoot.quote(result.error == null ? "Incomplete vanilla dungeon scan" : result.error))
+                    .append(", \"kill\": \"vanilla_dungeons_incomplete\"}").toString();
+            }
+        }
+        if (exactLoot != null) {
+            sb.append(", \"item_requirements\": ").append(exactLoot.json());
+            if (!exactLoot.passed()) return sb.append(", \"kill\": \"items\"}").toString();
+        }
+
+        if (obsidianParts != null) {
+            // Existing gates reject first. An earlier verified dungeon witness needs no village replay.
+            if (!obsidianParts.hasWitness()) {
+                for (final List<?> components : villageComponents) {
+                    GateCapture.village((SeedProbeWorld) world, components, obsidianParts);
+                    if (obsidianParts.hasWitness()) break;
+                }
+                if (!obsidianParts.hasWitness()) obsidianParts.finish("village_workshop");
+            }
+            sb.append(", \"obsidian_parts\": ").append(obsidianParts.json());
+            if (!obsidianParts.passed()) return sb.append(", \"kill\": ")
+                .append(ExactLoot.quote(obsidianParts.complete() ? "obsidianparts" : "obsidianparts_incomplete")).append('}').toString();
         }
 
         // --- No-rain region + humid neighbour. Deliberately the LAST gated stage: it is the most
@@ -2988,7 +3128,6 @@ public final class Prefilter {
             // 3 of the true top 10; the spawn-centred count correlates 0.70 and retains 10 of 10. The scoring
             // window is centred on spawn, so dungeons are only worth counting relative to it.
             final long tSpawn = Timing.start();
-            final RwgTerrain terra = new RwgTerrain(world);
             final Random spawnRand = new Random(seed);
             final net.minecraft.world.ChunkPosition cp = world.getWorldChunkManager()
                 .findBiomePosition(
@@ -3000,7 +3139,7 @@ public final class Prefilter {
                     spawnRand);
             int sx = cp != null ? cp.chunkPosX : 0, sz = cp != null ? cp.chunkPosZ : 0;
             int iters = 0;
-            while (!bopCanSpawn(world, terra, sx, sz)) {
+            while (!canSpawn(world, sx, sz)) {
                 sx += spawnRand.nextInt(64) - spawnRand.nextInt(64);
                 sz += spawnRand.nextInt(64) - spawnRand.nextInt(64);
                 if (++iters == 1000) break;
@@ -3068,11 +3207,11 @@ public final class Prefilter {
      * The pack's own stronghold generator, built exactly as {@code ChunkGeneratorRealistic} builds it so any
      * mod replacement applies. Dispatch, don't reimplement.
      */
-    private static synchronized Object strongholdGenerator() throws Exception {
-        if (STRONGHOLD_GEN == null) {
-            final Object gen = net.minecraftforge.event.terraingen.TerrainGen.getModdedMapGen(
-                new net.minecraft.world.gen.structure.MapGenStronghold(),
-                net.minecraftforge.event.terraingen.InitMapGenEvent.EventType.STRONGHOLD);
+    private static synchronized Object strongholdGenerator(World world) throws Exception {
+        final Object terrain = ((SeedProbeWorld) world).virginProvider().generator();
+        final Object gen = findField(terrain.getClass(), "strongholdGenerator").get(terrain);
+        if (gen == null) return null;
+        if (STRONGHOLD_GEN != gen) {
             SH_WORLD_OBJ = findField(gen.getClass(), "field_75039_c", "worldObj");
             SH_STRUCTURE_MAP = findField(gen.getClass(), "field_75053_d", "structureMap");
             SH_STRUCTURE_DATA = findField(gen.getClass(), "field_143029_e");
@@ -3117,7 +3256,8 @@ public final class Prefilter {
      * {@code structureMap}/{@code field_143029_e} carry-over that {@link #villageStarts} resets.
      */
     private static List<String> strongholdStarts(World world, int scx, int scz, int radiusChunks) throws Exception {
-        final Object gen = strongholdGenerator();
+        final Object gen = strongholdGenerator(world);
+        if (gen == null) return java.util.Collections.emptyList();
         SH_WORLD_OBJ.set(gen, world);
         SH_RAN_BIOME_CHECK.setBoolean(gen, false);
         ((Map<?, ?>) SH_STRUCTURE_MAP.get(gen)).clear();
@@ -3191,6 +3331,11 @@ public final class Prefilter {
     }
 
     private static WorldType findWorldType(String name) {
+        if (!"RWG2_CONTINENTS".equalsIgnoreCase(name) && !"RWG2".equalsIgnoreCase(name)
+            && !"RWG".equalsIgnoreCase(name)) {
+            throw new IllegalArgumentException(
+                "probe.prefilter.worldtype must be RWG2_CONTINENTS, RWG2, or RWG; got '" + name + "'");
+        }
         for (final WorldType t : WorldType.worldTypes) {
             if (t != null && name.equalsIgnoreCase(t.getWorldTypeName())) return t;
         }

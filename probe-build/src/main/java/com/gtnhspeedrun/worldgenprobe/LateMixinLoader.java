@@ -42,6 +42,12 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (Boolean.getBoolean("probe.prefilter.timing") || Boolean.getBoolean("probe.prefilter.skipskylight")) {
             mixins.add("SkylightMixin");
         }
+        if (Integer.getInteger("probe.prefilter.vanilladungeon", -1) >= 0) {
+            mixins.add("TerrainOracleMixin");
+        }
+        if (Boolean.getBoolean("probe.prefilter.gate.obsidianparts")) {
+            mixins.add("PartInventoryMixin");
+        }
         final boolean wantParallel = Boolean.getBoolean("probe.parallelnoise");
         final boolean wantFast = Boolean.getBoolean("probe.fastnoise");
         if (!wantParallel && !wantFast) return mixins;

@@ -51,7 +51,7 @@ final class BiomeTable {
 
     private static boolean dumped;
 
-    /** Per-biome-id classification, resolved once per JVM. Indexed by biome id; ids are bytes in chunk data. */
+    /** Per-biome-id classification, including the extended biome registry supplied by EndlessIDs. */
     private static boolean[] noRainById;
     private static int[] humById;
 
@@ -68,8 +68,9 @@ final class BiomeTable {
      */
     private static synchronized void ensureClassification() {
         if (noRainById != null) return;
-        final boolean[] noRain = new boolean[256];
-        final int[] hum = new int[256];
+        final BiomeGenBase[] registry = BiomeGenBase.getBiomeGenArray();
+        final boolean[] noRain = new boolean[registry.length];
+        final int[] hum = new int[registry.length];
         java.util.Arrays.fill(hum, -1);
         final Humidity h = Humidity.resolve();
         Field rainField = null;
@@ -78,8 +79,8 @@ final class BiomeTable {
         } catch (Exception e) {
             WorldgenProbe.LOG.warn("[biometable] enableRain unreadable, no biome will count as no-rain: {}", e);
         }
-        for (final BiomeGenBase b : BiomeGenBase.getBiomeGenArray()) {
-            if (b == null || b.biomeID < 0 || b.biomeID > 255) continue;
+        for (final BiomeGenBase b : registry) {
+            if (b == null || b.biomeID < 0 || b.biomeID >= registry.length) continue;
             if (rainField != null) {
                 try {
                     noRain[b.biomeID] = !rainField.getBoolean(b);
@@ -95,13 +96,13 @@ final class BiomeTable {
     /** True when this biome has enableRain == false. Unknown ids answer false. */
     static boolean noRain(int biomeId) {
         ensureClassification();
-        return biomeId >= 0 && biomeId < 256 && noRainById[biomeId];
+        return biomeId >= 0 && biomeId < noRainById.length && noRainById[biomeId];
     }
 
     /** Crop humidity bonus for this biome, or -1 when no humidity mechanic could be resolved. */
     static int humidity(int biomeId) {
         ensureClassification();
-        return biomeId >= 0 && biomeId < 256 ? humById[biomeId] : -1;
+        return biomeId >= 0 && biomeId < humById.length ? humById[biomeId] : -1;
     }
 
     /**
@@ -119,7 +120,7 @@ final class BiomeTable {
             final StringBuilder sb = new StringBuilder(65536);
             sb.append("{\"format\": 1");
             sb.append(", \"mods\": ")
-                .append(modVersions("cropsnh", "berriespp", "IC2", "BiomesOPlenty", "RWG"));
+                .append(modVersions("cropsnh", "berriespp", "IC2", "BiomesOPlenty", "RWG", "rwg2"));
             sb.append(", \"humiditySource\": \"")
                 .append(WorldgenProbe.jsonEscape(hum.describe()))
                 .append('"');

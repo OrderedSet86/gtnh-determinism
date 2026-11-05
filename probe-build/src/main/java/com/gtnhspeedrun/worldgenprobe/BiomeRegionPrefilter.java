@@ -36,7 +36,8 @@ import net.minecraft.world.chunk.Chunk;
  * <p>
  * Never reads {@code Chunk.getBiomeArray()}: EndlessIDs replaces the vanilla array and throws from that
  * accessor, which takes the run down on a 2.9/daily pack. {@code getBiomeGenForWorldCoords} takes chunk-local
- * coordinates, is what every mod uses, and resolves the 255 "unset" sentinel itself.
+ * coordinates and resolves stored biome IDs through the installed extended-ID implementation. IDs remain
+ * ints throughout this module; the 256-column scan is not a 256-biome limit.
  */
 final class BiomeRegionPrefilter {
 

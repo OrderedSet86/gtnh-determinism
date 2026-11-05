@@ -381,24 +381,33 @@ final class MeteorPrefilter {
     }
 
     /**
-     * Analytic terrain screen: RWG's height is pure noise math, so evaluate the biome's own rNoise formula
-     * (real PerlinNoise/CellNoise instances read off the reflected generator, real getRiverStrength /
-     * calculateRiver) at the impact and 16x3 ring samples — ~50 noise calls, no chunk generation. The proxy
-     * skips only the biome BLEND kernel (border=1, ocean=1), so it overshoots walls and undershoots
-     * blended slopes; it is a SCREEN, not a measurement — the staged chunkgen funnel stays as the exact
-     * check behind it, so a threshold calibrated to pass every known 300k+ site can only lose candidates
-     * the funnel would also have to see. This is the ~1000x lever: a chunkgen peek costs ~20 ms, this
-     * costs ~50 us.
+     * Height screen at the impact and 16x3 ring samples. Legacy RWG uses its real rNoise/calculateRiver
+     * calls, omitting the biome blend kernel as before. RWG2 instead reads actual virgin surface heights:
+     * continents, volcanoes and the new river transforms are not representable by the legacy formula.
+     * This makes the optional RWG2 proxy gate more expensive, but it never substitutes Alpha terrain.
      */
     static final class AnalyticScreen {
 
         private final Object cmr;
         private final Object perlin, cellN;
         private final java.lang.reflect.Method mBiomeData, mRiver, mCarve, mRNoise;
+        private final Prefilter.RwgTerrain providerTerrain;
 
         AnalyticScreen(net.minecraft.world.World world, Prefilter.RwgTerrain terra) throws Exception {
             cmr = world.getWorldChunkManager();
             final Object gen = terra.generator();
+            // RWG2 adds continent, island, volcano and river transforms beyond rNoise/calculateRiver.
+            // Its real virgin surface is the only sound height source; do not replay the legacy formula.
+            providerTerrain = gen.getClass().getName().startsWith("rwg2.") ? terra : null;
+            if (providerTerrain != null) {
+                perlin = null;
+                cellN = null;
+                mBiomeData = null;
+                mRiver = null;
+                mCarve = null;
+                mRNoise = null;
+                return;
+            }
             Object p = null, cn = null;
             for (final Field f : gen.getClass()
                 .getDeclaredFields()) {
@@ -426,16 +435,18 @@ final class MeteorPrefilter {
             // resolve on the BASE class: resolving on the concrete (0,0) biome and invoking on a sibling
             // subclass throws "object is not an instance of declaring class"
             java.lang.reflect.Method rn = null;
-            for (final java.lang.reflect.Method m : Class.forName("rwg.biomes.realistic.RealisticBiomeBase")
-                .getMethods()) {
+            for (final java.lang.reflect.Method m : mBiomeData.getReturnType().getMethods()) {
                 if ("rNoise".equals(m.getName())) rn = m;
             }
             if (rn == null) throw new NoSuchMethodException("RealisticBiomeBase.rNoise");
             mRNoise = rn;
         }
 
-        /** Single-biome river-carved height proxy at a column, no chunks. */
+        /** Legacy single-biome proxy, or the real virgin top-solid height for RWG2. */
         float height(int x, int z) throws Exception {
+            if (providerTerrain != null) {
+                return providerTerrain.columns(x >> 4, z >> 4).topSolid[((x & 15) << 4) | (z & 15)];
+            }
             final float river = ((Number) mRiver.invoke(cmr, x, z)).floatValue();
             final Object rb = mBiomeData.invoke(cmr, x, z);
             final float h = ((Number) mRNoise.invoke(rb, perlin, cellN, x, z, 1f, 1f, river + 1f)).floatValue();
@@ -489,6 +500,11 @@ final class MeteorPrefilter {
      */
     static void dumpRwg(net.minecraft.world.World world, Prefilter.RwgTerrain terra, String path) throws Exception {
         final Object cmr = world.getWorldChunkManager();
+        if (cmr.getClass().getName().startsWith("rwg2.")) {
+            throw new IllegalArgumentException(
+                "probe.prefilter.meteor.dumprwg exports the legacy RWG standalone model only; "
+                    + "RWG2 meteor gates use real virgin terrain instead");
+        }
         final StringBuilder sb = new StringBuilder(16384);
         sb.append("{\"noise_perlin\": \"");
         for (final Field f : terra.generator()

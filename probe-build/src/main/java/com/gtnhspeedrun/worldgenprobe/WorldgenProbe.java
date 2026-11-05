@@ -1310,11 +1310,16 @@ public class WorldgenProbe {
                 g);
         }
         staticSweepJars();
-        // RWG noise-impl saved data is bound to the first world's mapStorage.
-        final java.lang.reflect.Field rwgInst = Class.forName("rwg.world.RwgWorldSavedData")
-            .getDeclaredField("INSTANCE");
-        rwgInst.setAccessible(true);
-        rwgInst.set(null, null);
+        // Both mods bind their noise-implementation singleton to the first world's mapStorage.
+        for (final String name : new String[] { "rwg.world.RwgWorldSavedData", "rwg2.world.RwgWorldSavedData" }) {
+            try {
+                final java.lang.reflect.Field rwgInst = Class.forName(name).getDeclaredField("INSTANCE");
+                rwgInst.setAccessible(true);
+                rwgInst.set(null, null);
+            } catch (ClassNotFoundException absent) {
+                // Either generator mod may be absent; a present but incompatible class must still fail.
+            }
+        }
         // Fix jar virgin-terrain cache: self-invalidates on world identity change, but pins the old world until then.
         // Two package names: the current one, and the pre-rename one that jars up to 0.4 shipped (commit 1340ae3).
         final Class<?> oracle = findClass(

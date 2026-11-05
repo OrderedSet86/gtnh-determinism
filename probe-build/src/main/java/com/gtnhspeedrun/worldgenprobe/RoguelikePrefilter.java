@@ -93,7 +93,9 @@ final class RoguelikePrefilter {
         int entranceX = Integer.MIN_VALUE;
         int entranceZ = Integer.MIN_VALUE;
         final List<String> chests = new ArrayList<>();
+        final List<ExactLoot.Chest> exactChests = new ArrayList<>();
         final List<int[]> enchantTables = new ArrayList<>();
+        final List<int[]> skulls = new ArrayList<>();
         /**
          * Per TOOLS-type chest: {x, y, z, alumitePlate, anyPlate, hammerHead, toughRod} — the hammer%
          * categories counted on the ItemStacks at capture time ({@link LootCounts}), TOOLS only because all
@@ -266,7 +268,15 @@ final class RoguelikePrefilter {
             }
             for (final ITreasureChest chest : dungeon.getChests()) {
                 final TileEntityChest te = tileEntityOf(chest);
-                if (te == null) continue;
+                if (te == null) {
+                    if (System.getProperty("probe.prefilter.requireitems") != null || GateCapture.partsRequested()) {
+                        throw new IllegalStateException("Unreadable Roguelike chest inventory");
+                    }
+                    continue;
+                }
+                if (System.getProperty("probe.prefilter.requireitems") != null || GateCapture.partsRequested()) {
+                    r.exactChests.add(VanillaDungeonPrefilter.capture("roguelike", te, te.xCoord, te.yCoord, te.zCoord));
+                }
                 // The treasure TYPE distinguishes rooms the item list cannot: an ENCHANTING chest is
                 // stocked by exactly two rooms (DungeonsEnchant, DungeonsNetherBrickFortress), and only
                 // the first also places an enchantment table.
@@ -287,6 +297,7 @@ final class RoguelikePrefilter {
             // back from the F5 editor overlay's capture maps (live writes + buffered writes). Chest
             // type alone over-matches: the fortress room stocks an ENCHANTING chest with no table.
             r.enchantTables.addAll(enchantTables(editor));
+            if (GateCapture.headsRequired() > 0) r.skulls.addAll(GateCapture.skulls(editor));
         } catch (Throwable t) {
             r.error = t.toString();
         }
