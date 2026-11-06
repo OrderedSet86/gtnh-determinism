@@ -12,6 +12,8 @@
 # Same validity rules as warm-probe.sh: needs the gtnhdeterminism fix jar; cold boots are
 # still required for launch-variance tests and cold-parity baselines.
 set -euo pipefail
+# shellcheck source=level-type.sh
+source "$(dirname "${BASH_SOURCE[0]}")/level-type.sh"
 
 CMD=$1
 case "$CMD" in
@@ -22,11 +24,12 @@ start)
   flock -n 9 || { echo "another probe run holds $SERVER_DIR/.probe.lock; aborting" >&2; exit 1; }
   rm -rf World world "$CTL/ready" "$CTL/stop"
   if [ ! -f server.properties.bak ] && [ -f server.properties ]; then cp server.properties server.properties.bak; fi
+  LEVEL_TYPE_RESOLVED=$(level_type)
   cat > server.properties <<EOF
 allow-nether=true
 level-name=World
 level-seed=1
-level-type=rwg
+level-type=$LEVEL_TYPE_RESOLVED
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1

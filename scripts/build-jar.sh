@@ -33,11 +33,11 @@ PROJECT=${1:-}
 case "$PROJECT" in
   probe)
     SUBDIR=probe-build; JAR_PREFIX=worldgenprobe
-    RESOURCES=(mixins.worldgenprobe.json mixins.worldgenprobe.late.json)
+    RESOURCES=(mixins.worldgenprobe.json mixins.worldgenprobe.late.json licenses/jvmdowngrader/NOTICE.md)
     ;;
   fix)
     SUBDIR=fix-build; JAR_PREFIX=gtnhdeterminism
-    RESOURCES=(mixins.gtnhdeterminism.json mixins.gtnhdeterminism.late.json)
+    RESOURCES=(mixins.gtnhdeterminism.json mixins.gtnhdeterminism.late.json licenses/jvmdowngrader/NOTICE.md)
     ;;
   qol)
     SUBDIR=qol-build; JAR_PREFIX=gtnhspeedrunqol
@@ -98,6 +98,11 @@ for res in "${RESOURCES[@]}"; do
   fi
 done
 [ "$MISSING" -eq 0 ] || { echo "stale/incomplete jar — build system served cached output?" >&2; exit 1; }
+
+# At compatibility level JAVA_8, a mixin class with a nested class fails to apply, and the failure is only one
+# `/ERROR] [mixin]` line in the log. Reject the jar here.
+NESTED=$(grep -oE '[^ ]*/mixins/[^ ]*\$[^ ]*\.class' <<< "$JAR_LIST" || true)
+[ -z "$NESTED" ] || { echo "VERIFY FAIL: nested class in a mixin package (use a lambda):" >&2; echo "$NESTED" >&2; exit 1; }
 
 MD5=$(md5sum "$JAR" | awk '{print $1}')
 echo "OK: $BUILD_DIR/$JAR"

@@ -496,15 +496,7 @@ public final class Prefilter {
 
         /** Package-private: {@link BiomeRegionPrefilter} calls getNewNoise on this same instance. */
         IChunkProvider generator() {
-            if (gen == null) {
-                try {
-                    gen = (IChunkProvider) Class.forName("rwg.world.ChunkGeneratorRealistic")
-                        .getConstructor(World.class, long.class)
-                        .newInstance(world, world.getSeed());
-                } catch (Exception e) {
-                    throw new IllegalStateException("prefilter: cannot build RWG chunk generator", e);
-                }
-            }
+            if (gen == null) gen = buildGenerator(world);
             return gen;
         }
 
@@ -762,11 +754,25 @@ public final class Prefilter {
         private final World world;
         private final net.minecraft.world.gen.MapGenBase caves;
 
+        /**
+         * Build the terrain digest on the generator of the world type, and resolve the generator methods that the
+         * hand-rolled path calls.
+         *
+         * @throws IllegalStateException when {@code probe.prefilter.digestviaprovider=false} and the generator is not
+         *                               RWG's
+         * @throws NoSuchMethodException when the generator has no {@code generateTerrain} or
+         *                               {@code replaceBlocksForBiome}
+         */
         RwgTerrain(World world) throws Exception {
             this.world = world;
-            final Class<?> genCls = Class.forName("rwg.world.ChunkGeneratorRealistic");
-            gen = genCls.getConstructor(World.class, long.class)
-                .newInstance(world, world.getSeed());
+            gen = buildGenerator(world);
+            final Class<?> genCls = gen.getClass();
+            if (!VIA_PROVIDER && !"rwg.world.ChunkGeneratorRealistic".equals(genCls.getName())) {
+                // RWG2's provideChunk has steps that the hand-rolled path skips, such as mountain-chain river carving
+                // and lava caves
+                throw new IllegalStateException(
+                    "prefilter: probe.prefilter.digestviaprovider=false supports only RWG, not " + genCls.getName());
+            }
             cmr = world.getWorldChunkManager();
             // provideChunk runs the caves pass on the raw block array BEFORE the chunk is built — cave mouths
             // carve away surface grass, which flips getTopBlock and therefore the spawn walk. Same dispatch RWG
@@ -1467,8 +1473,12 @@ public final class Prefilter {
         }
     }
 
+    /**
+     * Evaluate every seed in {@code spec} worldlessly and write one JSONL row per seed to {@code outPath}. The world
+     * type comes from {@code -Dprobe.worldtype}, default {@code rwg}.
+     */
     public static void run(String spec, String outPath) throws Exception {
-        final WorldType rwg = findWorldType("rwg");
+        final WorldType worldType = findWorldType(System.getProperty("probe.worldtype", "rwg"));
         final int radiusChunks = Integer.getInteger("probe.prefilter.radius", 64);
         final List<Long> seeds = parseSpec(spec);
         WorldgenProbe.LOG
@@ -1500,8 +1510,8 @@ public final class Prefilter {
                     tier1);
             }
             for (final long seed : seeds) {
-                final SeedProbeWorld world = new SeedProbeWorld(seed, rwg);
-                if (tier1 < 0) BiomeTable.dumpOnce(tableDir, world.getWorldChunkManager());
+                final SeedProbeWorld world = new SeedProbeWorld(seed, worldType);
+                if (tier1 < 0) BiomeTable.dumpOnce(tableDir, world);
                 if (tier1 < 0) OreVeinTableDump.dumpOnce(tableDir, seed);
                 final long tSeed = Timing.start();
                 w.write(
@@ -3188,6 +3198,20 @@ public final class Prefilter {
                     + "}");
         }
         return out;
+    }
+
+    /**
+     * The chunk generator that the world's type builds, which is {@code ChunkGeneratorRealistic} for both RWG and RWG2.
+     * RWG2 builds a different generator for {@code RWG2} and {@code RWG2_CONTINENTS}, so the generator comes from the
+     * world type, not from a class name.
+     */
+    private static IChunkProvider buildGenerator(World world) {
+        return world.getWorldInfo()
+            .getTerrainType()
+            .getChunkGenerator(
+                world,
+                world.getWorldInfo()
+                    .getGeneratorOptions());
     }
 
     private static WorldType findWorldType(String name) {

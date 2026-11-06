@@ -396,8 +396,24 @@ final class MeteorPrefilter {
         private final Object perlin, cellN;
         private final java.lang.reflect.Method mBiomeData, mRiver, mCarve, mRNoise;
 
+        /**
+         * Resolve the RWG noise objects and chunk-manager methods that {@link #screen} evaluates.
+         *
+         * @throws IllegalStateException on any world type but {@code rwg}
+         * @throws NoSuchFieldException  when the generator has no {@code perlin} or {@code cell} field
+         * @throws NoSuchMethodException when a method that {@link #screen} calls is missing
+         */
         AnalyticScreen(net.minecraft.world.World world, Prefilter.RwgTerrain terra) throws Exception {
             cmr = world.getWorldChunkManager();
+            // the proxy bars were calibrated on rwg terrain only. RWG2 has rNoise and the same field names, so the
+            // screen would run on RWG2 and return uncalibrated numbers
+            if (!"rwg.world.ChunkManagerRealistic".equals(
+                cmr.getClass()
+                    .getName())) {
+                throw new IllegalStateException(
+                    "prefilter: the meteor analytic screen supports only level-type=rwg, not " + cmr.getClass()
+                        .getName());
+            }
             final Object gen = terra.generator();
             Object p = null, cn = null;
             for (final Field f : gen.getClass()

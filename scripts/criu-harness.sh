@@ -15,6 +15,8 @@
 # unprivileged restore never has to raise a limit. Parallel restores = one namespace set each; the
 # images dir is read-only at restore time so concurrent restores can share it.
 set -euo pipefail
+# shellcheck source=level-type.sh
+source "$(dirname "${BASH_SOURCE[0]}")/level-type.sh"
 
 SERVER_DIR=$1
 IMAGES_DIR=$2
@@ -36,11 +38,12 @@ checkpoint)
   rm -rf World world "$CTL"
   mkdir -p "$CTL" "$IMAGES_DIR"
   if [ ! -f server.properties.bak ] && [ -f server.properties ]; then cp server.properties server.properties.bak; fi
+  LEVEL_TYPE_RESOLVED=$(level_type)
   cat > server.properties <<EOF
 allow-nether=true
 level-name=World
 level-seed=1
-level-type=rwg
+level-type=$LEVEL_TYPE_RESOLVED
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1

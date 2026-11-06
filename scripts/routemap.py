@@ -2,7 +2,7 @@
 """Type a seed, get a route map. The one entry point, on Windows, macOS and Linux alike.
 
     routemap.py                      # pick an instance and a seed in a window
-    routemap.py --seed N [--instance NAME] [--radius 60] [--dims 0,7,-1]
+    routemap.py --seed N [--instance NAME] [--level-type T] [--radius 60] [--dims 0,7,-1]
 
 Run with no arguments it opens a small window; run with arguments it behaves as a CLI. Both call the
 same two modules -- routemap-bootstrap.py to turn the player's Prism instance into a headless server,
@@ -284,32 +284,39 @@ def find_jars():
     return found
 
 
-def existing_bundle(bundle, want_pack):
+def existing_bundle(bundle, want_pack, want_level_type):
     """A finished bundle for this seed that is still valid for the pack now installed.
 
     Worldgen does not survive a pack update -- mod changes move RNG consumption, structures and
     loot tables -- so a map baked against 2.8.4 describes a different world once the instance is on
-    2.9.0. Reusing it silently would be worse than the half hour it saves.
+    2.9.0. Reusing it silently would be worse than the half hour it saves. The same holds for the
+    world type: RWG and RWG2_CONTINENTS make unrelated terrain from one seed.
     """
     meta = bundle / "meta.json"
     if not meta.is_file():
         return None
     try:
-        pack = json.loads(meta.read_text()).get("pack")
+        recorded = json.loads(meta.read_text())
     except (OSError, ValueError):
         return None
+    pack = recorded.get("pack")
     if pack != want_pack:
         print(f"  the existing map was built for pack {pack}, you are on {want_pack}; rebuilding")
+        return None
+    # bundles from before world types were recorded were all built with RWG
+    level_type = recorded.get("level_type", "RWG")
+    if level_type.upper() != want_level_type.upper():
+        print(f"  the existing map was built for world type {level_type}, you asked for {want_level_type}; rebuilding")
         return None
     return bundle
 
 
-def generate(instance, seed, radius, dims, pack_version=None, out=None, keep_server=False,
+def generate(instance, seed, radius, dims, level_type, pack_version=None, out=None, keep_server=False,
              regenerate=False):
     """Assemble the server if needed, then build the bundle. Returns the bundle directory."""
     worlds = worlds_dir(instance, out)
     version_wanted = pack_version or instance["pack_version"]
-    if not regenerate and existing_bundle(worlds / str(seed), version_wanted):
+    if not regenerate and existing_bundle(worlds / str(seed), version_wanted, level_type):
         print(f"  a map for seed {seed} is already built; opening it")
         print("  (delete it, or pass --regenerate, to build it again)")
         return worlds / str(seed)
@@ -330,6 +337,7 @@ def generate(instance, seed, radius, dims, pack_version=None, out=None, keep_ser
         "--radius", str(radius),
         "--dims", dims,
         "--pack", version,
+        "--level-type", level_type,
         # Explicitly in the cache, NOT beside the bundle: the scratch holds every dimension's region
         # capture and runs to ~540 MB mid-build, and the bundle now lives inside the Prism instance.
         "--scratch", str(bootstrap.cache_root() / "scratch" / str(seed)),
@@ -402,6 +410,20 @@ def prompt():
             print(f"  - {p}")
         raise SystemExit(1)
 
+    level_type, choices = bootstrap.world_types(chosen)
+    if len(choices) > 1:
+        print("World types this instance can create:")
+        for n, choice in enumerate(choices, 1):
+            print(f"  {n}. {choice}{'   (the default)' if choice == level_type else ''}")
+        while True:
+            raw = _ask(f"Which one is your world? [1-{len(choices)}, Enter for {level_type}]: ")
+            if not raw:
+                break
+            if raw.isdigit() and 1 <= int(raw) <= len(choices):
+                level_type = choices[int(raw) - 1]
+                break
+            print("  Type one of the numbers above.")
+
     while True:
         raw = _ask("World seed: ")
         try:
@@ -411,7 +433,7 @@ def prompt():
             print("  A seed is a whole number, and may start with '-'.")
 
     print("\nThis takes about half an hour.\n")
-    generate(chosen, seed, 60, "0,7,-1")
+    generate(chosen, seed, 60, "0,7,-1", level_type)
     serve_and_open(viewer_dir(), worlds_dir(chosen), seed)
 
 
@@ -441,8 +463,24 @@ def run_gui():
     seed_var = tk.StringVar()
     ttk.Entry(frame, textvariable=seed_var, width=44).grid(column=1, row=1, pady=(8, 0))
 
+    ttk.Label(frame, text="World type").grid(column=0, row=2, sticky="w", pady=(8, 0))
+    type_var = tk.StringVar()
+    type_box = ttk.Combobox(frame, textvariable=type_var, width=42, state="readonly")
+    type_box.grid(column=1, row=2, pady=(8, 0))
+
+    def show_world_types(*_):
+        inst = next((i for i in instances if i["name"] == inst_var.get()), None)
+        if inst is None:
+            return
+        default, choices = bootstrap.world_types(inst)
+        type_box["values"] = choices
+        type_var.set(default)
+
+    inst_var.trace_add("write", show_world_types)
+    show_world_types()
+
     status = ttk.Label(frame, text="This takes about half an hour.", wraplength=420)
-    status.grid(column=0, row=3, columnspan=2, pady=(12, 0), sticky="w")
+    status.grid(column=0, row=4, columnspan=2, pady=(12, 0), sticky="w")
 
     def go():
         try:
@@ -455,12 +493,13 @@ def run_gui():
         if issues:
             messagebox.showerror("GTNH Route Map", "\n\n".join(issues))
             return
+        level_type = type_var.get()
         win.destroy()
-        generate(inst, seed, 60, "0,7,-1")
+        generate(inst, seed, 60, "0,7,-1", level_type)
         serve_and_open(viewer_dir(), worlds_dir(inst), seed)
         return bundle
 
-    ttk.Button(frame, text="Generate", command=go).grid(column=1, row=2, sticky="e", pady=(12, 0))
+    ttk.Button(frame, text="Generate", command=go).grid(column=1, row=3, sticky="e", pady=(12, 0))
     win.mainloop()
 
 
@@ -469,6 +508,9 @@ def main():
     ap.add_argument("--seed", type=int)
     ap.add_argument("--instance")
     ap.add_argument("--pack-version")
+    ap.add_argument("--level-type",
+                    help="world type of your world: RWG, RWG2 or RWG2_CONTINENTS "
+                         "(default: the instance's default world type)")
     ap.add_argument("--radius", type=int, default=60)
     ap.add_argument("--dims", default="0,7,-1")
     ap.add_argument("--list", action="store_true", help="show the instances that were found and exit")
@@ -497,7 +539,13 @@ def main():
             "several instances found; pass --instance:\n  "
             + "\n  ".join(i["name"] for i in instances if i["pack_version"])
         )
-    generate(chosen, args.seed, args.radius, args.dims, args.pack_version, args.out,
+    level_type, choices = bootstrap.world_types(chosen)
+    if args.level_type:
+        if args.level_type.upper() not in bootstrap.MAPPABLE_WORLD_TYPES:
+            raise SystemExit(f"--level-type {args.level_type} cannot be mapped; use one of: {', '.join(choices)}")
+        level_type = args.level_type
+    print(f"  world type {level_type}")
+    generate(chosen, args.seed, args.radius, args.dims, level_type, args.pack_version, args.out,
              args.keep_server, args.regenerate)
     if not args.no_serve:
         serve_and_open(viewer_dir(), worlds_dir(chosen, args.out), args.seed)

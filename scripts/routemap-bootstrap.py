@@ -84,6 +84,8 @@ REPOS = (
 KEEP_SIDES = frozenset({"BOTH", "SERVER", "BOTH_JAVA9", "SERVER_JAVA9"})
 
 MC_VERSION = "1.7.10"
+# Upper-cased world type names the probe can map: RWG, and RWG2 with and without continents.
+MAPPABLE_WORLD_TYPES = frozenset({"RWG", "RWG2", "RWG2_CONTINENTS"})
 # Some sites 403 a bare urllib User-Agent.
 UA = {"User-Agent": "gtnh-routemap/1.0 (+https://github.com/OrderedSet86/gtnh-determinism)"}
 
@@ -229,6 +231,28 @@ def parse_pack_version(name):
     """`GT_New_Horizons_2.9.0-beta-3_Java_17-26` -> `2.9.0-beta-3`; daily builds -> None."""
     m = re.search(r"(?:GT[_ ]New[_ ]Horizons|GTNH)[_ -]+(\d+\.\d+\.\d+(?:-(?:beta|rc)-\d+)?)", name, re.I)
     return m.group(1) if m else None
+
+
+def world_types(instance):
+    """(default, choices): the RWG world types this instance's world-creation screen offers.
+
+    Read from DefaultWorldGenerator's config, because that is what decides the default on the
+    Create New World screen: `RWG` up to the 2.9.0 RCs, `RWG2_CONTINENTS` on 2.9.0. Only RWG types
+    can be mapped, so `flat` and `default` are left out of the choices. An instance without the
+    config gets `RWG`, which is what every pack before 2.9.0 locks to.
+    """
+    cfg = instance["minecraft"] / "config" / "defaultworldgenerator.cfg"
+    text = cfg.read_text(encoding="utf-8", errors="replace") if cfg.is_file() else ""
+    m = re.search(r'S:"World Generator"=(\S+)', text)
+    default = m.group(1) if m else "RWG"
+    block = re.search(r'S:"World Generator Whitelist"\s*<(.*?)>', text, re.S)
+    listed = block.group(1).split() if block else [default]
+    choices = [t for t in listed if t.upper() in MAPPABLE_WORLD_TYPES]
+    if default.upper() not in MAPPABLE_WORLD_TYPES:
+        default = choices[0] if choices else "RWG"
+    if default not in choices:
+        choices.insert(0, default)
+    return default, choices
 
 
 def parse_java_range(name):

@@ -18,6 +18,8 @@
 # within a JVM, so warm runs cannot stand in for cold-launch variance tests on stock jars.
 # Requires Java 17-21 as $PROBE_JAVA (or java), worldgenprobe >= 0.3 in <server-dir>/mods.
 set -euo pipefail
+# shellcheck source=level-type.sh
+source "$(dirname "${BASH_SOURCE[0]}")/level-type.sh"
 
 SERVER_DIR=$1
 SEEDS=$2
@@ -36,11 +38,12 @@ flock -n 9 || { echo "another probe run holds $SERVER_DIR/.probe.lock; aborting"
 rm -rf World world
 if [ ! -f server.properties.bak ] && [ -f server.properties ]; then cp server.properties server.properties.bak; fi
 # level-seed is irrelevant: the boot world is discarded before the first warm slot.
+LEVEL_TYPE_RESOLVED=$(level_type)
 cat > server.properties <<EOF
 allow-nether=true
 level-name=World
 level-seed=1
-level-type=rwg
+level-type=$LEVEL_TYPE_RESOLVED
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1

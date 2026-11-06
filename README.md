@@ -1,7 +1,7 @@
 # gtnh-determinism
 
-Speedrun mod for GT: New Horizons 2.7.4 through 2.9.0-RC-2. Makes worldgen fully
-deterministic based on seed.
+Speedrun mod for GT: New Horizons 2.8.4 and 2.9.0. Makes worldgen fully deterministic based on
+seed.
 
 Discord: https://discord.gg/PbMWTcnZgC
 
@@ -16,13 +16,26 @@ directly above.](docs/img/launch-variance.png)
 **Grab the latest `gtnhdeterminism` jar from [Releases](../../releases) and drop it into `mods/` of a stock
 GTNH instance.**
 
-| Pack | Status |
-|---|---|
-| 2.7.4 | Tested. Launch pair byte-identical |
-| 2.8.0 – 2.8.4 | Expected to work; last tested at 2.8.4 |
-| 2.9.0-nightly / daily | Works on 0.14.0+ (tested on 2026-10-11 daily) |
-| 2.9.0-beta-3 | Tested. Same veins as daily-707 from the same seed, and the loot tables are unchanged |
-| 2.9.0-RC-1, RC-2 | Works on 0.14.0+ (tested on RC-1 and RC-2) |
+| Pack | World type | Status |
+|---|---|---|
+| 2.8.4 | `rwg` | Rows vs spiral, radius 8, 4 seeds: 1, 2, 72 and 0 differing blocks. Launch pair: 1 |
+| 2.9.0 | `RWG2_CONTINENTS` (the 2.9.0 default) | Rows vs spiral, radius 8, 4 seeds: 0, 388, 0 and 18 (stock on the first seed: 158,785). Launch pair: 0 |
+| 2.9.0 | `rwg` | Rows vs spiral, radius 8, 4 seeds: 133, 0, 839 and 172. Launch pair: 23 |
+
+Dungeon rooms and chest contents were identical in every pair. The remaining blocks are whole trees,
+Et Futurum deepslate ore host stone and deepslate↔gravel at the bottom of the world.
+
+Evidence: [results/2026-10-31-rwg2-continents](results/2026-10-31-rwg2-continents/README.md).
+
+Older packs, 2.9.0 betas and RCs are not supported. On GT 5.09.52.31 to 5.09.54.01 (2.9.0-beta-1) the jar
+logs a warning and leaves ore veins unfixed.
+
+2.9.0 ships two terrain mods. RWG alpha-1.5.3 is the `rwg` world type of earlier packs. Up to
+alpha-1.5.2, RWG put a biome in the climate category that a mod declared and in every later category.
+alpha-1.5.3 fixes that for new worlds, so a new `rwg` world has different biomes from a 2.8.4 world with
+the same seed. Realistic-World-Gen-2 (RWG2) adds `RWG2` and
+`RWG2_CONTINENTS`, which has oceans between continents. In 2.9.0, singleplayer world creation defaults to
+`RWG2_CONTINENTS`.
 
 | Target | What was wrong | What the jar fixes |
 |---|---|---|
@@ -42,7 +55,7 @@ GTNH instance.**
 | Et Futurum Requiem | Deepslate band (y16-31) and cave-vine length rolled off clock-seeded `World.rand` | Derived from world seed + position. Largest source on 2.9: 192,495 → 4,847 route-differing blocks |
 | Roguelike Dungeons | Position, placement and decoration read live terrain, hash-ordered sets and clock-seeded shuffles, and dungeons wrote into neighbour chunks in approach order | Position, layout, decoration and chest contents are a pure function of the seed; cross-chunk writes applied after each chunk's own decoration |
 | LootGames | Puzzle-room cracked-wall/broken-lamp variants rolled off a static clock-seeded `Random` | Room cosmetics seed-stable (minigame rewards are gameplay-time and untouched) |
-| RWG | Terrain-gated draw skew in all 29 decorators; `Math.random()` big trees | Decoration streams stable; big trees rolled from the seed |
+| RWG and RWG2 | One per-chunk `Random` for structures, lakes, dungeons, ores and decoration, with terrain-gated draws throughout; `Math.random()` big trees | Ore pass and decoration reseeded from seed and chunk; each decorator seeded from its position; big trees rolled from the seed; dungeon attempts forked per chunk. Jars up to 0.14.0 never bound the RWG decorator fixes and removed every Wood Hills big oak (see the [results](results/2026-10-31-rwg2-continents/README.md)) |
 | TinkersConstruct | Slime islands sized/shaped by a clock-seeded field (`rand`/`random` shadowing bug) | Slime islands seed-stable |
 | BiomesO'Plenty | Flora picked with `Math.random()` over an identity-ordered HashMap, shifting the shared decoration stream | Flora + downstream dirt/gravel patches seed-stable |
 | ProjectRed | Lily colors (dye yield!) rolled clock-random at worldgen | Lily colors derived from seed+position |
@@ -146,6 +159,13 @@ Without generating a chunk, the prefilter computes chest contents exactly for:
 It also answers village layouts, spawn point, terrain and Witchery structure cells. It does **not**
 cover vanilla `WorldGenDungeons` rooms or temples.
 
+The verified counts above are from `rwg` worlds. The probe scripts set `level-type` to `RWG2_CONTINENTS`
+when RWG2 is in `mods/`, and to `rwg` otherwise. Set `LEVEL_TYPE` to override. On `RWG2_CONTINENTS`:
+
+- the meteor analytic screen refuses to run, because its thresholds were calibrated on `rwg` terrain
+- `seedsearch/rwg-analytic` is a port of `rwg` terrain and does not predict RWG2 terrain
+- the other checks have not been verified against full generation yet
+
 Limits:
 
 - Witchery structures generate after chunk decoration, but the prefilter sees only virgin terrain, so
@@ -179,6 +199,13 @@ It builds a headless server from the player's **own Prism instance** (about 13 M
 of the 620 MB server pack), so the bundle matches the mod set the player loads, and it works for daily
 and beta packs. Bundles land in `<instance>/routemap/<seed>/`. The assembled server (~550 MB) is deleted
 afterwards unless `--keep-server` is passed; nothing else in the instance is written to.
+
+One seed makes unrelated terrain under `RWG` and `RWG2_CONTINENTS`, so the map must use the world type
+of the player's world. The default is the instance's default world type, from
+`config/defaultworldgenerator.cfg`: `RWG2_CONTINENTS` on 2.9.0, `RWG` on earlier packs. To choose another
+world type, use the World type list in the window, answer the question at the console (asked when the
+instance allows more than one type), or pass `--level-type`. A finished map is reused only for the same
+pack and world type.
 
 - `scripts/routemap-bootstrap.py` — Prism discovery, JRE selection, server assembly. Drops only
   client-side mods, which abort a headless boot.

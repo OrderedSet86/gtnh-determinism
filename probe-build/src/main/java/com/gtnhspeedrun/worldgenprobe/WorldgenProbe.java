@@ -2,6 +2,7 @@ package com.gtnhspeedrun.worldgenprobe;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -1154,6 +1155,8 @@ public class WorldgenProbe {
      * 2.8.4 jars (GT 5.09.51.482), and the 2.9/daily jars (GT 5.09.54.115, RWG alpha-1.5.2). Fields that GT deleted
      * in the 5.09.54.x worldgen rework are handled by {@link #clearOptionalStaticCollection}: still hard-failing
      * where the field exists, skipped with a log line where it does not. Everything else stays unconditional.
+     *
+     * @throws IllegalStateException when Thaumcraft's or Witchery's world generator is not registered
      */
     private static void resetStatics() throws Exception {
         // TC maze map (rings/obelisks): clearHashMap() clears the static `labyrinth`. The dimension/biome blacklists
@@ -1174,10 +1177,9 @@ public class WorldgenProbe {
         final java.lang.reflect.Field veins = gt.getDeclaredField("validOreveins");
         veins.setAccessible(true);
         ((Map<?, ?>) veins.get(null)).clear();
-        // Aggressive round-1 resets for the cross-seed ore-TE contamination bisect: GT's deferred worldgen queue,
-        // its (vestigial) processed-chunk set, and the re-entrancy flag on the registered generator instance.
-        // GT 5.09.54.x deleted mList and ProcChunks along with the deferred-worldgen queue they served, so both are
-        // optional; on 2.7.4-2.8.4 they still exist and a non-empty mList at teardown is still a contamination signal.
+        // for the cross-seed ore-TE bisect, reset GregTech's deferred worldgen queue (mList), processed-chunk set
+        // (ProcChunks) and the re-entrancy flag on the registered generator. GT 5.09.54.x deleted mList and ProcChunks,
+        // so both are optional. On 2.8.4 both exist, and a non-empty mList at teardown is a contamination signal.
         clearOptionalStaticCollection(gt, "mList", "queued containers");
         clearOptionalStaticCollection(gt, "ProcChunks", "processed chunks");
         final Object gtGen = findRegisteredGenerator("GTWorldgenerator");
@@ -1310,11 +1312,16 @@ public class WorldgenProbe {
                 g);
         }
         staticSweepJars();
-        // RWG noise-impl saved data is bound to the first world's mapStorage.
-        final java.lang.reflect.Field rwgInst = Class.forName("rwg.world.RwgWorldSavedData")
-            .getDeclaredField("INSTANCE");
-        rwgInst.setAccessible(true);
-        rwgInst.set(null, null);
+        // RWG noise-impl saved data is bound to the first world's mapStorage. RWG2 has a copy of the class, and 2.9.0
+        // loads both mods.
+        for (final String savedData : new String[] { "rwg.world.RwgWorldSavedData", "rwg2.world.RwgWorldSavedData" }) {
+            final Class<?> savedDataClass = findClass(savedData);
+            if (savedDataClass == null) continue;
+            final Field rwgInst = savedDataClass.getDeclaredField("INSTANCE");
+            rwgInst.setAccessible(true);
+            final Object staticFieldOwner = null; // a static field has no owning instance
+            rwgInst.set(staticFieldOwner, null);
+        }
         // Fix jar virgin-terrain cache: self-invalidates on world identity change, but pins the old world until then.
         // Two package names: the current one, and the pre-rename one that jars up to 0.4 shipped (commit 1340ae3).
         final Class<?> oracle = findClass(
@@ -1887,6 +1894,10 @@ public class WorldgenProbe {
         }
     }
 
+    /**
+     * Generate the walk around the probe centre in {@code order}, out to {@code radius} chunks, then write the chunk
+     * hashes and the requested reports to {@code out}.
+     */
     private void runProbe(WorldServer world, String order, int radius, String out) throws Exception {
         // Full-gen runs need the raise too: the prefilter path gets it via OreVeinTableDump.dumpOnce,
         // but a dim-7 ground-truth walk goes through here.
@@ -2093,7 +2104,7 @@ public class WorldgenProbe {
             dumpGtMaterialsOnce(new File(out).getParentFile());
             // Same sidecar contract as gtmats.json: seed-independent, written once, read back by the Python
             // side. Corpora need it so a biome id resolves to rain/humidity without hardcoding a pack's table.
-            BiomeTable.dumpOnce(new File(out).getParentFile(), world.getWorldChunkManager());
+            BiomeTable.dumpOnce(new File(out).getParentFile(), world);
         }
         final StringBuilder tedetail = new StringBuilder();
         if (Boolean.getBoolean("probe.tedetail")) {

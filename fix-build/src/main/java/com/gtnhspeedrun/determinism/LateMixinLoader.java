@@ -19,11 +19,12 @@ public class LateMixinLoader implements ILateMixinLoader {
     private static final Logger LOG = LogManager.getLogger(GtnhDeterminism.MODID);
 
     /**
-     * F4 has three implementations because GregTech rewrote the probe it corrects twice. Up to 5.09.52.30 (packs
-     * 2.7.4 through 2.8.4) the vein reroll asks {@code Block.isReplaceableOreGen}; 5.09.52.31 replaced that with
-     * {@code StoneType.findStoneType}; 5.09.54.02 split {@code executeWorldgenChunkified} into overloads, which
-     * changed the method selector needed to reach it. Pick by which shape is actually installed — see
-     * {@link GtOreShape}, including why a version-string comparison cannot work here.
+     * F4 has two implementations because GregTech rewrote the probe that F4 corrects twice, and only the first and last
+     * shapes ship in a supported pack. Up to 5.09.52.30 (pack 2.8.4) the vein reroll calls
+     * {@code Block.isReplaceableOreGen}. In 5.09.52.31 GregTech replaced that call with
+     * {@code StoneType.findStoneType}, and in 5.09.54.02 split {@code executeWorldgenChunkified} into overloads, so the
+     * method selector changed. Pick by the installed shape. {@link GtOreShape} explains why a version-string comparison
+     * cannot work.
      *
      * <p>
      * Getting this wrong has failed in both directions. It was silent first: the legacy mixin was
@@ -35,28 +36,28 @@ public class LateMixinLoader implements ILateMixinLoader {
      * @return the mixin to apply, or null when no shape matched.
      */
     private static String gtOreMixin() {
-        switch (GtOreShape.SHAPE) {
-            case VEIN_PLACEMENT:
+        return switch (GtOreShape.SHAPE) {
+            case VEIN_PLACEMENT -> {
                 LOG.info("GT ore-vein probe: VeinPlacement shape (GT 5.09.54.02+), F4 + native F4d");
-                return "worldgen.WorldgenGTOreLayerStoneTypeMixin";
-            case FIND_STONE_TYPE:
-                LOG.info(
-                    "GT ore-vein probe: findStoneType shape (GT 5.09.52.31-5.09.54.01), F4 + backported F4d; "
-                        + "stone-type lookup is {}",
-                    GtOreShape.FIND_STONE_TYPE_UNGATED ? "UNGATED (<= 5.09.53.10)" : "gated (>= 5.09.53.11)");
-                return "worldgen.WorldgenGTOreLayerFindStoneTypeMixin";
-            case REPLACEABLE_ORE_GEN:
+                yield "worldgen.WorldgenGTOreLayerStoneTypeMixin";
+            }
+            case REPLACEABLE_ORE_GEN -> {
                 LOG.info("GT ore-vein probe: isReplaceableOreGen shape (GT <= 5.09.52.30), F4 only");
-                return "worldgen.WorldgenGTOreLayerMixin";
-            default:
-                // Refusing is the only safe answer. Offering a mixin that cannot bind crashes the game, and
-                // offering one that binds partially silently reroutes ore veins.
+                yield "worldgen.WorldgenGTOreLayerMixin";
+            }
+            case UNSUPPORTED_FIND_STONE_TYPE -> {
                 LOG.warn(
-                    "GT ore-vein probe: UNRECOGNISED GregTech, no F4 ore-vein fix applied — ore veins will be "
-                        + "route-dependent on this pack. Please report this line: {}",
+                    "gtOreProbe.unsupported shape=findStoneType band=5.09.52.31-5.09.54.01 f4=off gregtech={}",
                     GtOreShape.installedGregTech());
-                return null;
-        }
+                yield null;
+            }
+            case UNKNOWN -> {
+                // a mixin that cannot bind crashes the game, and one that binds partially reroutes ore veins silently.
+                // Refuse
+                LOG.warn("gtOreProbe.unrecognised f4=off gregtech={}", GtOreShape.installedGregTech());
+                yield null;
+            }
+        };
     }
 
     @Override
@@ -64,6 +65,7 @@ public class LateMixinLoader implements ILateMixinLoader {
         return "mixins.gtnhdeterminism.late.json";
     }
 
+    /** Offer each mixin only when the mod the mixin targets is loaded, and F4 only for the installed GT shape. */
     @Override
     public List<String> getMixins(Set<String> loadedMods) {
         final List<String> mixins = new ArrayList<>();
@@ -99,18 +101,6 @@ public class LateMixinLoader implements ILateMixinLoader {
             if (GtOreShape.hasNativeDryRun()) {
                 mixins.add("worldgen.GTWorldGenContainerOrePinMixin");
                 mixins.add("worldgen.OreManagerVirginDryRunMixin");
-            } else if (GtOreShape.SHAPE == GtOreShape.Shape.FIND_STONE_TYPE) {
-                // No native dry run on this band: one fused call resolves the geometry, tests acceptance AND
-                // writes the ore. These reconstruct the split GregTech performed in 5.09.54 so the accept/reject
-                // decision can be pinned to the oreseed without relocating the write.
-                mixins.add("worldgen.OreManagerDryRunSuppressMixin");
-                mixins.add("worldgen.GTWorldGenContainerDryRunMixin");
-                // setOreForWorldGen's terrain read was respelled at 5.09.53.11, mid-band, so the virgin-read
-                // redirect needs two descriptors. They are separate classes rather than two require = 0
-                // injectors in one, so that whichever is offered must bind or bring the game down.
-                mixins.add(
-                    GtOreShape.FIND_STONE_TYPE_UNGATED ? "worldgen.OreManagerVirginStoneB1Mixin"
-                        : "worldgen.OreManagerVirginStoneB2Mixin");
             }
         }
         if (loadedMods.contains("BiomesOPlenty")) {
@@ -128,7 +118,17 @@ public class LateMixinLoader implements ILateMixinLoader {
         if (loadedMods.contains("RWG")) {
             mixins.add("worldgen.RwgDecoForkMixin");
             mixins.add("worldgen.RwgDungeonAttemptMixin");
+            mixins.add("worldgen.RwgPopulateReseedMixin");
+            mixins.add("worldgen.RwgWorldSavedDataMixin");
             mixins.add("worldgen.DecoBigTreeCtorMixin");
+        }
+        if (loadedMods.contains("rwg2")) {
+            mixins.add("worldgen.Rwg2DecoForkMixin");
+            mixins.add("worldgen.Rwg2DungeonAttemptMixin");
+            mixins.add("worldgen.Rwg2PopulateReseedMixin");
+            mixins.add("worldgen.Rwg2WorldSavedDataMixin");
+            if (loadedMods.contains("witchery")) mixins.add("worldgen.Rwg2WitcheryFoundationMixin");
+            mixins.add("worldgen.Rwg2DecoBigTreeCtorMixin");
         }
         if (loadedMods.contains("appliedenergistics2")) {
             // Not flag-gated: this is a fix, not a diagnostic. Meteorite existence is otherwise

@@ -140,12 +140,12 @@ def deploy_jars(server, jars):
         log(f"  deployed {jar.name}")
 
 
-def write_server_properties(server, seed, port):
+def write_server_properties(server, seed, port, level_type):
     (server / "server.properties").write_text(
         "allow-nether=true\n"
         "level-name=World\n"
         f"level-seed={seed}\n"
-        "level-type=rwg\n"
+        f"level-type={level_type}\n"
         "online-mode=false\n"
         "snooper-enabled=false\n"
         "max-tick-time=-1\n"
@@ -359,7 +359,7 @@ def probe_dimension(server, java, seed, dim, radius, scratch, trace=True):
     return {"search": out, "log": logfile, "region": dst_region, "dir": captured}
 
 
-def run_prefilter(server, java, seed, radius, scratch):
+def run_prefilter(server, java, seed, radius, scratch, level_type):
     """Stage-0 sweep: the POI layer, and the spawn point everything else is measured from."""
     out = scratch / "prefilter.jsonl"
     logfile = scratch / "prefilter.log"
@@ -387,6 +387,8 @@ def run_prefilter(server, java, seed, radius, scratch):
         "probe.prefilter.stronghold": str(radius * 2),
         "probe.prefilter.witchery": str(radius * 2),
         "probe.prefilter.chunkcache": "2048",
+        # The prefilter builds its own worlds rather than reading server.properties
+        "probe.worldtype": level_type,
     }
     log("  stage-0 prefilter (POIs, spawn)")
     shutil.rmtree(server / "World", ignore_errors=True)
@@ -513,6 +515,8 @@ def main():
     ap.add_argument("--dims", default="0,7,-1")
     ap.add_argument("--seedlib", help="gtnh-seedlib checkout (default: sibling of this repo)")
     ap.add_argument("--pack", help="pack version recorded in meta.json (default: read from the server stamp)")
+    ap.add_argument("--level-type", default="RWG",
+                    help="world type of the world being mapped: RWG, RWG2 or RWG2_CONTINENTS (default RWG)")
     ap.add_argument("--probe-jar", type=Path, help="worldgenprobe jar to deploy")
     ap.add_argument("--fix-jar", type=Path, help="gtnhdeterminism jar to deploy")
     ap.add_argument("--amidst", type=Path, help="AmidstGTNH biome/default.json, for real biome colours")
@@ -546,16 +550,16 @@ def main():
     scratch.mkdir(parents=True, exist_ok=True)
     bundle = (args.out / str(args.seed)).resolve()
 
-    log(f"seed {args.seed}  pack {pack}  radius {args.radius}  dims {dims}")
+    log(f"seed {args.seed}  pack {pack}  world type {args.level_type}  radius {args.radius}  dims {dims}")
     jars = [j for j in (args.probe_jar, args.fix_jar) if j]
     if jars:
         deploy_jars(server, jars)
     port = free_port(args.port)
     if port != args.port:
         log(f"  port {args.port} is busy; using {port}")
-    write_server_properties(server, args.seed, port)
+    write_server_properties(server, args.seed, port, args.level_type)
 
-    pre = run_prefilter(server, args.java, args.seed, args.radius, scratch)
+    pre = run_prefilter(server, args.java, args.seed, args.radius, scratch, args.level_type)
     results = {d: probe_dimension(server, args.java, args.seed, d, args.radius, scratch) for d in dims}
 
     log("  deriving vein and loot tables")
@@ -646,6 +650,13 @@ def main():
             cmd += [f"--veins-{flag}", vein_csvs[dim]]
     bake_output = run_py(builder, *cmd, cwd=seedlib)
     log(bake_output.rstrip())
+    # build_world_bundle.py does not know the world type, and routemap.py reuses a bundle only for
+    # the same pack and world type
+    meta_path = bundle / "meta.json"
+    if meta_path.is_file():
+        meta = json.loads(meta_path.read_text())
+        meta["level_type"] = args.level_type
+        meta_path.write_text(json.dumps(meta, separators=(",", ":")))
 
     problems = summarise(bundle, dims, args.radius, bake_output)
     if not args.keep_scratch:

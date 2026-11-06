@@ -26,15 +26,14 @@ import com.gtnhspeedrun.determinism.worldgen.TerrainOracle;
  * designed, but the answer is a pure function of the seed — population-order noise can no longer flip vein
  * identity, and any chunk of the vein region computes the same cached result.
  *
- * Targets GT up to and including 5.09.52.30 (packs 2.7.4 through 2.8.4). All isReplaceableOreGen calls inside
- * executeWorldgenChunkified are the probe — ore placement itself uses other paths. (GTNH speedrun determinism
- * audit, finding F4.)
+ * Targets GT up to and including 5.09.52.30 (pack 2.8.4). Every {@code isReplaceableOreGen} call in
+ * {@code executeWorldgenChunkified} is the probe. Ore placement uses other calls. Audit item F4.
  *
  * <p>
- * 5.09.52.31 deleted isReplaceableOreGen and moved the probe to StoneType.findStoneType; see
- * {@link WorldgenGTOreLayerFindStoneTypeMixin}, and {@link WorldgenGTOreLayerStoneTypeMixin} for the further
- * rewrite at 5.09.54.02. LateMixinLoader selects between the three by probing bytecode, never a version string —
- * the boundary interleaves by tag number, see {@link com.gtnhspeedrun.determinism.GtOreShape}.
+ * In 5.09.52.31 GregTech deleted {@code isReplaceableOreGen} and moved the probe to {@code StoneType.findStoneType}.
+ * {@link WorldgenGTOreLayerStoneTypeMixin} is the mixin for the rewrite at 5.09.54.02. {@code LateMixinLoader} selects
+ * between the two by probing bytecode, never by version string. {@code GtOreShape} explains why: the boundary
+ * interleaves by tag number.
  *
  * <p>
  * {@code require = 10} is the exact number of probe call sites, two five-call short-circuit chains, verified on
@@ -43,10 +42,8 @@ import com.gtnhspeedrun.determinism.worldgen.TerrainOracle;
  * mixin was {@code require = 0} until 0.14.0, so a misselection bound nothing at all and said nothing.
  *
  * <p>
- * <b>Scope: {@link GtOrePin#appliesTo(World)}.</b> Until 0.14.0 this handler carried no gate: it rewrote the
- * probe in EVERY dimension at EVERY flag setting, and {@code -Dgtnhdet.orepin=false} did not restore stock, so a
- * stock arm was unbuildable on 2.7.4/2.8.4. That is the same defect the 2026-09-07 correction fixed for
- * {@link WorldgenGTOreLayerStoneTypeMixin}; it survived here only because no measurement run used this band.
+ * <b>Scope: {@link GtOrePin#appliesTo(World)}.</b> The handler answers from virgin terrain only where the pin applies,
+ * so {@code -Dgtnhdet.orepin=false} restores stock.
  *
  * <p>
  * NOT covered: {@code setOreBlock}'s per-block live-world read still decides WHERE ore lands, and the

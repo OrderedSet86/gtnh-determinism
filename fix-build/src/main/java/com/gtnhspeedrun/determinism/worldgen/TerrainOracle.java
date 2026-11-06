@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import net.minecraft.block.Block;
+import net.minecraft.block.material.Material;
 import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
@@ -70,5 +71,25 @@ public final class TerrainOracle {
         if (y < 0 || y > 255) return 0;
         if (!(world instanceof WorldServer)) return world.getBlockMetadata(x, y, z);
         return virginChunk(world, x >> 4, z >> 4).getBlockMetadata(x & 15, y, z & 15);
+    }
+
+    /**
+     * {@code World.getTopSolidOrLiquidBlock} on the virgin chunk: one above the highest block that blocks movement and
+     * is neither leaves nor foliage, or -1 for an empty column.
+     */
+    public static int getTopSolidOrLiquidBlock(World world, int x, int z) {
+        if (!(world instanceof WorldServer)) return world.getTopSolidOrLiquidBlock(x, z);
+        final Chunk chunk = virginChunk(world, x >> 4, z >> 4);
+        final int localX = x & 15, localZ = z & 15;
+        for (int y = chunk.getTopFilledSegment() + 15; y > 0; y--) {
+            final Block block = chunk.getBlock(localX, y, localZ);
+            // vanilla passes the chunk-local x and z to isFoliage. Pass the same
+            if (block.getMaterial()
+                .blocksMovement() && block.getMaterial() != Material.leaves
+                && !block.isFoliage(world, localX, y, localZ)) {
+                return y + 1;
+            }
+        }
+        return -1;
     }
 }

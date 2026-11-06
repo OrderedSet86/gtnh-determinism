@@ -1,7 +1,6 @@
 # GTNH Worldgen Determinism
 
-Source of the `gtnhdeterminism` jar. Minecraft 1.7.10, for GT: New Horizons 2.7.4 through the
-current daily build.
+Source of the `gtnhdeterminism` jar. Minecraft 1.7.10, for GT: New Horizons 2.8.4 and 2.9.0.
 
 The jar makes world generation a pure function of the world seed: the same seed produces the same world on every
 launch, and by every approach route. The repo root README lists all 32 fixes, the evidence behind them, and the

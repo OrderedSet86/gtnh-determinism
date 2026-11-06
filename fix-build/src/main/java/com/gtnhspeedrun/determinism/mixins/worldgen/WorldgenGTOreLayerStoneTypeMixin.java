@@ -36,12 +36,9 @@ import gregtech.api.objects.XSTR;
  * from stock in exactly the dimension-restricted cases the gate exists for.
  *
  * <p>
- * Applied only when {@code WorldgenGTOreLayer} names {@code resolveVeinPlacement}, i.e. GT 5.09.54.02 and later;
- * see {@link com.gtnhspeedrun.determinism.GtOreShape}. Until 0.14.0 the gate was
- * {@code hasClass("gregtech.api.enums.StoneType")}, on the belief that the class did not exist before 5.09.54.x.
- * It exists from 5.09.52.31, so every pack in the 5.09.52.31 .. 5.09.54.01 band — including GTNH 2.9.0-beta-1 —
- * was handed this mixin, whose descriptor matches nothing there, and crashed at init. That band now gets
- * {@link WorldgenGTOreLayerFindStoneTypeMixin}.
+ * Applied only when {@code WorldgenGTOreLayer} names {@code resolveVeinPlacement}, that is, GT 5.09.54.02 and later.
+ * See {@code GtOreShape}. {@code StoneType} exists from 5.09.52.31, so a check for that class would also offer this
+ * mixin to 5.09.52.31 to 5.09.54.01. There the descriptor matches nothing and the game crashes at init.
  *
  * <p>
  * <b>Scope: {@link GtOrePin#appliesTo(World)}</b> — the same dimension whitelist and the same

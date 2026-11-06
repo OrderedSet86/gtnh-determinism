@@ -68,6 +68,11 @@ public final class EscBench {
         WorldgenProbe.LOG.info("[escbench] armed, writing {}", path);
     }
 
+    /**
+     * Step the benchmark once per client tick: create the {@code escbench} world with the {@code probe.worldtype} world
+     * type, install the tracer on {@code world.rand}, wait {@link #SETTLE_TICKS}, then pause and unpause
+     * {@link #CYCLES} times.
+     */
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent e) {
         if (e.phase != TickEvent.Phase.END || finished) return;
@@ -88,7 +93,7 @@ public final class EscBench {
                             .getName());
             }
             if (clientTicks > 300 && mc.theWorld == null) {
-                WorldType wt = WorldType.parseWorldType("rwg");
+                WorldType wt = WorldType.parseWorldType(System.getProperty("probe.worldtype", "rwg"));
                 if (wt == null) wt = WorldType.DEFAULT;
                 final WorldSettings ws = new WorldSettings(
                     4242L,

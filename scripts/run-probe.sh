@@ -19,6 +19,8 @@
 # Every run stamps World/.probe-provenance.json with the seed, order, jar md5s and any config
 # override, and the diff tools print it. That is how a confounded A/B announces itself.
 set -euo pipefail
+# shellcheck source=level-type.sh
+source "$(dirname "${BASH_SOURCE[0]}")/level-type.sh"
 
 SERVER_DIR=$1
 SEED=$2
@@ -90,11 +92,12 @@ done
 rm -rf World world
 # server.properties: force seed, offline, no spawn protection surprises
 if [ ! -f server.properties.bak ] && [ -f server.properties ]; then cp server.properties server.properties.bak; fi
+LEVEL_TYPE_RESOLVED=$(level_type)
 cat > server.properties <<EOF
 allow-nether=true
 level-name=World
 level-seed=$SEED
-level-type=rwg
+level-type=$LEVEL_TYPE_RESOLVED
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1
@@ -143,7 +146,7 @@ done
 # printed by the diff tools without anyone having to remember it exists.
 if [ -d World ]; then
   PROV=(--server-dir . --param "seed=$SEED" --param "order=$ORDER" --param "radius=$RADIUS"
-        --param "level_type=rwg")
+        --param "level_type=$LEVEL_TYPE_RESOLVED")
   if [ -n "${PROBE_CX:-}" ]; then PROV+=(--param "cx=$PROBE_CX"); fi
   if [ -n "${PROBE_CZ:-}" ]; then PROV+=(--param "cz=$PROBE_CZ"); fi
   if [ -n "${PROBE_DIM:-}" ]; then PROV+=(--param "dim=$PROBE_DIM"); fi

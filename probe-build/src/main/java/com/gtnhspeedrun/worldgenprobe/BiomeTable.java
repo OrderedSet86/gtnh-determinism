@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import net.minecraft.world.World;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.biome.WorldChunkManager;
 import net.minecraftforge.common.BiomeDictionary;
@@ -39,10 +40,15 @@ import cpw.mods.fml.common.ModContainer;
  * in the sidecar instead of silently changing what a sweep means.
  *
  * <p>
- * {@code rwgBuckets} and {@code rwgRivers} are read off the live chunk manager because source reading gives the
- * wrong answer. {@code rwg.support.Support.addBiome} is a {@code switch} with no {@code break} statements, so a
- * biome declared in one climate category falls through into every later one, and the categories a mod declares
- * are not the categories RWG ends up searching.
+ * The live chunk manager is the source of {@code rwgBuckets} and {@code rwgRivers}. Up to RWG alpha-1.5.2,
+ * {@code rwg.support.Support.addBiome} is a {@code switch} with no {@code break} statements, so a biome is put in the
+ * climate category that the biome's mod names and in every later category. In alpha-1.5.3, new worlds get the fixed
+ * lists and existing worlds keep the fall-through lists. The choice is saved per world, and is written to the sidecar
+ * as {@code rwgBiomeListVersion}.
+ *
+ * <p>
+ * Biome ids can exceed 255: RWG2's biomes are at 300 to 329, with EndlessIDs. The classification arrays are sized to
+ * {@link BiomeGenBase#getBiomeGenArray()}.
  */
 final class BiomeTable {
 
@@ -51,7 +57,7 @@ final class BiomeTable {
 
     private static boolean dumped;
 
-    /** Per-biome-id classification, resolved once per JVM. Indexed by biome id; ids are bytes in chunk data. */
+    /** Per-biome-id classification, resolved once per JVM. Indexed by biome id. */
     private static boolean[] noRainById;
     private static int[] humById;
 
@@ -68,8 +74,9 @@ final class BiomeTable {
      */
     private static synchronized void ensureClassification() {
         if (noRainById != null) return;
-        final boolean[] noRain = new boolean[256];
-        final int[] hum = new int[256];
+        final BiomeGenBase[] biomes = BiomeGenBase.getBiomeGenArray();
+        final boolean[] noRain = new boolean[biomes.length];
+        final int[] hum = new int[biomes.length];
         java.util.Arrays.fill(hum, -1);
         final Humidity h = Humidity.resolve();
         Field rainField = null;
@@ -78,8 +85,8 @@ final class BiomeTable {
         } catch (Exception e) {
             WorldgenProbe.LOG.warn("[biometable] enableRain unreadable, no biome will count as no-rain: {}", e);
         }
-        for (final BiomeGenBase b : BiomeGenBase.getBiomeGenArray()) {
-            if (b == null || b.biomeID < 0 || b.biomeID > 255) continue;
+        for (final BiomeGenBase b : biomes) {
+            if (b == null || b.biomeID < 0 || b.biomeID >= biomes.length) continue;
             if (rainField != null) {
                 try {
                     noRain[b.biomeID] = !rainField.getBoolean(b);
@@ -95,23 +102,24 @@ final class BiomeTable {
     /** True when this biome has enableRain == false. Unknown ids answer false. */
     static boolean noRain(int biomeId) {
         ensureClassification();
-        return biomeId >= 0 && biomeId < 256 && noRainById[biomeId];
+        return biomeId >= 0 && biomeId < noRainById.length && noRainById[biomeId];
     }
 
     /** Crop humidity bonus for this biome, or -1 when no humidity mechanic could be resolved. */
     static int humidity(int biomeId) {
         ensureClassification();
-        return biomeId >= 0 && biomeId < 256 ? humById[biomeId] : -1;
+        return biomeId >= 0 && biomeId < humById.length ? humById[biomeId] : -1;
     }
 
     /**
      * Write {@code biomes.json} into {@code dir}, once per process. Never throws: the sidecar is diagnostic, and
      * failing to write it must not take down a sweep that is otherwise producing valid rows.
      *
-     * @param cm the live chunk manager, used only for the reachability section; may be null
+     * @param world the live world. The world's chunk manager is used only for the reachability section
      */
-    static synchronized void dumpOnce(File dir, WorldChunkManager cm) {
+    public static synchronized void dumpOnce(File dir, World world) {
         if (dumped || dir == null) return;
+        final WorldChunkManager cm = world.getWorldChunkManager();
         dumped = true;
         try {
             final File out = new File(dir, "biomes.json");
@@ -119,7 +127,16 @@ final class BiomeTable {
             final StringBuilder sb = new StringBuilder(65536);
             sb.append("{\"format\": 1");
             sb.append(", \"mods\": ")
-                .append(modVersions("cropsnh", "berriespp", "IC2", "BiomesOPlenty", "RWG"));
+                .append(modVersions("cropsnh", "berriespp", "IC2", "BiomesOPlenty", "RWG", "rwg2"));
+            sb.append(", \"worldType\": \"")
+                .append(
+                    WorldgenProbe.jsonEscape(
+                        world.getWorldInfo()
+                            .getTerrainType()
+                            .getWorldTypeName()))
+                .append('"');
+            sb.append(", \"rwgBiomeListVersion\": ")
+                .append(rwgBiomeListVersion(world));
             sb.append(", \"humiditySource\": \"")
                 .append(WorldgenProbe.jsonEscape(hum.describe()))
                 .append('"');
@@ -351,6 +368,35 @@ final class BiomeTable {
         }
         return sb.append('}')
             .toString();
+    }
+
+    /**
+     * The biome-list version saved for this world by RWG alpha-1.5.3: 1 for the fall-through lists, 2 for the fixed
+     * ones. {@code null} when RWG has no such setting, as on alpha-1.5.0, and on worlds of another type.
+     */
+    private static String rwgBiomeListVersion(World world) {
+        // RWG2 saves data under the same "rwg_data" name, so RWG's getter throws ClassCastException on an RWG2 world
+        if (!"rwg.world.ChunkManagerRealistic".equals(
+            world.getWorldChunkManager()
+                .getClass()
+                .getName())) {
+            return "null";
+        }
+        try {
+            final Object version = Class.forName("rwg.world.RwgWorldSavedData")
+                .getMethod("getBiomeListVersion", World.class)
+                .invoke(null, world);
+            return String.valueOf(version);
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            return "null";
+        } catch (ReflectiveOperationException e) {
+            WorldgenProbe.LOG.warn(
+                "[biometable] RwgWorldSavedData.getBiomeListVersion failed: {}",
+                e.getCause() == null ? e.toString()
+                    : e.getCause()
+                        .toString());
+            return "null";
+        }
     }
 
     private static List<?> bucketEntries(WorldChunkManager cm, String bucket) {

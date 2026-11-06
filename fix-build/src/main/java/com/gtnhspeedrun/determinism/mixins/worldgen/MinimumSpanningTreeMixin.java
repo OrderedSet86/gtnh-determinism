@@ -1,8 +1,6 @@
 package com.gtnhspeedrun.determinism.mixins.worldgen;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
@@ -41,24 +39,23 @@ public abstract class MinimumSpanningTreeMixin {
     @Shadow(remap = false)
     Set<Edge> mstEdges;
 
+    /** Rebuild {@code mstEdges} sorted by edge length, then by start point, then by end point. */
     @Inject(
         method = "<init>(Ljava/util/Random;IILgreymerk/roguelike/worldgen/Coord;)V",
         at = @At("RETURN"),
         remap = false)
     private void gtnhdet$pinEdgeOrder(Random rand, int size, int edgeLength, Coord origin, CallbackInfo ci) {
         final List<Edge> sorted = new ArrayList<>(this.mstEdges);
-        Collections.sort(sorted, new Comparator<Edge>() {
-
-            @Override
-            public int compare(Edge a, Edge b) {
-                final int byLength = a.compareTo(b);
-                if (byLength != 0) return byLength;
-                final Point[] pa = a.getPoints();
-                final Point[] pb = b.getPoints();
-                final int byStart = gtnhdet$compareCoord(pa[0].getPosition(), pb[0].getPosition());
-                if (byStart != 0) return byStart;
-                return gtnhdet$compareCoord(pa[1].getPosition(), pb[1].getPosition());
-            }
+        // at compatibility level JAVA_8, a mixin class with a nested class fails to apply, and the failure is only an
+        // ERROR line in the log. Sort with a lambda. A lambda compiles to a method of this class.
+        sorted.sort((a, b) -> {
+            final int byLength = a.compareTo(b);
+            if (byLength != 0) return byLength;
+            final Point[] pa = a.getPoints();
+            final Point[] pb = b.getPoints();
+            final int byStart = gtnhdet$compareCoord(pa[0].getPosition(), pb[0].getPosition());
+            if (byStart != 0) return byStart;
+            return gtnhdet$compareCoord(pa[1].getPosition(), pb[1].getPosition());
         });
         this.mstEdges = new LinkedHashSet<>(sorted);
     }

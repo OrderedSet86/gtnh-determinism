@@ -19,30 +19,31 @@ import rwg.deco.trees.DecoBigTree;
  * Explicit-size call sites (DecoBigTree(int, int)) pass size >= 0 and keep their value.
  *
  * <p>
- * These are the only injectors left at {@code require = 0}. Every other soft injector was tightened to
- * {@code require = 1} once its target was confirmed byte-identical from the 2.7.4-era version through the daily
- * one, but RWG is the exception: packs up to 2.8.4 ship alpha-1.5.0 and 2.9 onwards ship alpha-1.5.2, and the
- * alpha-1.5.0 artifact is purged from the GTNH maven, so the two cannot be diffed. Crashing every 2.7.4 user over
- * an unverifiable assumption is worse than losing tree-size determinism, so this one stays soft.
+ * Both injectors are {@code require = 1}. The shipped alpha-1.5.0 (2.8.4) and alpha-1.5.3 (2.9.0) jars both have one
+ * {@code Math.random()} call in {@code <init>()V} and one {@code size} read in {@code func_76484_a}, checked with
+ * javap. The redirect must bind in pairs: the constructor redirect alone leaves {@code size} at -1, and
+ * {@code validTreeLocation()} then rejects every tree. {@link Rwg2DecoBigTreeCtorMixin} covers the RWG2 copy of the
+ * class.
  */
 @Mixin(value = DecoBigTree.class, remap = false)
 public class DecoBigTreeCtorMixin {
 
     @Shadow
-    int size;
+    private int size;
     @Shadow
-    Random rand;
+    private Random rand;
 
-    @Redirect(method = "<init>()V", at = @At(value = "INVOKE", target = "Ljava/lang/Math;random()D"), require = 0)
-    private static double gtnhdet$sentinelRoll() {
-        return -7.5 / 7.0; // 7 + floor(this * 7) == -1, the fork build's "roll in generate()" sentinel
+    @Redirect(method = "<init>()V", at = @At(value = "INVOKE", target = "Ljava/lang/Math;random()D"), require = 1)
+    private static double gtnhdet$sentinelRoll() { // noqa: NAR130
+        return -7.5 / 7.0; // 7 + floor(this * 7) == -1, the sentinel that gtnhdet$resolveSize replaces
     }
 
+    // func_76484_a is the only name in the shipped jars. With remap = false the refmap has no entry, so list both names
     @Redirect(
-        method = "generate",
+        method = { "func_76484_a", "generate" },
         at = @At(value = "FIELD", target = "Lrwg/deco/trees/DecoBigTree;size:I", opcode = Opcodes.GETFIELD),
-        require = 0)
-    private int gtnhdet$resolveSize(DecoBigTree self) {
+        require = 1)
+    private int gtnhdet$resolveSize(DecoBigTree self) { // noqa: NAR130
         return this.size >= 0 ? this.size : 7 + this.rand.nextInt(7);
     }
 }

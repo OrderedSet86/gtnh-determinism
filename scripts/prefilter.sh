@@ -36,6 +36,8 @@
 #
 # The probe jar must already be deployed: scripts/build-probe.sh --deploy <server-dir>.
 set -euo pipefail
+# shellcheck source=level-type.sh
+source "$(dirname "${BASH_SOURCE[0]}")/level-type.sh"
 
 [ $# -eq 2 ] || { sed -n '2,20p' "$0" >&2; exit 1; }
 SEEDSPEC=$1
@@ -95,11 +97,12 @@ exec 9>".prefilter.lock"
 flock -w 600 9 || { echo "prefilter server dir locked; aborting" >&2; exit 1; }
 
 rm -rf World world
+LEVEL_TYPE_RESOLVED=$(level_type)
 cat > server.properties <<EOF
 allow-nether=true
 level-name=World
 level-seed=1
-level-type=rwg
+level-type=$LEVEL_TYPE_RESOLVED
 online-mode=false
 snooper-enabled=false
 max-tick-time=-1
@@ -159,6 +162,7 @@ GATES=""
   -Dprobe.prefilter.radius="$RADIUS" \
   -Dprobe.prefilter.pieces="$PIECES" \
   -Dprobe.prefilter.terrain="${PREFILTER_TERRAIN:-4}" \
+  -Dprobe.worldtype="$LEVEL_TYPE_RESOLVED" \
   $GATES \
   -Dfml.readTimeout=180 -Dfml.queryResult=confirm \
   ${PROBE_JVMFLAGS:-} \
