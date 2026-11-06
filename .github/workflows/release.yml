@@ -53,9 +53,9 @@ jobs:
 
       - name: Collect artifacts
         run: |
-          # A JvmDowngrader build also writes -downgraded and -predowngrade jars. Both keep the dev (MCP) names and
-          # lack the shaded stubs. 0.15 shipped -downgraded.jar, which sorts before the final jar, and the game
-          # stopped at startup: "@Shadow field boundingBox was not located in the target class"
+          # A JvmDowngrader build also writes -downgraded.jar and -predowngrade.jar. Those jars have the dev (MCP)
+          # names and no shaded stubs, and the game stops at startup on them. -downgraded.jar sorts before the
+          # release jar, so select by name
           releaseJar() {
             local jars
             jars=$(ls "$1"/build/libs/*.jar | grep -v -E -- '-(dev|sources|downgraded|predowngrade)\.jar$' || true)
@@ -76,15 +76,14 @@ jobs:
 
       - name: Check JvmDowngrader stubs
         run: |
-          # Every stub a class calls must be in the jar, relocated under the jar's own prefix
+          # every stub that a class calls must be in the jar, under the jar's package prefix
           checkStubs() {
             local jar=$1 prefix=$2 unrelocated
             if ! unzip -Z1 "$jar" | grep -q "^$prefix/xyz/wagyourtail/jvmdg/"; then
               echo "::error::$jar has no JvmDowngrader stubs under $prefix/"
               return 1
             fi
-            # the classes under META-INF/versions/21 are the Java 21 originals and call no stubs
-            unrelocated=$(unzip -p "$jar" -x 'META-INF/*' | grep -a -o -P '(?<!/)xyz/wagyourtail/jvmdg/j[0-9]+/stub/' | wc -l)
+            unrelocated=$(unzip -p "$jar" | grep -a -o -P '(?<!/)xyz/wagyourtail/jvmdg/j[0-9]+/stub/' | wc -l)
             if [ "$unrelocated" -ne 0 ]; then
               echo "::error::$jar has $unrelocated calls to JvmDowngrader stubs that are not under $prefix/"
               return 1
