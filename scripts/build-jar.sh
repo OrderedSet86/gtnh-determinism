@@ -77,8 +77,11 @@ echo "building $PROJECT ($SUBDIR, clean, no configuration cache, JDK $GRADLE_JDK
 ./gradlew --no-configuration-cache clean spotlessApply build -x test \
   -Dorg.gradle.java.home="$GRADLE_JDK" --console=plain 2>&1 | tail -3
 
-JAR=$(ls -t build/libs/${JAR_PREFIX}-*.jar | grep -v -- '-dev\.jar$' | grep -v -- '-sources\.jar$' | head -1)
+# A JvmDowngrader build also writes -downgraded and -predowngrade jars, which keep the dev (MCP) names and lack the
+# shaded stubs. Same filter as release.yml
+JAR=$(ls build/libs/${JAR_PREFIX}-*.jar | grep -v -E -- '-(dev|sources|downgraded|predowngrade)\.jar$' || true)
 [ -n "$JAR" ] || { echo "no jar produced" >&2; exit 1; }
+[ "$(grep -c . <<< "$JAR")" -eq 1 ] || { echo "more than one release jar in build/libs: $JAR" >&2; exit 1; }
 
 # Verify: every top-level class declared in src/main/java is present in the jar.
 MISSING=0

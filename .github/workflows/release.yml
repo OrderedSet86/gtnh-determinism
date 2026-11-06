@@ -53,14 +53,45 @@ jobs:
 
       - name: Collect artifacts
         run: |
+          # A JvmDowngrader build also writes -downgraded and -predowngrade jars. Both keep the dev (MCP) names and
+          # lack the shaded stubs. 0.15 shipped -downgraded.jar, which sorts before the final jar, and the game
+          # stopped at startup: "@Shadow field boundingBox was not located in the target class"
+          releaseJar() {
+            local jars
+            jars=$(ls "$1"/build/libs/*.jar | grep -v -E -- '-(dev|sources|downgraded|predowngrade)\.jar$' || true)
+            if [ "$(printf '%s' "$jars" | grep -c .)" -ne 1 ]; then
+              echo "::error::expected one release jar in $1/build/libs, found: ${jars:-none}"
+              return 1
+            fi
+            echo "$jars"
+          }
+          fix_jar=$(releaseJar fix-build)
+          qol_jar=$(releaseJar qol-build)
+          probe_jar=$(releaseJar probe-build)
           mkdir -p dist
-          cp $(ls fix-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
-             "dist/gtnhdeterminism-${{ inputs.version }}.jar"
-          cp $(ls qol-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
-             "dist/gtnhspeedrunqol-${{ inputs.version }}.jar"
-          cp $(ls probe-build/build/libs/*.jar | grep -v -- -dev | grep -v -- -sources | head -1) \
-             "dist/worldgenprobe-${{ inputs.version }}.jar"
+          cp "$fix_jar" "dist/gtnhdeterminism-${{ inputs.version }}.jar"
+          cp "$qol_jar" "dist/gtnhspeedrunqol-${{ inputs.version }}.jar"
+          cp "$probe_jar" "dist/worldgenprobe-${{ inputs.version }}.jar"
           ls -la dist/
+
+      - name: Check JvmDowngrader stubs
+        run: |
+          # Every stub a class calls must be in the jar, relocated under the jar's own prefix
+          checkStubs() {
+            local jar=$1 prefix=$2 unrelocated
+            if ! unzip -Z1 "$jar" | grep -q "^$prefix/xyz/wagyourtail/jvmdg/"; then
+              echo "::error::$jar has no JvmDowngrader stubs under $prefix/"
+              return 1
+            fi
+            # the classes under META-INF/versions/21 are the Java 21 originals and call no stubs
+            unrelocated=$(unzip -p "$jar" -x 'META-INF/*' | grep -a -o -P '(?<!/)xyz/wagyourtail/jvmdg/j[0-9]+/stub/' | wc -l)
+            if [ "$unrelocated" -ne 0 ]; then
+              echo "::error::$jar has $unrelocated calls to JvmDowngrader stubs that are not under $prefix/"
+              return 1
+            fi
+          }
+          checkStubs dist/gtnhdeterminism-${{ inputs.version }}.jar gtnhdeterminism
+          checkStubs dist/worldgenprobe-${{ inputs.version }}.jar worldgenprobe
 
       # The route-map generator ships as a zip rather than a jar: it is the Python tool a player
       # runs to build a map of their own seed. The viewer and the bundle builder live in the
