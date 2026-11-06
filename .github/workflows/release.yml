@@ -39,6 +39,14 @@ jobs:
           git config user.email "orderedset86@users.noreply.github.com"
           git tag "v${{ inputs.version }}"
 
+      # Both resource copies are gitignored. Without them, the fix jar does not refill the chests of the Witchery
+      # buildings in the table, and the prefilter in the probe jar skips those chests
+      - name: Copy the shared chest table
+        run: |
+          for d in fix-build probe-build; do
+            cp shared/chest-nohooks.json "$d/src/main/resources/chest-nohooks.json"
+          done
+
       - name: Build fix jar (gtnhdeterminism)
         working-directory: fix-build
         run: ./gradlew build -x test -x spotlessCheck
@@ -74,8 +82,15 @@ jobs:
           cp "$probe_jar" "dist/worldgenprobe-${{ inputs.version }}.jar"
           ls -la dist/
 
-      - name: Check JvmDowngrader stubs
+      - name: Check jar contents
         run: |
+          for jar in dist/gtnhdeterminism-${{ inputs.version }}.jar dist/worldgenprobe-${{ inputs.version }}.jar; do
+            if ! unzip -p "$jar" chest-nohooks.json | cmp -s - shared/chest-nohooks.json; then
+              echo "::error::$jar has no chest-nohooks.json, or a copy that differs from shared/chest-nohooks.json"
+              exit 1
+            fi
+          done
+
           # every stub that a class calls must be in the jar, under the jar's package prefix
           checkStubs() {
             local jar=$1 prefix=$2 unrelocated

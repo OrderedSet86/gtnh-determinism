@@ -35,9 +35,8 @@ seedlib/**/*.tar.gz
 # hand-built scratch tool should not have to remember to come back and add a line.
 *.class
 
-# Build-generated copies of shared/chest-nohooks.json. scripts/build-jar.sh writes one into each jar's
-# resources on every build; the canonical file is shared/chest-nohooks.json. Tracking the copies would
-# let them drift from it in review, which is the exact failure the single-copy arrangement prevents.
+# Build-generated copies of shared/chest-nohooks.json. scripts/build-jar.sh and .github/workflows/release.yml
+# copy the shared file into each jar's resources on every build. Tracked copies could drift from the shared file.
 fix-build/src/main/resources/chest-nohooks.json
 probe-build/src/main/resources/chest-nohooks.json
 
